@@ -1,0 +1,835 @@
+<!-- Page_OrderFile.html : 발주파일 업로드 + 파싱 + 매칭 + DB 저장 (개선 버전) -->
+
+<style>
+  #ob-orderfile-wrap {
+    font-size: 13px;
+  }
+  
+  /* 컨트롤 영역 */
+  .ob-orderfile-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .ob-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .ob-form-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+  
+  #ob-customer-select {
+    min-width: 200px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  
+  #ob-orderfile-input {
+    font-size: 12px;
+  }
+  
+  .ob-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  
+  .ob-btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .ob-btn-primary:hover {
+    background: #2563eb;
+  }
+  
+  .ob-btn-success {
+    background: #10b981;
+    color: white;
+  }
+  
+  .ob-btn-success:hover {
+    background: #059669;
+  }
+  
+  .ob-btn-warning {
+    background: #f59e0b;
+    color: white;
+  }
+  
+  .ob-btn-warning:hover {
+    background: #d97706;
+  }
+  
+  .ob-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* 요약 카드 그리드 */
+  .ob-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .ob-summary-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+  
+  .ob-summary-card-label {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .ob-summary-card-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+  }
+  
+  .ob-summary-card-sub {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+  
+  .ob-summary-card.highlight {
+    background: #fef3c7;
+    border-color: #f59e0b;
+  }
+  
+  .ob-summary-card.success {
+    background: #d1fae5;
+    border-color: #10b981;
+  }
+  
+  /* 필터 버튼 영역 */
+  .ob-filter-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  
+  /* 테이블 */
+  .ob-table-wrapper {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  #ob-orderfile-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  
+  #ob-orderfile-table th,
+  #ob-orderfile-table td {
+    border: 1px solid #e5e7eb;
+    padding: 6px 8px;
+  }
+  
+  #ob-orderfile-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  
+  #ob-orderfile-table td.num {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+  
+  #ob-orderfile-table tr.unmatched {
+    background: #fee2e2;
+  }
+  
+  #ob-orderfile-table tr.matched {
+    background: #dcfce7;
+  }
+  
+  #ob-orderfile-table tr.hidden {
+    display: none;
+  }
+  
+  #ob-orderfile-table tbody tr:hover {
+    background: #f3f4f6;
+  }
+  
+  /* 상태 셀 스타일 */
+  .status-cell {
+    text-align: center;
+    font-size: 14px;
+  }
+  
+  .status-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+  }
+  
+  /* 중복 경고 모달 */
+  .ob-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  
+  .ob-modal-overlay.show {
+    display: flex;
+  }
+  
+  .ob-modal {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .ob-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .ob-modal-icon {
+    font-size: 32px;
+  }
+  
+  .ob-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+  }
+  
+  .ob-modal-body {
+    margin-bottom: 20px;
+    color: #4b5563;
+    line-height: 1.6;
+  }
+  
+  .ob-modal-list {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 12px;
+  }
+  
+  .ob-modal-list-item {
+    padding: 4px 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .ob-modal-list-item:last-child {
+    border-bottom: none;
+  }
+  
+  .ob-modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+</style>
+
+<div id="ob-orderfile-wrap">
+  <!-- 컨트롤 영역 -->
+  <div class="ob-orderfile-controls">
+    <div class="ob-form-group">
+      <label class="ob-form-label" for="ob-customer-select">발주처 선택 *</label>
+      <select id="ob-customer-select">
+        <option value="">-- 발주처를 선택하세요 --</option>
+      </select>
+    </div>
+    
+    <div class="ob-form-group">
+      <label class="ob-form-label" for="ob-orderfile-input">발주 파일</label>
+      <input type="file" id="ob-orderfile-input" accept=".xlsx,.xls,.csv" />
+    </div>
+    
+    <div class="ob-form-group" style="margin-top: 18px;">
+      <button type="button" id="ob-btn-parse" class="ob-btn ob-btn-primary">발주파일 파싱</button>
+    </div>
+    
+    <div class="ob-form-group" style="margin-top: 18px;">
+      <button type="button" id="ob-btn-save" class="ob-btn ob-btn-success" disabled>발주DB 저장</button>
+    </div>
+  </div>
+
+  <!-- 요약 카드 (파싱 후 표시) -->
+  <div id="ob-summary-cards" class="ob-summary-cards" style="display: none;">
+    <div class="ob-summary-card">
+      <div class="ob-summary-card-label">📦 총 상품</div>
+      <div class="ob-summary-card-value" id="summary-total">0개</div>
+    </div>
+    
+    <div class="ob-summary-card" id="summary-match-card">
+      <div class="ob-summary-card-label">✅ 매칭 상태</div>
+      <div class="ob-summary-card-value" id="summary-matched">0개</div>
+      <div class="ob-summary-card-sub" id="summary-unmatched">미매칭 0개</div>
+    </div>
+    
+    <div class="ob-summary-card success">
+      <div class="ob-summary-card-label">💰 총 공급액</div>
+      <div class="ob-summary-card-value" id="summary-amount">₩0</div>
+    </div>
+  </div>
+
+  <!-- 필터 컨트롤 (파싱 후 표시) -->
+  <div id="ob-filter-controls" class="ob-filter-controls" style="display: none;">
+    <button type="button" id="ob-btn-filter-unmatched" class="ob-btn ob-btn-warning">
+      ⚠️ 미매칭만 보기
+    </button>
+    <button type="button" id="ob-btn-filter-all" class="ob-btn" style="display: none;">
+      📋 전체 보기
+    </button>
+  </div>
+
+  <!-- 결과 테이블 -->
+  <div class="ob-table-wrapper">
+    <table id="ob-orderfile-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>브랜드</th>
+          <th>제품명</th>
+          <th>바코드</th>
+          <th>수량</th>
+          <th>공급단가</th>
+          <th>금액</th>
+          <th>상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">
+            파일을 선택하고 파싱 버튼을 클릭하세요
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 중복 발주 경고 모달 -->
+<div id="ob-duplicate-modal" class="ob-modal-overlay">
+  <div class="ob-modal">
+    <div class="ob-modal-header">
+      <div class="ob-modal-icon">⚠️</div>
+      <div class="ob-modal-title">중복 발주 경고</div>
+    </div>
+    <div class="ob-modal-body">
+      <p>오늘 이미 선택한 발주처에 발주 내역이 있습니다:</p>
+      <div id="duplicate-order-list" class="ob-modal-list"></div>
+      <p style="margin-top: 12px;">계속 진행하시겠습니까?</p>
+    </div>
+    <div class="ob-modal-footer">
+      <button type="button" id="ob-btn-duplicate-cancel" class="ob-btn">취소</button>
+      <button type="button" id="ob-btn-duplicate-continue" class="ob-btn ob-btn-success">계속 진행</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.OB = window.OB || {};
+  
+  OB.initOrderFilePage = function() {
+    var wrap = document.getElementById('ob-orderfile-wrap');
+    if (!wrap) {
+      console.warn('OrderFile wrapper not found');
+      return;
+    }
+
+    if (wrap.dataset.bound === '1') {
+      console.log('OrderFile already initialized');
+      return;
+    }
+    wrap.dataset.bound = '1';
+    
+    console.log('✅ OrderFile Page 초기화 완료');
+
+    var parsedItems = [];
+    var currentFilter = 'all'; // 'all' or 'unmatched'
+    
+    var customerSelect = document.getElementById('ob-customer-select');
+    var fileInput = document.getElementById('ob-orderfile-input');
+    var btnParse = document.getElementById('ob-btn-parse');
+    var btnSave = document.getElementById('ob-btn-save');
+    var tableBody = document.querySelector('#ob-orderfile-table tbody');
+    
+    var summaryCards = document.getElementById('ob-summary-cards');
+    var summaryTotal = document.getElementById('summary-total');
+    var summaryMatched = document.getElementById('summary-matched');
+    var summaryUnmatched = document.getElementById('summary-unmatched');
+    var summaryAmount = document.getElementById('summary-amount');
+    var summaryMatchCard = document.getElementById('summary-match-card');
+    
+    var filterControls = document.getElementById('ob-filter-controls');
+    var btnFilterUnmatched = document.getElementById('ob-btn-filter-unmatched');
+    var btnFilterAll = document.getElementById('ob-btn-filter-all');
+    
+    var duplicateModal = document.getElementById('ob-duplicate-modal');
+    var duplicateOrderList = document.getElementById('duplicate-order-list');
+    var btnDuplicateCancel = document.getElementById('ob-btn-duplicate-cancel');
+    var btnDuplicateContinue = document.getElementById('ob-btn-duplicate-continue');
+
+    // 발주처 목록 로드
+    loadCustomers();
+
+    function loadCustomers() {
+      console.log('📄 발주처 목록 로드 중...');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('✅ 발주처 응답:', result);
+          
+          if (result && result.success && result.data && Array.isArray(result.data)) {
+            console.log('📋 발주처 개수:', result.data.length);
+            
+            result.data.forEach(function(customerName) {
+              var option = document.createElement('option');
+              option.value = customerName;
+              option.textContent = customerName;
+              customerSelect.appendChild(option);
+            });
+            
+            console.log('✅ 발주처 드롭다운 채우기 완료');
+          } else {
+            console.warn('⚠️ 발주처 데이터 형식 오류:', result);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ 발주처 목록 로드 실패:', error);
+          alert('발주처 목록을 불러올 수 없습니다: ' + error.message);
+        })
+        .getCustomers();
+    }
+
+    /**
+     * 파싱 버튼 클릭
+     */
+    if (btnParse) {
+      btnParse.addEventListener('click', function() {
+        var file = fileInput.files[0];
+        var selectedCustomer = customerSelect.value;
+        
+        if (!selectedCustomer) {
+          alert('발주처를 먼저 선택해주세요.');
+          return;
+        }
+        
+        if (!file) {
+          alert('파일을 먼저 선택해주세요.');
+          return;
+        }
+
+        console.log('파싱 시작:', file.name, '발주처:', selectedCustomer);
+        OB.showLoading('파일을 읽는 중...');
+
+        var reader = new FileReader();
+        
+        reader.onload = function(e) {
+          try {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, { type: 'array' });
+            
+            var firstSheetName = workbook.SheetNames[0];
+            var worksheet = workbook.Sheets[firstSheetName];
+            
+            var rows = XLSX.utils.sheet_to_json(worksheet, { 
+              header: 1,
+              defval: '',
+              blankrows: false
+            });
+
+            console.log('엑셀 읽기 완료. 행 수:', rows.length);
+            
+            if (rows.length === 0) {
+              OB.hideLoading();
+              alert('파일이 비어있습니다.');
+              return;
+            }
+
+            OB.showLoading('서버에서 매칭 중...');
+            
+            google.script.run
+              .withSuccessHandler(function(result) {
+                OB.hideLoading();
+                console.log('파싱 결과:', result);
+                
+                if (result && result.items) {
+                  parsedItems = result.items.map(function(item) {
+                    item.customer = selectedCustomer;
+                    return item;
+                  });
+                  displayParseResult(result);
+                  btnSave.disabled = false;
+                } else {
+                  alert('파싱 결과가 올바르지 않습니다.');
+                }
+              })
+              .withFailureHandler(function(error) {
+                OB.hideLoading();
+                console.error('파싱 실패:', error);
+                alert('파싱 중 오류 발생: ' + error.message);
+              })
+              .processParsedOrderRows(rows);
+
+          } catch (err) {
+            OB.hideLoading();
+            console.error('파일 읽기 오류:', err);
+            alert('파일을 읽을 수 없습니다: ' + err.message);
+          }
+        };
+
+        reader.onerror = function() {
+          OB.hideLoading();
+          alert('파일 읽기 실패');
+        };
+
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    /**
+     * 저장 버튼 클릭 - 중복 체크 포함
+     */
+    if (btnSave) {
+      btnSave.addEventListener('click', function() {
+        if (!parsedItems || parsedItems.length === 0) {
+          alert('저장할 데이터가 없습니다.');
+          return;
+        }
+
+        var matchedItems = parsedItems.filter(function(item) {
+          return item.matchStatus === 'MATCHED';
+        });
+
+        if (matchedItems.length === 0) {
+          alert('매칭된 항목이 없어 저장할 수 없습니다.');
+          return;
+        }
+
+        // 중복 발주 체크
+        checkDuplicateOrder(customerSelect.value, function(hasDuplicate, duplicates) {
+          if (hasDuplicate) {
+            showDuplicateWarning(duplicates, function(shouldContinue) {
+              if (shouldContinue) {
+                proceedSave(matchedItems);
+              }
+            });
+          } else {
+            proceedSave(matchedItems);
+          }
+        });
+      });
+    }
+
+    /**
+     * 중복 발주 체크
+     */
+    function checkDuplicateOrder(customer, callback) {
+      var today = new Date();
+      var todayStr = today.getFullYear() + '-' + 
+                     String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                     String(today.getDate()).padStart(2, '0');
+      
+      console.log('🔍 중복 체크:', customer, todayStr);
+      
+      // 서버에 중복 체크 요청
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('중복 체크 결과:', result);
+          if (result && result.success) {
+            callback(result.hasDuplicate, result.orders || []);
+          } else {
+            callback(false, []);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('중복 체크 실패:', error);
+          callback(false, []);
+        })
+        .checkTodayDuplicateOrder(customer, todayStr);
+    }
+
+    /**
+     * 중복 경고 모달 표시
+     */
+    function showDuplicateWarning(duplicates, callback) {
+      duplicateOrderList.innerHTML = '';
+      
+      duplicates.forEach(function(order) {
+        var item = document.createElement('div');
+        item.className = 'ob-modal-list-item';
+        item.innerHTML = 
+          '<strong>' + order.orderCode + '</strong><br>' +
+          '브랜드: ' + order.brands + ' | ' +
+          '상품수: ' + order.itemCount + '개 | ' +
+          '금액: ₩' + formatNumber(order.totalAmount);
+        duplicateOrderList.appendChild(item);
+      });
+      
+      duplicateModal.classList.add('show');
+      
+      btnDuplicateCancel.onclick = function() {
+        duplicateModal.classList.remove('show');
+        callback(false);
+      };
+      
+      btnDuplicateContinue.onclick = function() {
+        duplicateModal.classList.remove('show');
+        callback(true);
+      };
+    }
+
+    /**
+     * 실제 저장 실행
+     */
+    function proceedSave(matchedItems) {
+      var confirmMsg = '매칭된 ' + matchedItems.length + '개 항목을 발주DB에 저장하시겠습니까?';
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+
+      console.log('DB 저장 시작. 항목 수:', matchedItems.length);
+      OB.showLoading('발주DB에 저장 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+          console.log('저장 결과:', result);
+          
+          if (!result.success) {
+            var errorMsg = '❌ 데이터 검증 실패!\n\n';
+            errorMsg += '이 ' + result.totalRows + '개 중 ' + result.errorCount + '건의 오류 발견\n\n';
+            errorMsg += '【오류 내역】\n';
+            errorMsg += result.errors.slice(0, 10).join('\n');
+            
+            if (result.errors.length > 10) {
+              errorMsg += '\n... 외 ' + (result.errors.length - 10) + '건';
+            }
+            
+            errorMsg += '\n\n⚠️ 모든 데이터 저장이 취소되었습니다.';
+            errorMsg += '\n\n오류를 수정한 후 다시 시도해주세요.';
+            
+            alert(errorMsg);
+            
+            console.error('=== 전체 오류 목록 ===');
+            result.errors.forEach(function(err) {
+              console.error(err);
+            });
+            
+            return;
+          }
+          
+          if (result.savedRows !== undefined) {
+            alert('✅ 저장 완료!\n\n' + result.savedRows + '개 항목이 성공적으로 저장되었습니다!');
+            
+            parsedItems = [];
+            fileInput.value = '';
+            customerSelect.value = '';
+            btnSave.disabled = true;
+            
+            // UI 초기화
+            summaryCards.style.display = 'none';
+            filterControls.style.display = 'none';
+            tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">저장 완료! 새 파일을 업로드해주세요.</td></tr>';
+          } else {
+            alert('⚠️ 저장 결과를 확인할 수 없습니다.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('저장 실패:', error);
+          alert('❌ 저장 중 오류 발생\n\n' + error.message);
+        })
+        .saveParsedOrdersToDB(matchedItems);
+    }
+
+    /**
+     * 파싱 결과 표시
+     */
+    function displayParseResult(result) {
+      // 요약 카드 업데이트
+      summaryTotal.textContent = result.parsedItems + '개';
+      summaryMatched.textContent = result.matchedCount + '개';
+      summaryUnmatched.textContent = '미매칭 ' + result.unmatchedCount + '개';
+      summaryAmount.textContent = '₩' + formatNumber(result.totalAmount);
+      
+      // 미매칭이 있으면 카드 강조
+      if (result.unmatchedCount > 0) {
+        summaryMatchCard.classList.add('highlight');
+      } else {
+        summaryMatchCard.classList.remove('highlight');
+      }
+      
+      summaryCards.style.display = 'grid';
+      
+      // 미매칭 항목이 있을 때만 필터 버튼 표시
+      if (result.unmatchedCount > 0) {
+        filterControls.style.display = 'flex';
+      } else {
+        filterControls.style.display = 'none';
+      }
+
+      // 테이블 렌더링
+      renderTable(result.items);
+    }
+
+    /**
+     * 테이블 렌더링
+     */
+    function renderTable(items) {
+      tableBody.innerHTML = '';
+      
+      if (!items || items.length === 0) {
+        var emptyRow = tableBody.insertRow();
+        var emptyCell = emptyRow.insertCell();
+        emptyCell.colSpan = 8;
+        emptyCell.style.textAlign = 'center';
+        emptyCell.style.padding = '40px';
+        emptyCell.style.color = '#9ca3af';
+        emptyCell.textContent = '파싱된 항목이 없습니다.';
+        return;
+      }
+
+      items.forEach(function(item) {
+        var row = tableBody.insertRow();
+        
+        // 매칭 상태에 따른 클래스 추가
+        if (item.matchStatus === 'MATCHED') {
+          row.className = 'matched';
+        } else {
+          row.className = 'unmatched';
+        }
+        
+        // 필터에 따라 숨김 처리
+        if (currentFilter === 'unmatched' && item.matchStatus === 'MATCHED') {
+          row.classList.add('hidden');
+        }
+
+        // 데이터 셀 추가
+        row.insertCell().textContent = item.seq || '';
+        row.insertCell().textContent = item.brand || '';
+        row.insertCell().textContent = item.productName || '';
+        row.insertCell().textContent = item.barcode || '';
+        
+        var qtyCell = row.insertCell();
+        qtyCell.className = 'num';
+        qtyCell.textContent = formatNumber(item.orderQty);
+        
+        var priceCell = row.insertCell();
+        priceCell.className = 'num';
+        priceCell.textContent = formatNumber(item.supplyPrice);
+        
+        var amountCell = row.insertCell();
+        amountCell.className = 'num';
+        amountCell.textContent = formatNumber(item.orderAmount);
+        
+        // 상태 셀 (개선)
+        var statusCell = row.insertCell();
+        statusCell.className = 'status-cell';
+        
+        if (item.matchStatus === 'MATCHED') {
+          statusCell.innerHTML = '<span class="status-text">✅ 매칭</span>';
+        } else {
+          var reason = '바코드 없음';
+          if (item.barcode) {
+            reason = '품목 미등록';
+          }
+          statusCell.innerHTML = '<span class="status-text">❌ ' + reason + '</span>';
+        }
+      });
+    }
+
+    /**
+     * 필터 버튼 이벤트
+     */
+    if (btnFilterUnmatched) {
+      btnFilterUnmatched.addEventListener('click', function() {
+        currentFilter = 'unmatched';
+        applyFilter();
+        btnFilterUnmatched.style.display = 'none';
+        btnFilterAll.style.display = 'inline-block';
+      });
+    }
+    
+    if (btnFilterAll) {
+      btnFilterAll.addEventListener('click', function() {
+        currentFilter = 'all';
+        applyFilter();
+        btnFilterAll.style.display = 'none';
+        btnFilterUnmatched.style.display = 'inline-block';
+      });
+    }
+
+    /**
+     * 필터 적용
+     */
+    function applyFilter() {
+      var rows = tableBody.querySelectorAll('tr');
+      rows.forEach(function(row) {
+        if (currentFilter === 'unmatched') {
+          if (row.classList.contains('matched')) {
+            row.classList.add('hidden');
+          } else {
+            row.classList.remove('hidden');
+          }
+        } else {
+          row.classList.remove('hidden');
+        }
+      });
+    }
+
+    /**
+     * 숫자 포맷
+     */
+    function formatNumber(num) {
+      if (num === null || num === undefined || num === '') return '0';
+      return Number(num).toLocaleString('ko-KR');
+    }
+
+  }; // end of OB.initOrderFilePage
+
+</script>

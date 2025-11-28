@@ -1,0 +1,120 @@
+<style>
+.ob-container{padding:20px;}
+
+/* 상단 옵션바 */
+.ob-topbar{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  background:white;
+  padding:12px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+}
+.ob-topbar select,.ob-topbar input{
+  padding:6px 8px;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+  font-size:13px;
+}
+
+.ob-btn{
+  padding:8px 14px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:13px;
+}
+.primary{background:#2563eb;color:white;}
+.secondary{background:#e5e7eb;}
+
+/* 테이블 */
+.ob-table-wrap{
+  overflow:auto;
+  max-height:720px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.ob-table-wrap table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.ob-table-wrap th,
+.ob-table-wrap td{
+  padding:8px;
+  border-bottom:1px solid #e2e8f0;
+  text-align:left;
+}
+.ob-table-wrap th{
+  background:#f1f5f9;
+  font-weight:bold;
+}
+.ob-table-wrap td.num{
+  text-align:right;
+}
+</style>
+
+<div class="ob-container">
+
+  <!-- 상단 옵션바 -->
+  <div class="ob-topbar">
+    <label>문서 유형</label>
+    <select id="inv-doc-type">
+      <option value="발주서(매입)">발주서(매입)</option>
+      <option value="발주서(매입)_롬앤">발주서(매입)_롬앤</option>
+      <option value="발주서(매입)_종근당">발주서(매입)_종근당</option>
+      <option value="발주서(매입)_삐아계열">발주서(매입)_삐아계열</option>
+      <option value="거래명세서(영세)">거래명세서(영세)</option>
+      <option value="거래명세서(부포)">거래명세서(부포)</option>
+      <option value="거래명세서(해외)">거래명세서(해외)</option>
+    </select>
+
+    <label>출력 방식</label>
+    <select id="inv-default-mode">
+      <option value="auto">자동(5행 기준)</option>
+      <option value="full">전체내역</option>
+      <option value="short">단축내역</option>
+    </select>
+
+    <label>발주번호</label>
+    <input id="inv-order-code" placeholder="OB2025-...">
+
+    <label>기간</label>
+    <input id="inv-start-date" type="date">
+    <input id="inv-end-date" type="date">
+
+    <label>매입처</label>
+    <input id="inv-supplier" placeholder="업체명">
+
+    <button id="inv-search-btn" class="ob-btn primary">조회</button>
+    <button id="inv-export-pdf" class="ob-btn secondary">PDF 출력</button>
+    <button id="inv-export-xlsx" class="ob-btn secondary">Excel 출력</button>
+  </div>
+
+  <!-- 테이블 -->
+  <div class="ob-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="inv-check-all"></th>
+          <th>발주일</th>
+          <th>발주번호</th>
+          <th>브랜드</th>
+          <th>매입처</th>
+          <th>발주처</th>
+          <th>품목수</th>
+          <th>매입액합계</th>
+          <th>공급액합계</th>
+          <th>출력방식</th>
+        </tr>
+      </thead>
+      <tbody id="inv-result-tbody">
+        <tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>

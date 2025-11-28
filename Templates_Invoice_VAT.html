@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Malgun Gothic', sans-serif;
+    font-size: 11px;
+    color: #000;
+  }
+  .page {
+    position: relative;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 15mm 15mm 20mm 15mm;
+  }
+
+  .title {
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10mm;
+  }
+
+  /* 인감 */
+  .stamp {
+    position: absolute;
+    top: 52mm;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32mm;
+    opacity: 0.7;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .bordered td, .bordered th {
+    border: 1px solid #000;
+  }
+
+  .header-table {
+    margin-bottom: 4mm;
+  }
+  .header-table td {
+    padding: 2px 4px;
+  }
+  .header-label {
+    width: 12mm;
+    text-align: center;
+    font-weight: bold;
+  }
+  .header-subtitle {
+    width: 15mm;
+    text-align: center;
+    font-weight: bold;
+    background: #e5e5e5;
+  }
+  .header-cell-label {
+    width: 18mm;
+    text-align: center;
+    font-weight: bold;
+    background: #f5f5f5;
+  }
+
+  /* 총액 줄 */
+  .total-line {
+    margin-bottom: 2mm;
+  }
+  .total-line td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  .total-caption {
+    width: 35mm;
+    text-align: center;
+    font-weight: bold;
+    background: #f5f5f5;
+  }
+  .total-number {
+    width: 40mm;
+    text-align: left;
+    font-weight: bold;
+  }
+  .total-kor-label {
+    width: 25mm;
+    text-align: center;
+    font-weight: bold;
+    background: #f5f5f5;
+  }
+  .total-kor-text {
+    text-align: left;
+  }
+
+  /* 품목 테이블 */
+  .item-table th, .item-table td {
+    border: 1px solid #000;
+    padding: 4px 3px;
+  }
+  .item-table th {
+    background: #f5f5f5;
+    text-align: center;
+    font-weight: bold;
+  }
+  .col-no    { width: 10mm; text-align:center; }
+  .col-code  { width: 25mm; text-align:center; }
+  .col-name  { width: auto; text-align:left; }
+  .col-spec  { width: 18mm; text-align:center; }
+  .col-qty   { width: 20mm; text-align:right; }
+  .col-price { width: 25mm; text-align:right; }
+  .col-amt   { width: 30mm; text-align:right; }
+  .col-note  { width: 20mm; text-align:left; }
+
+  /* 합계 영역 */
+  .summary-block {
+    margin-top: 4mm;
+    margin-bottom: 6mm;
+  }
+  .summary-block td {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  .summary-label {
+    width: 25mm;
+    font-weight: bold;
+    text-align: right;
+    padding-right: 8mm;
+  }
+  .summary-value {
+    border-bottom: 1px solid #000;
+    text-align: right;
+    padding-right: 4mm;
+    width: 35mm;
+  }
+
+  /* 비고 영역 */
+  .remark-table td {
+    border: 1px solid #000;
+  }
+  .remark-label {
+    width: 15mm;
+    background: #e5e5e5;
+    text-align: center;
+    font-weight: bold;
+  }
+  .remark-body {
+    height: 45mm;
+    padding: 5px;
+    vertical-align: top;
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 인감 (설정에서 base64 넘기면 자동 표시, 없으면 빈 문자열) -->
+  <? if (stampBase64) { ?>
+    <img class="stamp" src="data:image/png;base64,<?= stampBase64 ?>" alt="stamp">
+  <? } ?>
+
+  <!-- 제목 -->
+  <div class="title">(주)원브릿지 거래명세서</div>
+
+  <!-- 상단 공급자 / 발주처 테이블 -->
+  <table class="header-table bordered">
+    <tr>
+      <td class="header-subtitle" rowspan="4">공<br>급<br>처</td>
+      <td class="header-cell-label">상&nbsp;&nbsp;&nbsp;&nbsp;호</td>
+      <td><?= supplierName ?></td>
+      <td class="header-subtitle" rowspan="4">발<br>주<br>처</td>
+      <td class="header-cell-label">상&nbsp;&nbsp;&nbsp;&nbsp;호</td>
+      <td><?= buyerName ?></td>
+    </tr>
+    <tr>
+      <td class="header-cell-label">등록번호</td>
+      <td><?= supplierBizNo ?></td>
+      <td class="header-cell-label">등록번호</td>
+      <td><?= buyerBizNo ?></td>
+    </tr>
+    <tr>
+      <td class="header-cell-label">담당자</td>
+      <td><?= supplierManager ?></td>
+      <td class="header-cell-label">전화번호</td>
+      <td><?= buyerPhone ?></td>
+    </tr>
+    <tr>
+      <td class="header-cell-label">납기일자</td>
+      <td><?= dueDate ?></td>
+      <td class="header-cell-label">주&nbsp;&nbsp;&nbsp;&nbsp;소</td>
+      <td><?= buyerAddress ?></td>
+    </tr>
+  </table>
+
+  <!-- 총액 (VAT포함) 줄 -->
+  <table class="total-line">
+    <tr>
+      <td class="total-caption">총 액 (VAT포함)</td>
+      <td class="total-number">₩<?= totalAmount ?></td>
+      <td class="total-kor-label">구십구만&nbsp;원</td>
+      <td class="total-kor-text"><?= amountHangul ?></td>
+    </tr>
+  </table>
+
+  <!-- 품목 테이블 -->
+  <table class="item-table">
+    <thead>
+      <tr>
+        <th class="col-no">No</th>
+        <th class="col-code">코드</th>
+        <th class="col-name">품명</th>
+        <th class="col-spec">규격</th>
+        <th class="col-qty">수량</th>
+        <th class="col-price">단가</th>
+        <th class="col-amt">합계 금액</th>
+        <th class="col-note">비고</th>
+      </tr>
+    </thead>
+    <tbody>
+      <? var rowCount = items && items.length ? items.length : 0; ?>
+      <? for (var i = 0; i < rowCount; i++) {
+           var it = items[i]; ?>
+        <tr>
+          <td class="col-no"><?= i + 1 ?></td>
+          <td class="col-code"><?= it.code || '' ?></td>
+          <td class="col-name"><?= it.name || '' ?></td>
+          <td class="col-spec"><?= it.spec || '' ?></td>
+          <td class="col-qty"><?= it.qty || '' ?></td>
+          <td class="col-price"><?= it.price || '' ?></td>
+          <td class="col-amt"><?= it.amount || '' ?></td>
+          <td class="col-note"><?= it.note || '' ?></td>
+        </tr>
+      <? } ?>
+
+      <!-- 빈 행 채우기 (최소 5행 보장) -->
+      <? for (var j = rowCount; j < 5; j++) { ?>
+        <tr>
+          <td class="col-no">&nbsp;</td>
+          <td class="col-code">&nbsp;</td>
+          <td class="col-name">&nbsp;</td>
+          <td class="col-spec">&nbsp;</td>
+          <td class="col-qty">&nbsp;</td>
+          <td class="col-price">&nbsp;</td>
+          <td class="col-amt">&nbsp;</td>
+          <td class="col-note">&nbsp;</td>
+        </tr>
+      <? } ?>
+    </tbody>
+  </table>
+
+  <!-- 합계 영역 (공급가/부가세/총합계) -->
+  <table class="summary-block">
+    <tr>
+      <td class="summary-label">합 계 금 액</td>
+      <td class="summary-value"><?= totalSupply ?></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="summary-label">부&nbsp;&nbsp;&nbsp;&nbsp;가&nbsp;&nbsp;&nbsp;&nbsp;세</td>
+      <td class="summary-value"><?= totalVat ?></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="summary-label">총 합계금액(VAT포함)</td>
+      <td class="summary-value"><?= totalAmount ?></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <!-- 비고 영역 -->
+  <table class="remark-table" style="margin-top: 2mm;">
+    <tr>
+      <td class="remark-label">비<br>고</td>
+      <td class="remark-body">
+        발주처 발주코드 : <?= buyerOrderCode || '' ?><br><br>
+        <?= remark || '' ?>
+      </td>
+    </tr>
+  </table>
+
+</div>
+</body>
+</html>

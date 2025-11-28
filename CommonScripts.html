@@ -1,0 +1,418 @@
+<script>
+  // ===== 전역 네임스페이스 =====
+  window.OB = window.OB || {};
+  
+  // ===== 페이지 파라미터 초기 설정 =====
+  (function() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var pageFromUrl = urlParams.get('page') || 'orderFile';
+    
+    OB.state = {
+      currentPage: pageFromUrl,
+      isLoading: false,
+      initializedPages: {}
+    };
+  })();
+
+  // ===== 공통 페이지 초기화 로직 =====
+  OB.initCurrentPage = function(page) {
+    console.log('🔧 initCurrentPage 호출:', page);
+    
+    if (OB.state.initializedPages[page]) {
+      console.log('⏭️  이미 초기화됨:', page);
+      return;
+    }
+
+    var initFuncName = null;
+
+    switch(page) {
+      case 'orderFile':
+        initFuncName = 'initOrderFilePage';
+        break;
+      case 'dashboard':
+        initFuncName = 'initDashboardPage';
+        break;
+      case 'orderList':
+        initFuncName = 'initOrderListPage';
+        break;
+      case 'invoiceOutput':
+        initFuncName = 'initInvoiceOutputPage';
+        break;
+      case 'settings':
+        initFuncName = 'initSettingsPage';
+        break;
+    }
+
+    if (initFuncName && typeof OB[initFuncName] === 'function') {
+      console.log('✅ 초기화 함수 실행:', initFuncName);
+      
+      try {
+        OB[initFuncName]();
+        OB.state.initializedPages[page] = true;
+        console.log('✅ 초기화 완료:', page);
+      } catch (err) {
+        console.error('❌ 초기화 실패:', page, err);
+      }
+    } else {
+      console.warn('⚠️  초기화 함수 없음:', page, initFuncName);
+    }
+  };
+
+  // ===== 로딩 오버레이 =====
+  OB.showLoading = function (message) {
+    var overlay = document.getElementById('ob-loading-overlay');
+    var textEl = document.getElementById('ob-loading-text');
+    if (!overlay || !textEl) return;
+    textEl.textContent = message || '처리 중입니다.';
+    overlay.classList.add('show');
+    OB.state.isLoading = true;
+  };
+
+  OB.hideLoading = function () {
+    var overlay = document.getElementById('ob-loading-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    OB.state.isLoading = false;
+  };
+
+  // ===== API 래퍼 =====
+  OB.api = {
+    ping: function () {
+      OB.showLoading('시스템 상태 확인 중.');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          OB.hideLoading();
+          console.log('ping result:', res);
+          alert('서버 연결 완료: ' + (res && res.status));
+        })
+        .withFailureHandler(function (err) {
+          OB.hideLoading();
+          console.error(err);
+          alert('서버 연결 실패');
+        })
+        .ping();
+    },
+
+    loadPage: function (page) {
+      OB.showLoading('페이지 불러오는 중...');
+      console.log('📄 페이지 로드 시작:', page);
+
+      google.script.run
+        .withSuccessHandler(function (html) {
+          OB.hideLoading();
+
+          var container = document.getElementById('app-main');
+          if (!container) {
+            console.error('❌ app-main 컨테이너를 찾을 수 없음');
+            return;
+          }
+
+          container.innerHTML = html;
+
+          // 페이지 상태 업데이트
+          OB.state.currentPage = page;
+          
+          // 새로 로드한 페이지는 초기화 상태 리셋
+          OB.state.initializedPages[page] = false;
+
+          // 네비게이션 하이라이트
+          OB.highlightActiveNav(page);
+
+          // 약간의 지연 후 초기화 (DOM 렌더링 완료 대기)
+          setTimeout(function() {
+            OB.initCurrentPage(page);
+          }, 50);
+        })
+        .withFailureHandler(function (err) {
+          OB.hideLoading();
+          console.error('❌ 페이지 로드 실패:', err);
+          alert('페이지 로드 실패: ' + err.message);
+        })
+        .getPageContent(page);
+    }
+  };
+
+  // ===== 네비게이션 액티브 표시 =====
+  OB.highlightActiveNav = function(page) {
+    var links = document.querySelectorAll('.ob-nav-link');
+    links.forEach(function(link) {
+      var navPage = link.getAttribute('data-nav-page');
+      if (navPage === page) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    });
+  };
+
+  // ===== 네비게이션 이벤트 설정 =====
+  function setupNavLinks() {
+    var links = document.querySelectorAll('.ob-nav-link');
+    links.forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var page = link.getAttribute('data-nav-page');
+        if (page) OB.api.loadPage(page);
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOMContentLoaded - 초기 페이지:', OB.state.currentPage);
+
+    setupNavLinks();
+    OB.highlightActiveNav(OB.state.currentPage);
+    OB.initCurrentPage(OB.state.currentPage);
+  });
+
+  // ===== 유틸리티 함수 =====
+  OB.formatNumber = function(num) {
+    if (num === null || num === undefined || num === '') return '0';
+    return Number(num).toLocaleString('ko-KR');
+  };
+
+  OB.formatDate = function(date) {
+    if (!date) return '';
+    if (typeof date === 'string') return date;
+    
+    var d = new Date(date);
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    
+    return year + '-' + month + '-' + day;
+  };
+
+  // ===========================================================
+  // ✅ InvoiceOutput 페이지 초기화 함수
+  // ===========================================================
+  OB.invoiceOutputState = { modesByOrder: {} };
+
+  OB.initInvoiceOutputPage = function() {
+    console.log('🔧 initInvoiceOutputPage 시작');
+    
+    var searchBtn = document.getElementById('inv-search-btn');
+    
+    // 버튼이 없으면 종료
+    if (!searchBtn) {
+      console.error('❌ 조회 버튼(inv-search-btn)을 찾을 수 없음!');
+      return;
+    }
+    
+    // 중복 초기화 방지
+    if (searchBtn.dataset.bound === '1') {
+      console.log('⭕ 이미 초기화됨');
+      return;
+    }
+    searchBtn.dataset.bound = '1';
+
+    // 빈 테이블 렌더링 함수
+    function renderEmpty() {
+      var tbody = document.getElementById("inv-result-tbody");
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>';
+      }
+    }
+
+    // 날짜 포맷팅 함수
+    function formatDate(dateVal) {
+      if (!dateVal) return '';
+      var d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      var year = d.getFullYear();
+      var month = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return year + '-' + month + '-' + day;
+    }
+
+    // 숫자 포맷팅 함수
+    function formatNumber(num) {
+      if (num === null || num === undefined || num === '') return '0';
+      return Number(num).toLocaleString('ko-KR');
+    }
+    
+    renderEmpty();
+
+    // 전체 체크박스 이벤트
+    var checkAll = document.getElementById("inv-check-all");
+    if (checkAll) {
+      checkAll.addEventListener("change", function(e) {
+        var checkboxes = document.querySelectorAll(".inv-row-check");
+        checkboxes.forEach(function(c) {
+          c.checked = e.target.checked;
+        });
+      });
+    }
+
+    // ✅ 조회 버튼 클릭 이벤트
+    searchBtn.addEventListener('click', function() {
+      console.log('🔍 조회 버튼 클릭됨');
+      
+      var params = {
+        orderCode: document.getElementById("inv-order-code").value,
+        supplier: document.getElementById("inv-supplier").value,
+        startDate: document.getElementById("inv-start-date").value,
+        endDate: document.getElementById("inv-end-date").value
+      };
+      
+      console.log('📋 조회 파라미터:', params);
+      
+      OB.showLoading('발주 목록 조회 중...');
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          console.log('✅ 서버 응답:', res);
+          
+          OB.hideLoading();
+          
+          // 응답 검증
+          if (!res) {
+            alert("서버 응답이 없습니다.");
+            renderEmpty();
+            return;
+          }
+          
+          if (!res.success) { 
+            alert("오류 발생: " + (res.error || '알 수 없는 오류'));
+            renderEmpty();
+            return;
+          }
+
+          var tbody = document.getElementById("inv-result-tbody");
+          if (!tbody) {
+            console.error('❌ tbody 요소를 찾을 수 없음');
+            return;
+          }
+          
+          // 테이블 초기화
+          tbody.innerHTML = "";
+
+          // 데이터 없음
+          if (!res.orders || res.orders.length === 0) {
+            renderEmpty();
+            return;
+          }
+
+          // 데이터 렌더링
+          res.orders.forEach(function(o) {
+            var mode = OB.invoiceOutputState.modesByOrder[o.orderCode] || "auto";
+            var dateStr = formatDate(o.orderDate);
+            
+            var tr = document.createElement('tr');
+            tr.innerHTML = 
+              '<td><input type="checkbox" class="inv-row-check" data-oc="' + o.orderCode + '"></td>' +
+              '<td>' + dateStr + '</td>' +
+              '<td>' + (o.orderCode || '') + '</td>' +
+              '<td>' + (o.brand || '') + '</td>' +
+              '<td>' + (o.supplier || '') + '</td>' +
+              '<td>' + (o.buyer || '') + '</td>' +
+              '<td class="num">' + (o.itemCount || 0) + '</td>' +
+              '<td class="num">' + formatNumber(o.totalPurchaseAmount) + '</td>' +
+              '<td class="num">' + formatNumber(o.totalAmount) + '</td>' +
+              '<td>' +
+                '<select class="inv-mode" data-oc="' + o.orderCode + '">' +
+                  '<option value="auto"' + (mode === "auto" ? ' selected' : '') + '>자동</option>' +
+                  '<option value="full"' + (mode === "full" ? ' selected' : '') + '>전체</option>' +
+                  '<option value="short"' + (mode === "short" ? ' selected' : '') + '>단축</option>' +
+                '</select>' +
+              '</td>';
+            
+            tbody.appendChild(tr);
+          });
+          
+          console.log('✅ 테이블 렌더링 완료: ' + res.orders.length + '건');
+        })
+        .withFailureHandler(function(err) {
+          console.error('❌ 서버 오류:', err);
+          OB.hideLoading();
+          alert("서버 통신 오류: " + (err.message || err));
+          renderEmpty();
+        })
+        .getPrintableOrdersApi(params);
+    });
+    
+    console.log('✅ 조회 버튼 이벤트 바인딩 완료');
+
+    // ✅ PDF 출력 버튼 이벤트
+    var pdfBtn = document.getElementById("inv-export-pdf");
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', function() {
+        console.log('📄 PDF 출력 버튼 클릭');
+        
+        // 체크된 발주번호 수집
+        var selected = [];
+        document.querySelectorAll(".inv-row-check:checked").forEach(function(c) {
+          selected.push(c.dataset.oc);
+        });
+
+        if (selected.length === 0) {
+          alert("출력할 발주번호를 선택하세요.");
+          return;
+        }
+
+        // 문서 유형 매핑
+        var docTypeName = document.getElementById("inv-doc-type").value;
+        var docTypeMap = {
+          "거래명세서(부포)": "INVOICE_VAT",
+          "거래명세서(영세)": "INVOICE_NVAT",
+          "거래명세서(해외)": "INVOICE_EN",
+          "발주서(매입)": "ORDER_BASIC",
+          "발주서(매입)_롬앤": "ORDER_ROMAND",
+          "발주서(매입)_종근당": "ORDER_JONGGEUN",
+          "발주서(매입)_삐아계열": "ORDER_BBIA"
+        };
+        var docType = docTypeMap[docTypeName] || "INVOICE_VAT";
+
+        // 출력방식 수집
+        var modesByOrder = {};
+        document.querySelectorAll(".inv-mode").forEach(function(sel) {
+          modesByOrder[sel.dataset.oc] = sel.value || "auto";
+        });
+
+        var params = {
+          orderCodes: selected,
+          docType: docType,
+          printMode: "auto",
+          modesByOrder: modesByOrder
+        };
+
+        console.log('📄 PDF 생성 파라미터:', params);
+
+        OB.showLoading('PDF 생성 중...');
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            OB.hideLoading();
+            
+            if (!res || !res.success) {
+              alert(res ? res.error : "PDF 생성 중 오류가 발생했습니다.");
+              return;
+            }
+
+            // ZIP 다운로드 URL 오픈
+            var url = "https://drive.google.com/uc?export=download&id=" + res.fileId;
+            window.open(url, "_blank");
+          })
+          .withFailureHandler(function(err) {
+            OB.hideLoading();
+            console.error('❌ PDF 생성 실패:', err);
+            alert("PDF 생성 실패: " + (err.message || err));
+          })
+          .generateInvoiceZipApi(params);
+      });
+      
+      console.log('✅ PDF 버튼 이벤트 바인딩 완료');
+    }
+
+    console.log('✅ initInvoiceOutputPage 완료');
+  };
+
+</script>
+
+<!-- 전역 로딩 오버레이 -->
+<div id="ob-loading-overlay" class="ob-loading-overlay">
+  <div class="ob-loading-box">
+    <div class="ob-spinner"></div>
+    <div id="ob-loading-text">처리 중입니다...</div>
+  </div>
+</div>

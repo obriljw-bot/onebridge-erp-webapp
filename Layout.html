@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <?!= include('CommonHead'); ?>
+  </head>
+  <body class="ob-body">
+    <div class="ob-app-shell">
+      <!-- 좌측 사이드바 -->
+      <aside class="ob-sidebar">
+        <?!= include('Component_Sidebar'); ?>
+      </aside>
+
+      <!-- 우측 메인 영역 -->
+      <main class="ob-main">
+        <header class="ob-header">
+          <?!= include('Component_HeaderNav'); ?>
+        </header>
+
+        <section id="app-main" class="ob-main-content">
+          <? if (page === 'dashboard') { ?>
+            <?!= include('Page_Dashboard'); ?>
+          <? } else if (page === 'orderList') { ?>
+            <?!= include('Page_OrderList'); ?>
+          <? } else if (page === 'invoiceOutput') { ?>
+            <?!= include('Page_InvoiceOutput'); ?>
+          <? } else if (page === 'settings') { ?>
+            <?!= include('Page_Settings'); ?>
+          <? } else { ?>
+            <?!= include('Page_OrderFile'); ?>
+          <? } ?>
+        </section>
+      </main>
+    </div>
+
+    <?!= include('CommonScripts'); ?>
+  </body>
+</html>

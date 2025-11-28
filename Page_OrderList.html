@@ -1,0 +1,100 @@
+<div>
+  <div class="ob-page-title">발주 내역</div>
+  <div class="ob-page-subtitle">
+    발주DB 기준으로 발주번호/브랜드/매입처/상태를 조회·검색하는 화면의 뼈대입니다.
+  </div>
+
+  <div class="ob-card ob-mb-12">
+    <div class="ob-card-header">
+      <div>
+        <div class="ob-card-title">검색 조건</div>
+        <div class="ob-card-subtitle">간단한 조회 바 · 이후 실제 조건과 연동</div>
+      </div>
+      <button class="ob-button sm secondary" type="button">
+        고급 필터 (추가 예정)
+      </button>
+    </div>
+
+    <div class="ob-grid-3 ob-mb-8">
+      <div>
+        <div style="font-size: 12px; margin-bottom:4px;">발주번호</div>
+        <input class="ob-input" placeholder="예: OB2025-11-001">
+      </div>
+      <div>
+        <div style="font-size: 12px; margin-bottom:4px;">브랜드</div>
+        <input class="ob-input" placeholder="브랜드명 검색">
+      </div>
+      <div>
+        <div style="font-size: 12px; margin-bottom:4px;">매입처</div>
+        <input class="ob-input" placeholder="매입처명 검색">
+      </div>
+    </div>
+
+    <div class="ob-flex ob-gap-8">
+      <button class="ob-button sm" type="button">
+        조회 (시뮬레이션)
+      </button>
+      <button class="ob-button sm secondary" type="button">
+        초기화
+      </button>
+    </div>
+  </div>
+
+  <div class="ob-card">
+    <div class="ob-card-header">
+      <div>
+        <div class="ob-card-title">발주 목록 (예시 데이터)</div>
+        <div class="ob-card-subtitle">실제 발주DB 연동 시 이 테이블에 출력</div>
+      </div>
+      <div class="ob-flex ob-gap-8">
+        <button class="ob-button sm secondary" type="button">
+          엑셀 다운로드 (추가 예정)
+        </button>
+        <button class="ob-button sm secondary" type="button">
+          선택 발주서 출력 (추가 예정)
+        </button>
+      </div>
+    </div>
+
+    <div class="ob-table-wrap">
+      <table class="ob-table">
+        <thead>
+          <tr>
+            <th>발주번호</th>
+            <th>발주일</th>
+            <th>매입처</th>
+            <th>브랜드</th>
+            <th class="ob-text-right">발주금액</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OB2025-11-001</td>
+            <td>2025-11-20</td>
+            <td>A 매입처</td>
+            <td>Dr.G</td>
+            <td class="ob-text-right">₩ 12,500,000</td>
+            <td><span class="ob-badge success">발주완료</span></td>
+          </tr>
+          <tr>
+            <td>OB2025-11-002</td>
+            <td>2025-11-20</td>
+            <td>B 매입처</td>
+            <td>rom&nd</td>
+            <td class="ob-text-right">₩ 8,200,000</td>
+            <td><span class="ob-badge info">출고대기</span></td>
+          </tr>
+          <tr>
+            <td>OB2025-11-003</td>
+            <td>2025-11-21</td>
+            <td>C 매입처</td>
+            <td>마녀공장</td>
+            <td class="ob-text-right">₩ 5,600,000</td>
+            <td><span class="ob-badge warning">수량조정</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

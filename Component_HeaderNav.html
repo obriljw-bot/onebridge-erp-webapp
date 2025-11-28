@@ -1,0 +1,26 @@
+<div class="ob-flex-between ob-gap-8" style="width: 100%;">
+  <div class="ob-flex ob-gap-8" style="align-items: center;">
+    <div style="font-size: 14px; font-weight: 600;">OneBridge ERP</div>
+    <div class="ob-tag-pill">v2 · SSR Hybrid</div>
+  </div>
+
+  <div class="ob-flex ob-gap-8" style="align-items: center;">
+    <button class="ob-button sm secondary" onclick="OB.api.ping()">
+      시스템 점검
+    </button>
+    <span class="ob-text-muted" style="font-size: 12px;">Today: <span id="ob-header-date"></span></span>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var el = document.getElementById('ob-header-date');
+    if (el) {
+      var d = new Date();
+      var y = d.getFullYear();
+      var m = ('0' + (d.getMonth() + 1)).slice(-2);
+      var day = ('0' + d.getDate()).slice(-2);
+      el.textContent = y + '-' + m + '-' + day;
+    }
+  })();
+</script>

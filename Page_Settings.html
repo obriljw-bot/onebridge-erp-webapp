@@ -1,0 +1,118 @@
+<script>
+/* ============================================================
+   Page_Settings — 기초데이터 관리 화면 초기화
+   (InvoiceOutput 관련 코드는 절대 포함되지 않음)
+   ============================================================ */
+
+window.OB = window.OB || {};
+
+OB.initSettingsPage = function () {
+  console.log("🔧 initSettingsPage 시작");
+
+  const wrap = document.getElementById("ob-settings-wrap");
+  if (!wrap) {
+    console.error("❌ Settings wrapper 요소 없음");
+    return;
+  }
+
+  if (wrap.dataset.bound === "1") {
+    console.log("⏭ 이미 초기화됨: Settings");
+    return;
+  }
+  wrap.dataset.bound = "1";
+
+  console.log("✅ Settings Page 초기화 완료");
+
+  // 🔹 향후 확장: 매입처 / 품목 / 브랜드 / 시스템 설정 로드
+  // 이하 부분은 너가 나중에 CRUD 만들 때 추가하면 됨.
+
+  loadSupplierList();
+  loadBrandList();
+
+  /* -------------------------
+        매입처 목록 로드
+     ------------------------- */
+  function loadSupplierList() {
+    const supplierTbody = document.getElementById("settings-supplier-tbody");
+    if (!supplierTbody) return;
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success) {
+          console.error("❌ 매입처 로드 실패:", res ? res.error : "unknown");
+          return;
+        }
+
+        const { header, rows } = res.data;
+        supplierTbody.innerHTML = "";
+
+        rows.forEach(function (row) {
+          const code = row[header.indexOf("거래처코드")];
+          const name = row[header.indexOf("거래처명")];
+          const brand = row[header.indexOf("브랜드")];
+          const memo = row[header.indexOf("비고")];
+
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            code +
+            "</td>" +
+            "<td>" +
+            name +
+            "</td>" +
+            "<td>" +
+            (brand || "") +
+            "</td>" +
+            "<td>" +
+            (memo || "") +
+            "</td>";
+
+          supplierTbody.appendChild(tr);
+        });
+      })
+      .withFailureHandler(function (err) {
+        console.error("❌ 매입처 로드 오류:", err);
+      })
+      .handleApiRequest("getSuppliers", {});
+  }
+
+  /* -------------------------
+        브랜드 목록 로드 (선택)
+     ------------------------- */
+  function loadBrandList() {
+    const brandTbody = document.getElementById("settings-brand-tbody");
+    if (!brandTbody) return;
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success) {
+          console.error("❌ 브랜드 로드 실패:", res ? res.error : "unknown");
+          return;
+        }
+
+        brandTbody.innerHTML = "";
+        const { header, rows } = res.data;
+
+        rows.forEach(function (row) {
+          const brand = row[header.indexOf("브랜드")];
+          const code = row[header.indexOf("브랜드코드")];
+
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            brand +
+            "</td>" +
+            "<td>" +
+            code +
+            "</td>";
+
+          brandTbody.appendChild(tr);
+        });
+      })
+      .withFailureHandler(function (err) {
+        console.error("❌ 브랜드 로드 오류:", err);
+      })
+      .handleApiRequest("getProductsApi", {});
+  }
+};
+</script>
