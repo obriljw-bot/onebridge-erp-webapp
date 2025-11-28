@@ -14,13 +14,15 @@
  * @param {Object} params
  *   - orderCodes: string[]   발주번호 배열
  *   - docType:    string     문서 유형 (예: 'INVOICE_VAT')
- *   - printMode:  string     출력 모드 ('full' | 'short' | 'auto') - 현재는 full과 auto 동일 처리
+ *   - printMode:  string     기본 출력 모드 ('full' | 'short' | 'auto')
+ *   - modesByOrder: Object   발주번호별 개별 출력 모드 { orderCode: mode }
  */
 function generateInvoiceZip(params) {
   params = params || {};
-  var orderCodes = params.orderCodes || [];
-  var docType    = params.docType    || 'INVOICE_VAT';
-  var printMode  = params.printMode  || 'auto';
+  var orderCodes  = params.orderCodes  || [];
+  var docType     = params.docType     || 'INVOICE_VAT';
+  var printMode   = params.printMode   || 'auto';
+  var modesByOrder = params.modesByOrder || {};
 
   if (!orderCodes.length) {
     return {
@@ -68,12 +70,15 @@ function generateInvoiceZip(params) {
           return;
         }
 
+        // 발주별 개별 출력방식 적용
+        var mode = modesByOrder[orderCode] || printMode || 'auto';
+
         var pdfBlob;
 
         switch (docType) {
           case 'INVOICE_VAT':
           default:
-            pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, printMode);
+            pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode);
             break;
         }
 
@@ -155,6 +160,8 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     var items        = [];
     var totalSupply  = 0;
     var totalAmount  = 0;
+    var itemCount    = 0;
+    var brandName    = firstRow[idxBrand] || '';
 
     for (var i = 0; i < orderRows.length; i++) {
       var r   = orderRows[i];
@@ -164,16 +171,17 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
       // ✅ 수정: 거래원장에서 직접 값을 읽음
       var unitPrice   = Number(idxUnitPrice   >= 0 ? (r[idxUnitPrice]   || 0) : 0);
       var supplyPrice = Number(idxSupplyPrice >= 0 ? (r[idxSupplyPrice] || 0) : 0);
-    
+
       // 매입액 = 거래원장의 "매입액" 컬럼 (이미 수식으로 계산되어 있음)
       var amount = Number(idxAmount >= 0 ? (r[idxAmount] || 0) : (qty * unitPrice));
-    
+
       // 공급액 = 거래원장의 "공급액" 컬럼 (이미 수식으로 계산되어 있음)
       var supply = Number(idxSupplyAmount >= 0 ? (r[idxSupplyAmount] || 0) : (qty * supplyPrice));
 
       // ✅ 수정: 총합계는 공급액 기준
       totalAmount += amount;
       totalSupply += supply;
+      itemCount++;
 
       var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
       var name = r[idxProductName] || '';
@@ -189,6 +197,30 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
         note:   ''
       });
     }
+
+  // ========================================
+  // 출력방식 로직 적용
+  // ========================================
+  var actualMode = printMode;
+
+  // auto 모드: 품목수에 따라 자동 결정
+  if (printMode === 'auto') {
+    actualMode = itemCount <= 5 ? 'full' : 'short';
+  }
+
+  // short 모드: 품목 리스트를 축약
+  if (actualMode === 'short' && itemCount > 0) {
+    var summaryText = brandName + ' 외 ' + (itemCount - 1) + '건';
+    items = [{
+      code:   '',
+      name:   summaryText,
+      spec:   '',
+      qty:    formatNumber_(itemCount),
+      price:  '',
+      amount: formatNumber_(totalSupply),
+      note:   '(단축 출력)'
+    }];
+  }
 
   if (!items.length) {
     // 품목이 하나도 없으면 형식상 1행 빈 행만 생성

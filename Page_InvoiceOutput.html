@@ -11,6 +11,7 @@
   border-radius:8px;
   box-shadow:0 1px 4px rgba(0,0,0,0.1);
   margin-bottom:16px;
+  align-items:center;
 }
 .ob-topbar select,.ob-topbar input{
   padding:6px 8px;
@@ -25,9 +26,38 @@
   border-radius:6px;
   cursor:pointer;
   font-size:13px;
+  transition: all 0.2s;
 }
 .primary{background:#2563eb;color:white;}
+.primary:hover{background:#1d4ed8;}
 .secondary{background:#e5e7eb;}
+.secondary:hover{background:#d1d5db;}
+.success{background:#10b981;color:white;}
+.success:hover{background:#059669;}
+
+/* 일괄선택 버튼 그룹 */
+.bulk-select-group{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  background:#f9fafb;
+  padding:8px;
+  border-radius:6px;
+  border:1px solid #e5e7eb;
+}
+.bulk-select-btn{
+  padding:6px 12px;
+  border:1px solid #d1d5db;
+  border-radius:4px;
+  background:white;
+  cursor:pointer;
+  font-size:12px;
+  transition: all 0.2s;
+}
+.bulk-select-btn:hover{
+  background:#f3f4f6;
+  border-color:#9ca3af;
+}
 
 /* 테이블 */
 .ob-table-wrap{
@@ -36,6 +66,7 @@
   background:white;
   border-radius:8px;
   box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
 }
 .ob-table-wrap table{
   width:100%;
@@ -51,9 +82,74 @@
 .ob-table-wrap th{
   background:#f1f5f9;
   font-weight:bold;
+  position:sticky;
+  top:0;
+  z-index:10;
 }
 .ob-table-wrap td.num{
   text-align:right;
+}
+
+/* 정렬 가능 헤더 */
+.ob-table-wrap th.sortable{
+  cursor:pointer;
+  user-select:none;
+}
+.ob-table-wrap th.sortable:hover{
+  background:#e2e8f0;
+}
+.ob-table-wrap th.sortable::after{
+  content:' ⇅';
+  opacity:0.3;
+  font-size:11px;
+}
+.ob-table-wrap th.sortable.asc::after{
+  content:' ↑';
+  opacity:1;
+}
+.ob-table-wrap th.sortable.desc::after{
+  content:' ↓';
+  opacity:1;
+}
+
+/* 페이지네이션 */
+.pagination-container{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.pagination-controls{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.pagination-btn{
+  padding:6px 12px;
+  border:1px solid #d1d5db;
+  border-radius:4px;
+  background:white;
+  cursor:pointer;
+  font-size:13px;
+}
+.pagination-btn:disabled{
+  opacity:0.4;
+  cursor:not-allowed;
+}
+.pagination-btn:not(:disabled):hover{
+  background:#f3f4f6;
+}
+.pagination-btn.active{
+  background:#2563eb;
+  color:white;
+  border-color:#2563eb;
+}
+.page-info{
+  font-size:13px;
+  color:#6b7280;
 }
 </style>
 
@@ -90,8 +186,21 @@
     <input id="inv-supplier" placeholder="업체명">
 
     <button id="inv-search-btn" class="ob-btn primary">조회</button>
-    <button id="inv-export-pdf" class="ob-btn secondary">PDF 출력</button>
     <button id="inv-export-xlsx" class="ob-btn secondary">Excel 출력</button>
+    <button id="inv-export-pdf" class="ob-btn success">PDF 출력</button>
+  </div>
+
+  <!-- 일괄 선택 버튼 그룹 -->
+  <div class="bulk-select-group" id="inv-bulk-select" style="display:none;">
+    <span style="font-size:12px;font-weight:bold;color:#6b7280;">빠른 선택:</span>
+    <button class="bulk-select-btn" id="inv-select-all">전체 선택</button>
+    <button class="bulk-select-btn" id="inv-deselect-all">전체 해제</button>
+    <span style="border-left:1px solid #d1d5db;height:20px;"></span>
+    <span style="font-size:12px;color:#6b7280;">브랜드별:</span>
+    <div id="inv-brand-btns"></div>
+    <span style="border-left:1px solid #d1d5db;height:20px;"></span>
+    <span style="font-size:12px;color:#6b7280;">매입처별:</span>
+    <div id="inv-supplier-btns"></div>
   </div>
 
   <!-- 테이블 -->
@@ -100,14 +209,14 @@
       <thead>
         <tr>
           <th><input type="checkbox" id="inv-check-all"></th>
-          <th>발주일</th>
-          <th>발주번호</th>
-          <th>브랜드</th>
-          <th>매입처</th>
-          <th>발주처</th>
-          <th>품목수</th>
-          <th>매입액합계</th>
-          <th>공급액합계</th>
+          <th class="sortable" data-sort="orderDate">발주일</th>
+          <th class="sortable" data-sort="orderCode">발주번호</th>
+          <th class="sortable" data-sort="brand">브랜드</th>
+          <th class="sortable" data-sort="supplier">매입처</th>
+          <th class="sortable" data-sort="buyer">발주처</th>
+          <th class="sortable num" data-sort="itemCount">품목수</th>
+          <th class="sortable num" data-sort="totalPurchaseAmount">매입액합계</th>
+          <th class="sortable num" data-sort="totalAmount">공급액합계</th>
           <th>출력방식</th>
         </tr>
       </thead>
@@ -117,4 +226,577 @@
     </table>
   </div>
 
+  <!-- 페이지네이션 -->
+  <div class="pagination-container" id="inv-pagination" style="display:none;">
+    <div class="page-info" id="inv-page-info">0-0 / 0</div>
+    <div class="pagination-controls">
+      <button class="pagination-btn" id="inv-page-first">처음</button>
+      <button class="pagination-btn" id="inv-page-prev">이전</button>
+      <div id="inv-page-numbers" style="display:flex;gap:4px;"></div>
+      <button class="pagination-btn" id="inv-page-next">다음</button>
+      <button class="pagination-btn" id="inv-page-last">마지막</button>
+    </div>
+  </div>
+
 </div>
+
+<script>
+(function() {
+  console.log('🔧 InvoiceOutput 페이지 스크립트 로드');
+
+  // ========================================
+  // 전역 변수
+  // ========================================
+  var allOrders = [];           // 서버에서 받아온 전체 발주 목록
+  var filteredOrders = [];      // 필터링/정렬된 발주 목록
+  var currentPage = 1;          // 현재 페이지
+  var itemsPerPage = 20;        // 페이지당 항목 수
+  var currentSort = {           // 현재 정렬 상태
+    column: 'orderDate',
+    direction: 'desc'
+  };
+  var modesByOrder = {};        // 발주별 출력방식 저장
+
+  // ========================================
+  // 유틸리티 함수
+  // ========================================
+  function formatDate(dateVal) {
+    if (!dateVal) return '';
+    var d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function formatDateInput(d) {
+    if (!d) return '';
+    if (!(d instanceof Date)) d = new Date(d);
+    if (isNaN(d.getTime())) return '';
+    var year = d.getFullYear();
+    var month = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return year + month + day;
+  }
+
+  function formatNumber(num) {
+    if (num === null || num === undefined || num === '') return '0';
+    return Number(num).toLocaleString('ko-KR');
+  }
+
+  function renderEmpty() {
+    var tbody = document.getElementById("inv-result-tbody");
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>';
+    }
+    document.getElementById('inv-pagination').style.display = 'none';
+    document.getElementById('inv-bulk-select').style.display = 'none';
+  }
+
+  // ========================================
+  // 1. Excel 다운로드
+  // ========================================
+  function downloadExcel() {
+    if (!filteredOrders || filteredOrders.length === 0) {
+      alert('다운로드할 데이터가 없습니다.');
+      return;
+    }
+
+    var csv = [];
+
+    // 헤더
+    csv.push(['발주일', '발주번호', '발주처', '브랜드', '매입처', '품목수', '매입액', '공급액'].join(','));
+
+    // 데이터
+    filteredOrders.forEach(function(order) {
+      var row = [
+        formatDate(order.orderDate),
+        order.orderCode || '',
+        order.buyer || '',
+        order.brand || '',
+        order.supplier || '',
+        order.itemCount || 0,
+        order.totalPurchaseAmount || 0,
+        order.totalAmount || 0
+      ];
+      csv.push(row.join(','));
+    });
+
+    // BOM 추가 (한글 깨짐 방지)
+    var csvContent = '\uFEFF' + csv.join('\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    var url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', '발주출력목록_' + formatDateInput(new Date()) + '.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    console.log('✅ Excel 다운로드 완료: ' + filteredOrders.length + '건');
+  }
+
+  // ========================================
+  // 2. 정렬 기능
+  // ========================================
+  function sortOrders(column, direction) {
+    filteredOrders.sort(function(a, b) {
+      var aVal = a[column];
+      var bVal = b[column];
+
+      // 날짜 처리
+      if (column === 'orderDate') {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      }
+
+      // 숫자 처리
+      if (column === 'itemCount' || column === 'totalPurchaseAmount' || column === 'totalAmount') {
+        aVal = Number(aVal) || 0;
+        bVal = Number(bVal) || 0;
+      }
+
+      // 문자열 처리
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+
+      if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function updateSortIndicators() {
+    var headers = document.querySelectorAll('.ob-table-wrap th.sortable');
+    headers.forEach(function(header) {
+      header.classList.remove('asc', 'desc');
+      if (header.dataset.sort === currentSort.column) {
+        header.classList.add(currentSort.direction);
+      }
+    });
+  }
+
+  // ========================================
+  // 3. 페이지네이션
+  // ========================================
+  function renderPagination(totalPages) {
+    var paginationContainer = document.getElementById('inv-pagination');
+    var pageInfo = document.getElementById('inv-page-info');
+    var pageNumbers = document.getElementById('inv-page-numbers');
+    var btnFirst = document.getElementById('inv-page-first');
+    var btnPrev = document.getElementById('inv-page-prev');
+    var btnNext = document.getElementById('inv-page-next');
+    var btnLast = document.getElementById('inv-page-last');
+
+    if (totalPages <= 1) {
+      paginationContainer.style.display = 'none';
+      return;
+    }
+
+    paginationContainer.style.display = 'flex';
+
+    // 버튼 활성화/비활성화
+    btnFirst.disabled = currentPage === 1;
+    btnPrev.disabled = currentPage === 1;
+    btnNext.disabled = currentPage === totalPages;
+    btnLast.disabled = currentPage === totalPages;
+
+    // 페이지 번호 버튼
+    pageNumbers.innerHTML = '';
+
+    var maxButtons = 5;
+    var startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    var endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    if (endPage - startPage < maxButtons - 1) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+
+    for (var i = startPage; i <= endPage; i++) {
+      var btn = document.createElement('button');
+      btn.className = 'pagination-btn';
+      btn.textContent = i;
+      btn.dataset.page = i;
+
+      if (i === currentPage) {
+        btn.classList.add('active');
+      }
+
+      btn.addEventListener('click', function() {
+        currentPage = parseInt(this.dataset.page);
+        renderOrders();
+      });
+
+      pageNumbers.appendChild(btn);
+    }
+
+    // 페이지 정보
+    var startIdx = (currentPage - 1) * itemsPerPage + 1;
+    var endIdx = Math.min(currentPage * itemsPerPage, filteredOrders.length);
+    pageInfo.textContent = startIdx + '-' + endIdx + ' / ' + filteredOrders.length;
+
+    // 버튼 이벤트
+    btnFirst.onclick = function() { currentPage = 1; renderOrders(); };
+    btnPrev.onclick = function() { if (currentPage > 1) { currentPage--; renderOrders(); } };
+    btnNext.onclick = function() { if (currentPage < totalPages) { currentPage++; renderOrders(); } };
+    btnLast.onclick = function() { currentPage = totalPages; renderOrders(); };
+  }
+
+  // ========================================
+  // 4. 브랜드/매입처별 일괄 선택
+  // ========================================
+  function renderBulkSelectButtons() {
+    var bulkSelectContainer = document.getElementById('inv-bulk-select');
+    var brandBtnsContainer = document.getElementById('inv-brand-btns');
+    var supplierBtnsContainer = document.getElementById('inv-supplier-btns');
+
+    if (filteredOrders.length === 0) {
+      bulkSelectContainer.style.display = 'none';
+      return;
+    }
+
+    bulkSelectContainer.style.display = 'flex';
+
+    // 브랜드 목록 추출
+    var brands = {};
+    var suppliers = {};
+    filteredOrders.forEach(function(order) {
+      if (order.brand) brands[order.brand] = true;
+      if (order.supplier) suppliers[order.supplier] = true;
+    });
+
+    var brandList = Object.keys(brands).sort();
+    var supplierList = Object.keys(suppliers).sort();
+
+    // 브랜드 버튼 생성
+    brandBtnsContainer.innerHTML = '';
+    brandList.forEach(function(brand) {
+      var btn = document.createElement('button');
+      btn.className = 'bulk-select-btn';
+      btn.textContent = brand;
+      btn.addEventListener('click', function() {
+        selectByBrand(brand);
+      });
+      brandBtnsContainer.appendChild(btn);
+    });
+
+    // 매입처 버튼 생성
+    supplierBtnsContainer.innerHTML = '';
+    supplierList.forEach(function(supplier) {
+      var btn = document.createElement('button');
+      btn.className = 'bulk-select-btn';
+      btn.textContent = supplier;
+      btn.addEventListener('click', function() {
+        selectBySupplier(supplier);
+      });
+      supplierBtnsContainer.appendChild(btn);
+    });
+  }
+
+  function selectByBrand(brand) {
+    var checkboxes = document.querySelectorAll('.inv-row-check');
+    var startIdx = (currentPage - 1) * itemsPerPage;
+    var endIdx = Math.min(startIdx + itemsPerPage, filteredOrders.length);
+
+    for (var i = startIdx; i < endIdx; i++) {
+      var order = filteredOrders[i];
+      if (order.brand === brand) {
+        var checkbox = checkboxes[i - startIdx];
+        if (checkbox) checkbox.checked = true;
+      }
+    }
+  }
+
+  function selectBySupplier(supplier) {
+    var checkboxes = document.querySelectorAll('.inv-row-check');
+    var startIdx = (currentPage - 1) * itemsPerPage;
+    var endIdx = Math.min(startIdx + itemsPerPage, filteredOrders.length);
+
+    for (var i = startIdx; i < endIdx; i++) {
+      var order = filteredOrders[i];
+      if (order.supplier === supplier) {
+        var checkbox = checkboxes[i - startIdx];
+        if (checkbox) checkbox.checked = true;
+      }
+    }
+  }
+
+  // ========================================
+  // 테이블 렌더링
+  // ========================================
+  function renderOrders() {
+    var tbody = document.getElementById('inv-result-tbody');
+
+    if (!filteredOrders || filteredOrders.length === 0) {
+      renderEmpty();
+      return;
+    }
+
+    // 정렬
+    sortOrders(currentSort.column, currentSort.direction);
+    updateSortIndicators();
+
+    // 페이지네이션 계산
+    var totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+    var startIdx = (currentPage - 1) * itemsPerPage;
+    var endIdx = Math.min(startIdx + itemsPerPage, filteredOrders.length);
+    var pageOrders = filteredOrders.slice(startIdx, endIdx);
+
+    // 테이블 렌더링
+    tbody.innerHTML = '';
+    pageOrders.forEach(function(o) {
+      var mode = modesByOrder[o.orderCode] || document.getElementById('inv-default-mode').value || 'auto';
+      var dateStr = formatDate(o.orderDate);
+
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><input type="checkbox" class="inv-row-check" data-oc="' + o.orderCode + '"></td>' +
+        '<td>' + dateStr + '</td>' +
+        '<td>' + (o.orderCode || '') + '</td>' +
+        '<td>' + (o.brand || '') + '</td>' +
+        '<td>' + (o.supplier || '') + '</td>' +
+        '<td>' + (o.buyer || '') + '</td>' +
+        '<td class="num">' + (o.itemCount || 0) + '</td>' +
+        '<td class="num">' + formatNumber(o.totalPurchaseAmount) + '</td>' +
+        '<td class="num">' + formatNumber(o.totalAmount) + '</td>' +
+        '<td>' +
+          '<select class="inv-mode" data-oc="' + o.orderCode + '">' +
+            '<option value="auto"' + (mode === 'auto' ? ' selected' : '') + '>자동</option>' +
+            '<option value="full"' + (mode === 'full' ? ' selected' : '') + '>전체</option>' +
+            '<option value="short"' + (mode === 'short' ? ' selected' : '') + '>단축</option>' +
+          '</select>' +
+        '</td>';
+
+      tbody.appendChild(tr);
+    });
+
+    // 출력방식 변경 이벤트
+    document.querySelectorAll('.inv-mode').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        modesByOrder[this.dataset.oc] = this.value;
+      });
+    });
+
+    // 페이지네이션 렌더링
+    renderPagination(totalPages);
+
+    // 일괄 선택 버튼 렌더링
+    renderBulkSelectButtons();
+
+    console.log('✅ 테이블 렌더링 완료: ' + pageOrders.length + '/' + filteredOrders.length + '건');
+  }
+
+  // ========================================
+  // 조회 기능
+  // ========================================
+  function searchOrders() {
+    console.log('🔍 조회 버튼 클릭됨');
+
+    var params = {
+      orderCode: document.getElementById("inv-order-code").value,
+      supplier: document.getElementById("inv-supplier").value,
+      startDate: document.getElementById("inv-start-date").value,
+      endDate: document.getElementById("inv-end-date").value
+    };
+
+    console.log('📋 조회 파라미터:', params);
+
+    OB.showLoading('발주 목록 조회 중...');
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        console.log('✅ 서버 응답:', res);
+
+        OB.hideLoading();
+
+        if (!res) {
+          alert("서버 응답이 없습니다.");
+          renderEmpty();
+          return;
+        }
+
+        if (!res.success) {
+          alert("오류 발생: " + (res.error || '알 수 없는 오류'));
+          renderEmpty();
+          return;
+        }
+
+        if (!res.orders || res.orders.length === 0) {
+          renderEmpty();
+          return;
+        }
+
+        // 데이터 저장
+        allOrders = res.orders;
+        filteredOrders = res.orders.slice();
+        currentPage = 1;
+
+        // 렌더링
+        renderOrders();
+
+        console.log('✅ 조회 완료: ' + res.orders.length + '건');
+      })
+      .withFailureHandler(function(err) {
+        console.error('❌ 서버 오류:', err);
+        OB.hideLoading();
+        alert("서버 통신 오류: " + (err.message || err));
+        renderEmpty();
+      })
+      .getPrintableOrdersApi(params);
+  }
+
+  // ========================================
+  // PDF 출력 기능
+  // ========================================
+  function exportPDF() {
+    console.log('📄 PDF 출력 버튼 클릭');
+
+    // 체크된 발주번호 수집
+    var selected = [];
+    document.querySelectorAll(".inv-row-check:checked").forEach(function(c) {
+      selected.push(c.dataset.oc);
+    });
+
+    if (selected.length === 0) {
+      alert("출력할 발주번호를 선택하세요.");
+      return;
+    }
+
+    // 문서 유형 매핑
+    var docTypeName = document.getElementById("inv-doc-type").value;
+    var docTypeMap = {
+      "거래명세서(부포)": "INVOICE_VAT",
+      "거래명세서(영세)": "INVOICE_NVAT",
+      "거래명세서(해외)": "INVOICE_EN",
+      "발주서(매입)": "ORDER_BASIC",
+      "발주서(매입)_롬앤": "ORDER_ROMAND",
+      "발주서(매입)_종근당": "ORDER_JONGGEUN",
+      "발주서(매입)_삐아계열": "ORDER_BBIA"
+    };
+    var docType = docTypeMap[docTypeName] || "INVOICE_VAT";
+
+    // 출력방식 수집
+    var modes = {};
+    document.querySelectorAll(".inv-mode").forEach(function(sel) {
+      modes[sel.dataset.oc] = sel.value || "auto";
+    });
+
+    var params = {
+      orderCodes: selected,
+      docType: docType,
+      printMode: "auto",
+      modesByOrder: modes
+    };
+
+    console.log('📄 PDF 생성 파라미터:', params);
+
+    OB.showLoading('PDF 생성 중... (' + selected.length + '건)');
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        OB.hideLoading();
+
+        if (!res || !res.success) {
+          alert(res ? res.error : "PDF 생성 중 오류가 발생했습니다.");
+          return;
+        }
+
+        // ZIP 다운로드 URL 오픈
+        var url = "https://drive.google.com/uc?export=download&id=" + res.fileId;
+        window.open(url, "_blank");
+
+        alert('✅ PDF 생성 완료!\n파일: ' + res.fileName);
+      })
+      .withFailureHandler(function(err) {
+        OB.hideLoading();
+        console.error('❌ PDF 생성 실패:', err);
+        alert("PDF 생성 실패: " + (err.message || err));
+      })
+      .generateInvoiceZipApi(params);
+  }
+
+  // ========================================
+  // 초기화
+  // ========================================
+  window.addEventListener('load', function() {
+    console.log('🔧 InvoiceOutput 페이지 초기화 시작');
+
+    // 조회 버튼
+    var searchBtn = document.getElementById('inv-search-btn');
+    if (searchBtn) {
+      searchBtn.addEventListener('click', searchOrders);
+    }
+
+    // Excel 출력 버튼
+    var excelBtn = document.getElementById('inv-export-xlsx');
+    if (excelBtn) {
+      excelBtn.addEventListener('click', downloadExcel);
+    }
+
+    // PDF 출력 버튼
+    var pdfBtn = document.getElementById('inv-export-pdf');
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', exportPDF);
+    }
+
+    // 전체 체크박스
+    var checkAll = document.getElementById("inv-check-all");
+    if (checkAll) {
+      checkAll.addEventListener("change", function(e) {
+        var checkboxes = document.querySelectorAll(".inv-row-check");
+        checkboxes.forEach(function(c) {
+          c.checked = e.target.checked;
+        });
+      });
+    }
+
+    // 정렬 헤더 클릭 이벤트
+    var sortableHeaders = document.querySelectorAll('.ob-table-wrap th.sortable');
+    sortableHeaders.forEach(function(header) {
+      header.addEventListener('click', function() {
+        var column = header.dataset.sort;
+
+        if (currentSort.column === column) {
+          currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          currentSort.column = column;
+          currentSort.direction = 'asc';
+        }
+
+        currentPage = 1;
+        renderOrders();
+      });
+    });
+
+    // 일괄 선택 버튼
+    var selectAllBtn = document.getElementById('inv-select-all');
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', function() {
+        var checkboxes = document.querySelectorAll('.inv-row-check');
+        checkboxes.forEach(function(c) {
+          c.checked = true;
+        });
+      });
+    }
+
+    var deselectAllBtn = document.getElementById('inv-deselect-all');
+    if (deselectAllBtn) {
+      deselectAllBtn.addEventListener('click', function() {
+        var checkboxes = document.querySelectorAll('.inv-row-check');
+        checkboxes.forEach(function(c) {
+          c.checked = false;
+        });
+        document.getElementById('inv-check-all').checked = false;
+      });
+    }
+
+    console.log('✅ InvoiceOutput 페이지 초기화 완료');
+  });
+
+})();
+</script>
