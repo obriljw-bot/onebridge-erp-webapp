@@ -1,100 +1,716 @@
-<div>
-  <div class="ob-page-title">발주 내역</div>
-  <div class="ob-page-subtitle">
-    발주DB 기준으로 발주번호/브랜드/매입처/상태를 조회·검색하는 화면의 뼈대입니다.
-  </div>
+<!-- Page_OrderList.html : 발주 내역 조회 -->
 
-  <div class="ob-card ob-mb-12">
-    <div class="ob-card-header">
-      <div>
-        <div class="ob-card-title">검색 조건</div>
-        <div class="ob-card-subtitle">간단한 조회 바 · 이후 실제 조건과 연동</div>
+<style>
+  .orderlist-wrap {
+    font-size: 13px;
+  }
+
+  /* 검색 필터 카드 */
+  .orderlist-filter-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .orderlist-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .orderlist-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .orderlist-filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+  }
+
+  .orderlist-input {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .orderlist-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .orderlist-btn-group {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .orderlist-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .orderlist-btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .orderlist-btn-primary:hover {
+    background: #2563eb;
+  }
+
+  .orderlist-btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
+  .orderlist-btn-secondary:hover {
+    background: #e5e7eb;
+  }
+
+  /* 결과 카드 */
+  .orderlist-result-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .orderlist-result-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .orderlist-result-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .orderlist-result-count {
+    font-size: 14px;
+    color: #6b7280;
+  }
+
+  /* 테이블 */
+  .orderlist-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .orderlist-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .orderlist-table th,
+  .orderlist-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .orderlist-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .orderlist-table td {
+    font-size: 13px;
+    color: #111827;
+  }
+
+  .orderlist-table tbody tr {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .orderlist-table tbody tr:hover {
+    background: #f9fafb;
+  }
+
+  .orderlist-table .text-right {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+
+  .orderlist-table .text-center {
+    text-align: center;
+  }
+
+  .orderlist-ordercode {
+    color: #3b82f6;
+    font-weight: 600;
+  }
+
+  /* 뱃지 */
+  .orderlist-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .orderlist-badge-success {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .orderlist-badge-warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .orderlist-badge-info {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  /* 모달 */
+  .orderlist-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .orderlist-modal-overlay.show {
+    display: flex;
+  }
+
+  .orderlist-modal {
+    background: white;
+    border-radius: 12px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .orderlist-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .orderlist-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .orderlist-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #9ca3af;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+
+  .orderlist-modal-close:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  .orderlist-modal-body {
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .orderlist-detail-section {
+    margin-bottom: 24px;
+  }
+
+  .orderlist-detail-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .orderlist-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .orderlist-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .orderlist-detail-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+  }
+
+  .orderlist-detail-value {
+    font-size: 14px;
+    color: #111827;
+    font-weight: 500;
+  }
+
+  .orderlist-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .orderlist-detail-table th,
+  .orderlist-detail-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border: 1px solid #e5e7eb;
+  }
+
+  .orderlist-detail-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .orderlist-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #9ca3af;
+  }
+
+  .orderlist-empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .orderlist-empty-text {
+    font-size: 14px;
+  }
+</style>
+
+<div class="orderlist-wrap">
+  <!-- 검색 필터 -->
+  <div class="orderlist-filter-card">
+    <div class="orderlist-filter-grid">
+      <div class="orderlist-filter-group">
+        <label class="orderlist-filter-label">시작일</label>
+        <input type="date" id="orderlist-start-date" class="orderlist-input" />
       </div>
-      <button class="ob-button sm secondary" type="button">
-        고급 필터 (추가 예정)
-      </button>
+
+      <div class="orderlist-filter-group">
+        <label class="orderlist-filter-label">종료일</label>
+        <input type="date" id="orderlist-end-date" class="orderlist-input" />
+      </div>
+
+      <div class="orderlist-filter-group">
+        <label class="orderlist-filter-label">발주번호</label>
+        <input type="text" id="orderlist-order-code" class="orderlist-input" placeholder="발주번호 검색" />
+      </div>
+
+      <div class="orderlist-filter-group">
+        <label class="orderlist-filter-label">발주처</label>
+        <input type="text" id="orderlist-buyer" class="orderlist-input" placeholder="발주처명" />
+      </div>
+
+      <div class="orderlist-filter-group">
+        <label class="orderlist-filter-label">브랜드</label>
+        <input type="text" id="orderlist-brand" class="orderlist-input" placeholder="브랜드명" />
+      </div>
+
+      <div class="orderlist-filter-group">
+        <label class="orderlist-filter-label">매입처</label>
+        <input type="text" id="orderlist-supplier" class="orderlist-input" placeholder="매입처명" />
+      </div>
     </div>
 
-    <div class="ob-grid-3 ob-mb-8">
-      <div>
-        <div style="font-size: 12px; margin-bottom:4px;">발주번호</div>
-        <input class="ob-input" placeholder="예: OB2025-11-001">
-      </div>
-      <div>
-        <div style="font-size: 12px; margin-bottom:4px;">브랜드</div>
-        <input class="ob-input" placeholder="브랜드명 검색">
-      </div>
-      <div>
-        <div style="font-size: 12px; margin-bottom:4px;">매입처</div>
-        <input class="ob-input" placeholder="매입처명 검색">
-      </div>
-    </div>
-
-    <div class="ob-flex ob-gap-8">
-      <button class="ob-button sm" type="button">
-        조회 (시뮬레이션)
-      </button>
-      <button class="ob-button sm secondary" type="button">
+    <div class="orderlist-btn-group">
+      <button type="button" id="orderlist-btn-reset" class="orderlist-btn orderlist-btn-secondary">
         초기화
       </button>
+      <button type="button" id="orderlist-btn-search" class="orderlist-btn orderlist-btn-primary">
+        조회
+      </button>
     </div>
   </div>
 
-  <div class="ob-card">
-    <div class="ob-card-header">
+  <!-- 결과 테이블 -->
+  <div class="orderlist-result-card">
+    <div class="orderlist-result-header">
       <div>
-        <div class="ob-card-title">발주 목록 (예시 데이터)</div>
-        <div class="ob-card-subtitle">실제 발주DB 연동 시 이 테이블에 출력</div>
-      </div>
-      <div class="ob-flex ob-gap-8">
-        <button class="ob-button sm secondary" type="button">
-          엑셀 다운로드 (추가 예정)
-        </button>
-        <button class="ob-button sm secondary" type="button">
-          선택 발주서 출력 (추가 예정)
-        </button>
+        <div class="orderlist-result-title">발주 내역</div>
+        <div class="orderlist-result-count" id="orderlist-result-count">조회 버튼을 클릭하세요</div>
       </div>
     </div>
 
-    <div class="ob-table-wrap">
-      <table class="ob-table">
+    <div class="orderlist-table-wrapper">
+      <table class="orderlist-table">
         <thead>
           <tr>
-            <th>발주번호</th>
             <th>발주일</th>
-            <th>매입처</th>
+            <th>발주번호</th>
+            <th>발주처</th>
             <th>브랜드</th>
-            <th class="ob-text-right">발주금액</th>
-            <th>상태</th>
+            <th>매입처</th>
+            <th class="text-center">품목수</th>
+            <th class="text-right">매입액</th>
+            <th class="text-right">공급액</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="orderlist-tbody">
           <tr>
-            <td>OB2025-11-001</td>
-            <td>2025-11-20</td>
-            <td>A 매입처</td>
-            <td>Dr.G</td>
-            <td class="ob-text-right">₩ 12,500,000</td>
-            <td><span class="ob-badge success">발주완료</span></td>
-          </tr>
-          <tr>
-            <td>OB2025-11-002</td>
-            <td>2025-11-20</td>
-            <td>B 매입처</td>
-            <td>rom&nd</td>
-            <td class="ob-text-right">₩ 8,200,000</td>
-            <td><span class="ob-badge info">출고대기</span></td>
-          </tr>
-          <tr>
-            <td>OB2025-11-003</td>
-            <td>2025-11-21</td>
-            <td>C 매입처</td>
-            <td>마녀공장</td>
-            <td class="ob-text-right">₩ 5,600,000</td>
-            <td><span class="ob-badge warning">수량조정</span></td>
+            <td colspan="8" class="orderlist-empty">
+              <div class="orderlist-empty-icon">📋</div>
+              <div class="orderlist-empty-text">조회 버튼을 클릭하여 발주 내역을 확인하세요</div>
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+<!-- 발주 상세 모달 -->
+<div id="orderlist-modal" class="orderlist-modal-overlay">
+  <div class="orderlist-modal">
+    <div class="orderlist-modal-header">
+      <div class="orderlist-modal-title" id="orderlist-modal-title">발주 상세</div>
+      <button type="button" class="orderlist-modal-close" id="orderlist-modal-close">×</button>
+    </div>
+    <div class="orderlist-modal-body" id="orderlist-modal-body">
+      <!-- 동적으로 로드됨 -->
+    </div>
+  </div>
+</div>
+
+<script>
+  window.OB = window.OB || {};
+
+  OB.initOrderListPage = function() {
+    var wrap = document.querySelector('.orderlist-wrap');
+    if (!wrap) {
+      console.warn('OrderList wrapper not found');
+      return;
+    }
+
+    if (wrap.dataset.bound === '1') {
+      console.log('OrderList already initialized');
+      return;
+    }
+    wrap.dataset.bound = '1';
+
+    console.log('✅ OrderList Page 초기화 완료');
+
+    var btnSearch = document.getElementById('orderlist-btn-search');
+    var btnReset = document.getElementById('orderlist-btn-reset');
+    var tbody = document.getElementById('orderlist-tbody');
+    var resultCount = document.getElementById('orderlist-result-count');
+
+    var modal = document.getElementById('orderlist-modal');
+    var modalClose = document.getElementById('orderlist-modal-close');
+    var modalTitle = document.getElementById('orderlist-modal-title');
+    var modalBody = document.getElementById('orderlist-modal-body');
+
+    var currentOrders = [];
+
+    // 오늘 날짜를 기본값으로 설정 (최근 30일)
+    setDefaultDates();
+
+    function setDefaultDates() {
+      var today = new Date();
+      var thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+
+      document.getElementById('orderlist-end-date').value = formatDateInput(today);
+      document.getElementById('orderlist-start-date').value = formatDateInput(thirtyDaysAgo);
+    }
+
+    function formatDateInput(date) {
+      var year = date.getFullYear();
+      var month = String(date.getMonth() + 1).padStart(2, '0');
+      var day = String(date.getDate()).padStart(2, '0');
+      return year + '-' + month + '-' + day;
+    }
+
+    // 조회 버튼
+    if (btnSearch) {
+      btnSearch.addEventListener('click', function() {
+        var params = {
+          startDate: document.getElementById('orderlist-start-date').value,
+          endDate: document.getElementById('orderlist-end-date').value,
+          orderCode: document.getElementById('orderlist-order-code').value,
+          buyer: document.getElementById('orderlist-buyer').value,
+          brand: document.getElementById('orderlist-brand').value,
+          supplier: document.getElementById('orderlist-supplier').value
+        };
+
+        console.log('🔍 발주 조회 파라미터:', params);
+
+        OB.showLoading('발주 내역 조회 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+            console.log('✅ 발주 조회 결과:', result);
+
+            if (!result || !result.success) {
+              alert('조회 중 오류 발생: ' + (result ? result.error : '알 수 없는 오류'));
+              renderEmpty();
+              return;
+            }
+
+            currentOrders = result.orders || [];
+            renderOrders(currentOrders);
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 발주 조회 실패:', error);
+            alert('조회 실패: ' + error.message);
+            renderEmpty();
+          })
+          .getPrintableOrdersApi(params);
+      });
+    }
+
+    // 초기화 버튼
+    if (btnReset) {
+      btnReset.addEventListener('click', function() {
+        document.getElementById('orderlist-start-date').value = '';
+        document.getElementById('orderlist-end-date').value = '';
+        document.getElementById('orderlist-order-code').value = '';
+        document.getElementById('orderlist-buyer').value = '';
+        document.getElementById('orderlist-brand').value = '';
+        document.getElementById('orderlist-supplier').value = '';
+
+        setDefaultDates();
+        renderEmpty();
+      });
+    }
+
+    // 발주 목록 렌더링
+    function renderOrders(orders) {
+      tbody.innerHTML = '';
+
+      if (!orders || orders.length === 0) {
+        renderEmpty();
+        return;
+      }
+
+      resultCount.textContent = '총 ' + orders.length + '건';
+
+      orders.forEach(function(order) {
+        var tr = document.createElement('tr');
+        tr.dataset.orderCode = order.orderCode;
+
+        tr.innerHTML =
+          '<td>' + formatDate(order.orderDate) + '</td>' +
+          '<td><span class="orderlist-ordercode">' + (order.orderCode || '') + '</span></td>' +
+          '<td>' + (order.buyer || '') + '</td>' +
+          '<td>' + (order.brand || '') + '</td>' +
+          '<td>' + (order.supplier || '') + '</td>' +
+          '<td class="text-center">' + (order.itemCount || 0) + '개</td>' +
+          '<td class="text-right">₩' + formatNumber(order.totalPurchaseAmount) + '</td>' +
+          '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>';
+
+        tr.addEventListener('click', function() {
+          loadOrderDetail(order.orderCode);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 빈 테이블 렌더링
+    function renderEmpty() {
+      tbody.innerHTML =
+        '<tr><td colspan="8" class="orderlist-empty">' +
+        '<div class="orderlist-empty-icon">📋</div>' +
+        '<div class="orderlist-empty-text">조회 결과가 없습니다</div>' +
+        '</td></tr>';
+
+      resultCount.textContent = '조회 결과 없음';
+      currentOrders = [];
+    }
+
+    // 발주 상세 조회
+    function loadOrderDetail(orderCode) {
+      console.log('📦 발주 상세 조회:', orderCode);
+
+      OB.showLoading('상세 정보 조회 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+          console.log('✅ 발주 상세 결과:', result);
+
+          if (!result || !result.success) {
+            alert('상세 조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          renderOrderDetail(orderCode, result.orderItems || []);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('❌ 발주 상세 조회 실패:', error);
+          alert('상세 조회 실패: ' + error.message);
+        })
+        .getOrderDetail(orderCode);
+    }
+
+    // 발주 상세 모달 렌더링
+    function renderOrderDetail(orderCode, items) {
+      if (!items || items.length === 0) {
+        alert('해당 발주의 상세 정보가 없습니다.');
+        return;
+      }
+
+      var firstItem = items[0];
+
+      modalTitle.textContent = '발주 상세 - ' + orderCode;
+
+      var html = '';
+
+      // 기본 정보
+      html += '<div class="orderlist-detail-section">';
+      html += '<div class="orderlist-detail-section-title">기본 정보</div>';
+      html += '<div class="orderlist-detail-grid">';
+      html += '<div class="orderlist-detail-item"><div class="orderlist-detail-label">발주번호</div><div class="orderlist-detail-value">' + (firstItem['발주번호'] || '') + '</div></div>';
+      html += '<div class="orderlist-detail-item"><div class="orderlist-detail-label">발주일</div><div class="orderlist-detail-value">' + formatDate(firstItem['발주일']) + '</div></div>';
+      html += '<div class="orderlist-detail-item"><div class="orderlist-detail-label">발주처</div><div class="orderlist-detail-value">' + (firstItem['발주처'] || '') + '</div></div>';
+      html += '<div class="orderlist-detail-item"><div class="orderlist-detail-label">브랜드</div><div class="orderlist-detail-value">' + (firstItem['브랜드'] || '') + '</div></div>';
+      html += '<div class="orderlist-detail-item"><div class="orderlist-detail-label">매입처</div><div class="orderlist-detail-value">' + (firstItem['매입처'] || '') + '</div></div>';
+      html += '<div class="orderlist-detail-item"><div class="orderlist-detail-label">출고상태</div><div class="orderlist-detail-value">' + (firstItem['출고'] || '미출고') + '</div></div>';
+      html += '</div>';
+      html += '</div>';
+
+      // 품목 목록
+      html += '<div class="orderlist-detail-section">';
+      html += '<div class="orderlist-detail-section-title">품목 목록 (' + items.length + '개)</div>';
+      html += '<table class="orderlist-detail-table">';
+      html += '<thead><tr>';
+      html += '<th>제품명</th>';
+      html += '<th>품목코드</th>';
+      html += '<th class="text-right">발주수량</th>';
+      html += '<th class="text-right">확정수량</th>';
+      html += '<th class="text-right">매입가</th>';
+      html += '<th class="text-right">공급가</th>';
+      html += '<th class="text-right">매입액</th>';
+      html += '<th class="text-right">공급액</th>';
+      html += '</tr></thead>';
+      html += '<tbody>';
+
+      var totalPurchaseAmount = 0;
+      var totalSupplyAmount = 0;
+
+      items.forEach(function(item) {
+        var purchaseAmount = Number(item['매입액'] || 0);
+        var supplyAmount = Number(item['공급액'] || 0);
+
+        totalPurchaseAmount += purchaseAmount;
+        totalSupplyAmount += supplyAmount;
+
+        html += '<tr>';
+        html += '<td>' + (item['제품명'] || '') + '</td>';
+        html += '<td>' + (item['품목코드'] || '') + '</td>';
+        html += '<td class="text-right">' + formatNumber(item['발주수량']) + '</td>';
+        html += '<td class="text-right">' + formatNumber(item['확정수량']) + '</td>';
+        html += '<td class="text-right">₩' + formatNumber(item['매입가']) + '</td>';
+        html += '<td class="text-right">₩' + formatNumber(item['공급가']) + '</td>';
+        html += '<td class="text-right">₩' + formatNumber(purchaseAmount) + '</td>';
+        html += '<td class="text-right">₩' + formatNumber(supplyAmount) + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody>';
+      html += '<tfoot>';
+      html += '<tr style="font-weight: 700; background: #f9fafb;">';
+      html += '<td colspan="6" class="text-right">합계</td>';
+      html += '<td class="text-right">₩' + formatNumber(totalPurchaseAmount) + '</td>';
+      html += '<td class="text-right">₩' + formatNumber(totalSupplyAmount) + '</td>';
+      html += '</tr>';
+      html += '</tfoot>';
+      html += '</table>';
+      html += '</div>';
+
+      modalBody.innerHTML = html;
+      modal.classList.add('show');
+    }
+
+    // 모달 닫기
+    if (modalClose) {
+      modalClose.addEventListener('click', function() {
+        modal.classList.remove('show');
+      });
+    }
+
+    // 모달 외부 클릭시 닫기
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        modal.classList.remove('show');
+      }
+    });
+
+    // 유틸리티 함수
+    function formatNumber(num) {
+      if (num === null || num === undefined || num === '') return '0';
+      return Number(num).toLocaleString('ko-KR');
+    }
+
+    function formatDate(date) {
+      if (!date) return '';
+      if (typeof date === 'string') {
+        // 이미 YYYY-MM-DD 형식이면 그대로 반환
+        if (date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
+      }
+
+      var d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+
+      var year = d.getFullYear();
+      var month = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+
+      return year + '-' + month + '-' + day;
+    }
+
+    console.log('✅ OrderList 이벤트 바인딩 완료');
+  };
+</script>
