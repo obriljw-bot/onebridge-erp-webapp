@@ -275,69 +275,84 @@ function saveParsedOrdersToDB(items) {
 
   // 브랜드별 매입처 매핑 생성
   var brandToSupplierMap = buildBrandToSupplierMap_();
-  
+
   // 거래처별/브랜드별 코드 매핑 생성
   var customerCodeMap = buildCustomerCodeMap_();
   var brandCodeMap = buildBrandCodeMap_();
 
-  // 발주처별로 그룹핑
-  var itemsByCustomer = {};
+  // ✅ 발주처 + 브랜드별로 그룹핑 (옵션 B: 브랜드별 발주번호)
+  var itemsByCustomerAndBrand = {};
   for (var i = 0; i < validationResults.length; i++) {
     var result = validationResults[i];
     var customer = result.customer;
-    if (!itemsByCustomer[customer]) {
-      itemsByCustomer[customer] = [];
+    var brand = result.brand;
+    var key = customer + '|' + brand;  // 복합 키: "발주처|브랜드"
+
+    if (!itemsByCustomerAndBrand[key]) {
+      itemsByCustomerAndBrand[key] = {
+        customer: customer,
+        brand: brand,
+        items: []
+      };
     }
-    itemsByCustomer[customer].push({
+
+    itemsByCustomerAndBrand[key].items.push({
       item: result.item,
       buyPrice: result.buyPrice,
       supplyPrice: result.supplyPrice,
-      qty: result.qty,
-      brand: result.brand
+      qty: result.qty
     });
   }
 
   var saved = 0;
   var startRow = sheet.getLastRow() + 1;
 
-  // 발주처별로 처리
-  for (var customer in itemsByCustomer) {
-    var customerItems = itemsByCustomer[customer];
+  // ✅ 발주처 + 브랜드 그룹별로 처리
+  for (var key in itemsByCustomerAndBrand) {
+    var group = itemsByCustomerAndBrand[key];
+    var customer = group.customer;
+    var brand = group.brand;
+
     var customerCode = customerCodeMap[customer] || 'CUS';
-    
+    var brandCode = brandCodeMap[brand] || brand.substring(0, 2).toUpperCase();
+
+    // ✅ 브랜드 그룹마다 한 번만 순번 조회
     var orderSeq = getNextOrderSeq_(sheet, dateStr, customer);
-    
-    for (var i = 0; i < customerItems.length; i++) {
-      var data = customerItems[i];
+
+    // ✅ 브랜드 그룹마다 하나의 발주번호 생성
+    var orderCode = dateStr + '-' + customerCode + '-' + brandCode + '-' + padZero(orderSeq, 3);
+
+    var supplier = brandToSupplierMap[brand] || '';
+    var buyer = customer;
+
+    Logger.log('📦 발주번호 생성: ' + orderCode + ' (' + brand + ', ' + group.items.length + '개 품목)');
+
+    // ✅ 같은 브랜드의 모든 품목에 같은 발주번호 적용
+    for (var i = 0; i < group.items.length; i++) {
+      var data = group.items[i];
       var item = data.item;
-      
-      var brandCode = brandCodeMap[data.brand] || data.brand.substring(0, 2).toUpperCase();
-      var orderCode = dateStr + '-' + customerCode + '-' + brandCode + '-' + padZero(orderSeq, 3);
-      
-      var supplier = brandToSupplierMap[data.brand] || '';
-      var buyer = customer;
-      
+
       var row = new Array(header.length).fill('');
       var currentRow = startRow + saved;
 
       // 기본 정보
       if (c.orderDate      >= 0) row[c.orderDate]      = todaySerial;
-      if (c.orderCode      >= 0) row[c.orderCode]      = orderCode;
+      if (c.orderCode      >= 0) row[c.orderCode]      = orderCode;  // ✅ 같은 발주번호 사용
       if (c.productCode    >= 0) row[c.productCode]    = item.barcode || '';
-      if (c.brand          >= 0) row[c.brand]          = data.brand;
+      if (c.brand          >= 0) row[c.brand]          = brand;
       if (c.supplier       >= 0) row[c.supplier]       = supplier;
       if (c.buyer          >= 0) row[c.buyer]          = buyer;
       if (c.vatType        >= 0) row[c.vatType]        = '부별';
       if (c.productName    >= 0) row[c.productName]    = item.productName || '';
-      
+
       // 수량
       if (c.orderQty       >= 0) row[c.orderQty]       = data.qty;
       if (c.confirmQty     >= 0) row[c.confirmQty]     = data.qty;
-      
+
       // 단가
       if (c.buyPrice       >= 0) row[c.buyPrice]       = data.buyPrice;
       if (c.supplyPrice    >= 0) row[c.supplyPrice]    = data.supplyPrice;
-      
+
       // 금액 계산 - 수식으로 입력
       var sheetRowNum = currentRow;
       var buyPriceCol = getColumnLetter_(c.buyPrice);
@@ -345,7 +360,7 @@ function saveParsedOrdersToDB(items) {
       var orderQtyCol = getColumnLetter_(c.orderQty);
       var amountBuyCol = getColumnLetter_(c.amountBuy);
       var amountSupplyCol = getColumnLetter_(c.amountSupply);
-      
+
       if (c.amountBuy      >= 0) {
         row[c.amountBuy] = '=' + buyPriceCol + sheetRowNum + '*' + orderQtyCol + sheetRowNum;
       }
@@ -357,10 +372,10 @@ function saveParsedOrdersToDB(items) {
       }
       if (c.marginRate     >= 0) {
         var marginAmountCol = getColumnLetter_(c.marginAmount);
-        row[c.marginRate] = '=IF(' + amountSupplyCol + sheetRowNum + '=0,0,' + 
+        row[c.marginRate] = '=IF(' + amountSupplyCol + sheetRowNum + '=0,0,' +
                             marginAmountCol + sheetRowNum + '/' + amountSupplyCol + sheetRowNum + ')';
       }
-      
+
       // 상태 정보
       if (c.payBuy         >= 0) row[c.payBuy]         = '미결제';
       if (c.paySell        >= 0) row[c.paySell]        = '미결제';
@@ -370,7 +385,7 @@ function saveParsedOrdersToDB(items) {
       if (c.inboundPlace   >= 0) row[c.inboundPlace]   = buyer;
       if (c.memo           >= 0) row[c.memo]           = '';
       if (c.billingDate    >= 0) row[c.billingDate]    = '';
-      
+
       // 메타 정보
       if (c.rowNumber      >= 0) row[c.rowNumber]      = '';
       if (c.createdAt      >= 0) row[c.createdAt]      = timeStr;
@@ -378,8 +393,8 @@ function saveParsedOrdersToDB(items) {
 
       sheet.appendRow(row);
       saved++;
-      orderSeq++;
     }
+    // ✅ orderSeq++ 삭제: 각 그룹마다 getNextOrderSeq_()를 새로 호출하므로 불필요
   }
   
   Logger.log('✅✅✅ 저장 완료! 총 ' + saved + '건');
