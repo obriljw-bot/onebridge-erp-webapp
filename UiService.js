@@ -18,10 +18,14 @@ function getPageTemplateName_(page) {
       return 'Page_OrderFile';
     case 'dashboard':
       return 'Page_Dashboard';
-    case 'orderList':          // orders → orderList로 통일
+    case 'orderList':
       return 'Page_OrderList';
-    case 'invoiceOutput':      // 🔥 핵심 수정 (invoice → invoiceOutput)
+    case 'invoiceOutput':
       return 'Page_InvoiceOutput';
+    case 'purchaseSettlement':
+      return 'Page_PurchaseSettlement';
+    case 'salesSettlement':
+      return 'Page_SalesSettlement';
     case 'settings':
       return 'Page_Settings';
     default:

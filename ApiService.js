@@ -631,3 +631,57 @@ function getPrintableOrders(params) {
     };
   }
 }
+
+/**
+ * ============================================================
+ * 회계 마감 API (클라이언트용 래퍼)
+ * ============================================================
+ */
+
+/**
+ * 매입 데이터 집계
+ */
+function aggregatePurchaseOrdersApi(params) {
+  var result = aggregatePurchaseOrders(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매출 데이터 집계
+ */
+function aggregateSalesOrdersApi(params) {
+  var result = aggregateSalesOrders(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매입 마감 저장
+ */
+function savePurchaseSettlementApi(params) {
+  var result = savePurchaseSettlement(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매출 마감 저장
+ */
+function saveSalesSettlementApi(params) {
+  var result = saveSalesSettlement(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매입 마감 목록 조회
+ */
+function getPurchaseSettlementsApi(params) {
+  var result = getPurchaseSettlements(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매출 마감 목록 조회
+ */
+function getSalesSettlementsApi(params) {
+  var result = getSalesSettlements(params);
+  return safeReturn(result);
+}
