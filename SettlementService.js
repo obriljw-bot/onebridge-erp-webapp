@@ -552,6 +552,57 @@ function getPurchaseSettlements(params) {
 }
 
 /**
+ * 매출 마감 목록 조회
+ */
+function getSalesSettlements(params) {
+  try {
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_SALES_SETTLEMENT_SHEET);
+
+    if (!sheet) {
+      return {
+        success: true,
+        settlements: []
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var settlements = [];
+
+    for (var i = 1; i < data.length; i++) {
+      settlements.push({
+        settlementId: data[i][0],
+        type: data[i][1],
+        buyer: data[i][2],
+        startDate: formatDateString(data[i][3]),
+        endDate: formatDateString(data[i][4]),
+        status: data[i][5],
+        totalItems: data[i][6],
+        totalOrderQty: data[i][7],
+        totalConfirmedQty: data[i][8],
+        totalSupplyAmount: data[i][9],
+        diffQty: data[i][10],
+        notes: data[i][11],
+        createdAt: formatDateString(data[i][12]),
+        createdBy: data[i][13]
+      });
+    }
+
+    return {
+      success: true,
+      settlements: settlements
+    };
+
+  } catch (err) {
+    Logger.log('[getSalesSettlements Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
  * ============================================================
  * 3. 유틸리티 함수
  * ============================================================

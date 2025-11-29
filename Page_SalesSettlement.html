@@ -1,0 +1,251 @@
+<style>
+.settlement-wrap{padding:20px;}
+
+/* 페이지 헤더 */
+.settlement-header{
+  margin-bottom:20px;
+}
+.settlement-header h1{
+  font-size:24px;
+  font-weight:700;
+  color:#1e293b;
+  margin:0 0 8px 0;
+}
+.settlement-header p{
+  color:#64748b;
+  margin:0;
+  font-size:14px;
+}
+
+/* 검색 바 */
+.settlement-search{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+  align-items:flex-end;
+}
+
+.settlement-search-field{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.settlement-search-field label{
+  font-size:13px;
+  font-weight:500;
+  color:#475569;
+}
+.settlement-search-field select,
+.settlement-search-field input{
+  padding:8px 12px;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+  font-size:14px;
+  min-width:150px;
+}
+
+.settlement-btn{
+  padding:8px 16px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  transition:all 0.2s;
+}
+.settlement-btn.primary{background:#2563eb;color:white;}
+.settlement-btn.primary:hover{background:#1d4ed8;}
+.settlement-btn.secondary{background:#e5e7eb;color:#1e293b;}
+.settlement-btn.secondary:hover{background:#d1d5db;}
+.settlement-btn.success{background:#10b981;color:white;}
+.settlement-btn.success:hover{background:#059669;}
+
+/* 요약 카드 */
+.settlement-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+
+.settlement-summary-card{
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.settlement-summary-card-label{
+  font-size:12px;
+  color:#64748b;
+  margin-bottom:4px;
+}
+.settlement-summary-card-value{
+  font-size:20px;
+  font-weight:700;
+  color:#1e293b;
+}
+.settlement-summary-card-value.diff{color:#ef4444;}
+
+/* 테이블 */
+.settlement-table-wrap{
+  overflow:auto;
+  max-height:600px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+}
+.settlement-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.settlement-table th,
+.settlement-table td{
+  padding:10px;
+  border-bottom:1px solid #e2e8f0;
+  text-align:left;
+}
+.settlement-table th{
+  background:#f1f5f9;
+  font-weight:600;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.settlement-table td.num{text-align:right;}
+.settlement-table td.diff{color:#ef4444;font-weight:600;}
+
+.settlement-empty{
+  text-align:center;
+  padding:60px 20px;
+  color:#64748b;
+}
+.settlement-empty-icon{
+  font-size:48px;
+  margin-bottom:12px;
+}
+.settlement-empty-text{
+  font-size:14px;
+}
+
+/* 액션 바 */
+.settlement-actions{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+  padding:16px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+</style>
+
+<div class="settlement-wrap">
+  <!-- 페이지 헤더 -->
+  <div class="settlement-header">
+    <h1>💳 발주처별 마감</h1>
+    <p>발주처별로 발주 데이터를 집계하고 마감 처리합니다</p>
+  </div>
+
+  <!-- 검색 바 -->
+  <div class="settlement-search">
+    <div class="settlement-search-field">
+      <label>발주처</label>
+      <input type="text" id="sales-settlement-buyer" placeholder="발주처 입력">
+    </div>
+
+    <div class="settlement-search-field">
+      <label>시작일</label>
+      <input type="date" id="sales-settlement-start-date">
+    </div>
+
+    <div class="settlement-search-field">
+      <label>종료일</label>
+      <input type="date" id="sales-settlement-end-date">
+    </div>
+
+    <button class="settlement-btn primary" id="sales-settlement-search-btn">
+      🔍 조회
+    </button>
+
+    <button class="settlement-btn secondary" id="sales-settlement-reset-btn">
+      초기화
+    </button>
+  </div>
+
+  <!-- 요약 카드 -->
+  <div class="settlement-summary" id="sales-settlement-summary" style="display:none;">
+    <div class="settlement-summary-card">
+      <div class="settlement-summary-card-label">총 품목수</div>
+      <div class="settlement-summary-card-value" id="sales-settlement-total-items">0</div>
+    </div>
+
+    <div class="settlement-summary-card">
+      <div class="settlement-summary-card-label">총 발주수량</div>
+      <div class="settlement-summary-card-value" id="sales-settlement-total-order-qty">0</div>
+    </div>
+
+    <div class="settlement-summary-card">
+      <div class="settlement-summary-card-label">총 확정수량</div>
+      <div class="settlement-summary-card-value" id="sales-settlement-total-confirmed-qty">0</div>
+    </div>
+
+    <div class="settlement-summary-card">
+      <div class="settlement-summary-card-label">차이 수량</div>
+      <div class="settlement-summary-card-value diff" id="sales-settlement-diff-qty">0</div>
+    </div>
+
+    <div class="settlement-summary-card">
+      <div class="settlement-summary-card-label">총 매출액</div>
+      <div class="settlement-summary-card-value" id="sales-settlement-total-amount">₩0</div>
+    </div>
+  </div>
+
+  <!-- 상세 테이블 -->
+  <div class="settlement-table-wrap">
+    <table class="settlement-table">
+      <thead>
+        <tr>
+          <th>발주번호</th>
+          <th>발주일</th>
+          <th>매입처</th>
+          <th>브랜드</th>
+          <th>제품명</th>
+          <th>품목코드</th>
+          <th class="num">발주수량</th>
+          <th class="num">확정수량</th>
+          <th class="num">차이</th>
+          <th class="num">매출가</th>
+          <th class="num">매출액</th>
+        </tr>
+      </thead>
+      <tbody id="sales-settlement-tbody">
+        <tr>
+          <td colspan="11" class="settlement-empty">
+            <div class="settlement-empty-icon">📋</div>
+            <div class="settlement-empty-text">발주처와 기간을 선택하여 조회하세요</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 액션 버튼 -->
+  <div class="settlement-actions" id="sales-settlement-actions" style="display:none;">
+    <button class="settlement-btn secondary" id="sales-settlement-save-draft-btn">
+      💾 임시저장
+    </button>
+    <button class="settlement-btn success" id="sales-settlement-confirm-btn">
+      ✅ 확정
+    </button>
+    <button class="settlement-btn secondary" id="sales-settlement-export-btn">
+      📥 엑셀 다운로드
+    </button>
+  </div>
+</div>

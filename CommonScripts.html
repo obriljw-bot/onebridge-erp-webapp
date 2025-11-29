@@ -1674,6 +1674,305 @@
     console.log('✅ PurchaseSettlement 페이지 초기화 완료');
   };
 
+  // ========================================
+  // 매출 마감 페이지
+  // ========================================
+
+  OB.salesSettlementState = {
+    currentData: null,
+    buyer: '',
+    startDate: '',
+    endDate: ''
+  };
+
+  OB.initSalesSettlementPage = function() {
+    console.log('🔧 SalesSettlement 페이지 초기화 시작');
+
+    var state = OB.salesSettlementState;
+
+    // DOM 요소
+    var buyerInput = document.getElementById('sales-settlement-buyer');
+    var startDateInput = document.getElementById('sales-settlement-start-date');
+    var endDateInput = document.getElementById('sales-settlement-end-date');
+    var searchBtn = document.getElementById('sales-settlement-search-btn');
+    var resetBtn = document.getElementById('sales-settlement-reset-btn');
+    var tbody = document.getElementById('sales-settlement-tbody');
+    var summaryDiv = document.getElementById('sales-settlement-summary');
+    var actionsDiv = document.getElementById('sales-settlement-actions');
+
+    var saveDraftBtn = document.getElementById('sales-settlement-save-draft-btn');
+    var confirmBtn = document.getElementById('sales-settlement-confirm-btn');
+    var exportBtn = document.getElementById('sales-settlement-export-btn');
+
+    // 기본 날짜 설정 (이번 달)
+    setDefaultDates();
+
+    function setDefaultDates() {
+      var now = new Date();
+      var year = now.getFullYear();
+      var month = String(now.getMonth() + 1).padStart(2, '0');
+
+      var firstDay = year + '-' + month + '-01';
+      var lastDay = new Date(year, now.getMonth() + 1, 0);
+      var lastDayStr = year + '-' + month + '-' + String(lastDay.getDate()).padStart(2, '0');
+
+      startDateInput.value = firstDay;
+      endDateInput.value = lastDayStr;
+    }
+
+    // 조회 버튼
+    if (searchBtn) {
+      searchBtn.addEventListener('click', function() {
+        var buyer = buyerInput.value.trim();
+        var startDate = startDateInput.value;
+        var endDate = endDateInput.value;
+
+        if (!buyer) {
+          alert('발주처를 입력해주세요.');
+          return;
+        }
+
+        if (!startDate || !endDate) {
+          alert('마감 기간을 선택해주세요.');
+          return;
+        }
+
+        state.buyer = buyer;
+        state.startDate = startDate;
+        state.endDate = endDate;
+
+        console.log('📋 매출 마감 조회:', {buyer, startDate, endDate});
+
+        OB.showLoading('매출 데이터 집계 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+            console.log('✅ 집계 완료:', result);
+
+            if (!result || !result.success) {
+              alert('집계 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              renderEmpty();
+              return;
+            }
+
+            state.currentData = result;
+            renderSummary(result);
+            renderTable(result.items || []);
+            showActions();
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 집계 실패:', error);
+            alert('집계 실패: ' + error.message);
+            renderEmpty();
+          })
+          .aggregateSalesOrdersApi({
+            buyer: buyer,
+            startDate: startDate,
+            endDate: endDate
+          });
+      });
+    }
+
+    // 초기화 버튼
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function() {
+        buyerInput.value = '';
+        setDefaultDates();
+        state.currentData = null;
+        renderEmpty();
+        hideActions();
+        hideSummary();
+      });
+    }
+
+    // 임시저장 버튼
+    if (saveDraftBtn) {
+      saveDraftBtn.addEventListener('click', function() {
+        saveSettlement('DRAFT');
+      });
+    }
+
+    // 확정 버튼
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function() {
+        if (!confirm('마감을 확정하시겠습니까?\n확정 후에는 수정할 수 없습니다.')) {
+          return;
+        }
+        saveSettlement('CONFIRMED');
+      });
+    }
+
+    // 엑셀 다운로드 버튼
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function() {
+        downloadExcel();
+      });
+    }
+
+    // 요약 렌더링
+    function renderSummary(data) {
+      document.getElementById('sales-settlement-total-items').textContent =
+        OB.formatNumber(data.totalItems || 0);
+      document.getElementById('sales-settlement-total-order-qty').textContent =
+        OB.formatNumber(data.totalOrderQty || 0);
+      document.getElementById('sales-settlement-total-confirmed-qty').textContent =
+        OB.formatNumber(data.totalConfirmedQty || 0);
+      document.getElementById('sales-settlement-diff-qty').textContent =
+        OB.formatNumber(data.diffQty || 0);
+      document.getElementById('sales-settlement-total-amount').textContent =
+        '₩' + OB.formatNumber(data.totalSupplyAmount || 0);
+
+      summaryDiv.style.display = 'grid';
+    }
+
+    function hideSummary() {
+      summaryDiv.style.display = 'none';
+    }
+
+    // 테이블 렌더링
+    function renderTable(items) {
+      if (!items || items.length === 0) {
+        renderEmpty();
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      items.forEach(function(item) {
+        var tr = document.createElement('tr');
+
+        var diffQty = item.diffQty || 0;
+        var diffClass = diffQty !== 0 ? 'diff' : '';
+
+        tr.innerHTML =
+          '<td>' + (item.orderCode || '') + '</td>' +
+          '<td>' + (item.orderDate || '') + '</td>' +
+          '<td>' + (item.supplier || '') + '</td>' +
+          '<td>' + (item.brand || '') + '</td>' +
+          '<td>' + (item.productName || '') + '</td>' +
+          '<td>' + (item.productCode || '') + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.orderQty || 0) + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.confirmedQty || 0) + '</td>' +
+          '<td class="num ' + diffClass + '">' + OB.formatNumber(diffQty) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(item.supplyPrice || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(item.supplyAmount || 0) + '</td>';
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderEmpty() {
+      tbody.innerHTML =
+        '<tr><td colspan="11" class="settlement-empty">' +
+        '<div class="settlement-empty-icon">📋</div>' +
+        '<div class="settlement-empty-text">발주처와 기간을 선택하여 조회하세요</div>' +
+        '</td></tr>';
+    }
+
+    function showActions() {
+      actionsDiv.style.display = 'flex';
+    }
+
+    function hideActions() {
+      actionsDiv.style.display = 'none';
+    }
+
+    // 마감 저장
+    function saveSettlement(status) {
+      if (!state.currentData || !state.currentData.items) {
+        alert('집계된 데이터가 없습니다.');
+        return;
+      }
+
+      var params = {
+        buyer: state.buyer,
+        startDate: state.startDate,
+        endDate: state.endDate,
+        status: status,
+        items: state.currentData.items,
+        notes: ''
+      };
+
+      OB.showLoading('마감 저장 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            alert('저장 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          alert(result.message || '저장 완료');
+          console.log('✅ 마감 저장 완료:', result.settlementId);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('❌ 저장 실패:', error);
+          alert('저장 실패: ' + error.message);
+        })
+        .saveSalesSettlementApi(params);
+    }
+
+    // 엑셀 다운로드
+    function downloadExcel() {
+      if (!state.currentData || !state.currentData.items) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+      }
+
+      var csv = [];
+
+      // 헤더
+      csv.push([
+        '발주번호', '발주일', '매입처', '브랜드', '제품명', '품목코드',
+        '발주수량', '확정수량', '차이', '매출가', '매출액'
+      ].join(','));
+
+      // 데이터
+      state.currentData.items.forEach(function(item) {
+        var row = [
+          item.orderCode || '',
+          item.orderDate || '',
+          item.supplier || '',
+          item.brand || '',
+          item.productName || '',
+          item.productCode || '',
+          item.orderQty || 0,
+          item.confirmedQty || 0,
+          item.diffQty || 0,
+          item.supplyPrice || 0,
+          item.supplyAmount || 0
+        ];
+        csv.push(row.join(','));
+      });
+
+      // BOM 추가
+      var csvContent = '\uFEFF' + csv.join('\n');
+      var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      var link = document.createElement('a');
+      var url = URL.createObjectURL(blob);
+
+      var fileName = '매출마감_' + state.buyer + '_' +
+        state.startDate.replace(/-/g, '') + '-' +
+        state.endDate.replace(/-/g, '') + '.csv';
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log('✅ 엑셀 다운로드 완료');
+    }
+
+    console.log('✅ SalesSettlement 페이지 초기화 완료');
+  };
+
 </script>
 
 <!-- 전역 로딩 오버레이 -->
