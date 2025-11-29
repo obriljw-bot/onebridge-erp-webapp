@@ -740,6 +740,285 @@
       });
     }
 
+    // ========================================
+    // 탭 전환 로직
+    // ========================================
+    var tabNavItems = document.querySelectorAll('.tab-nav-item');
+    tabNavItems.forEach(function(tabNavItem) {
+      tabNavItem.addEventListener('click', function() {
+        var targetTab = this.getAttribute('data-tab');
+
+        // 모든 탭 비활성화
+        document.querySelectorAll('.tab-nav-item').forEach(function(item) {
+          item.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-content').forEach(function(content) {
+          content.classList.remove('active');
+        });
+
+        // 선택한 탭 활성화
+        this.classList.add('active');
+        document.getElementById('tab-' + targetTab).classList.add('active');
+      });
+    });
+
+    // ========================================
+    // 일괄 청구서 탭 로직
+    // ========================================
+
+    var billingState = {
+      currentData: null,
+      company: '',
+      startDate: '',
+      endDate: ''
+    };
+
+    // DOM 요소
+    var billingCompanyInput = document.getElementById('billing-company');
+    var billingStartDateInput = document.getElementById('billing-start-date');
+    var billingEndDateInput = document.getElementById('billing-end-date');
+    var billingSearchBtn = document.getElementById('billing-search-btn');
+    var billingResetBtn = document.getElementById('billing-reset-btn');
+    var billingTbody = document.getElementById('billing-result-tbody');
+    var billingSummary = document.getElementById('billing-summary');
+    var billingActions = document.getElementById('billing-actions');
+
+    // 기본 날짜 설정 (이번 달)
+    function setBillingDefaultDates() {
+      var now = new Date();
+      var year = now.getFullYear();
+      var month = String(now.getMonth() + 1).padStart(2, '0');
+      var firstDay = year + '-' + month + '-01';
+      var lastDay = new Date(year, now.getMonth() + 1, 0);
+      var lastDayStr = year + '-' + month + '-' + String(lastDay.getDate()).padStart(2, '0');
+
+      billingStartDateInput.value = firstDay;
+      billingEndDateInput.value = lastDayStr;
+    }
+
+    setBillingDefaultDates();
+
+    // 조회 버튼
+    if (billingSearchBtn) {
+      billingSearchBtn.addEventListener('click', function() {
+        var company = billingCompanyInput.value.trim();
+        var startDate = billingStartDateInput.value;
+        var endDate = billingEndDateInput.value;
+
+        if (!company) {
+          alert('거래처를 입력해주세요.');
+          return;
+        }
+
+        if (!startDate || !endDate) {
+          alert('기간을 선택해주세요.');
+          return;
+        }
+
+        billingState.company = company;
+        billingState.startDate = startDate;
+        billingState.endDate = endDate;
+
+        OB.showLoading('청구 데이터 집계 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+
+            if (!result || !result.success) {
+              alert('집계 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              renderBillingEmpty();
+              return;
+            }
+
+            billingState.currentData = result;
+            renderBillingSummary(result);
+            renderBillingTable(result.items || []);
+            showBillingActions();
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            alert('집계 실패: ' + error.message);
+            renderBillingEmpty();
+          })
+          .aggregateBillingDataApi({
+            company: company,
+            startDate: startDate,
+            endDate: endDate
+          });
+      });
+    }
+
+    // 초기화 버튼
+    if (billingResetBtn) {
+      billingResetBtn.addEventListener('click', function() {
+        billingCompanyInput.value = '';
+        setBillingDefaultDates();
+        billingState.currentData = null;
+        renderBillingEmpty();
+        hideBillingSummary();
+        hideBillingActions();
+      });
+    }
+
+    // 요약 렌더링
+    function renderBillingSummary(data) {
+      document.getElementById('billing-total-items').textContent = OB.formatNumber(data.totalItems || 0);
+      document.getElementById('billing-total-order-qty').textContent = OB.formatNumber(data.totalOrderQty || 0);
+      document.getElementById('billing-total-confirmed-qty').textContent = OB.formatNumber(data.totalConfirmedQty || 0);
+      document.getElementById('billing-total-amount').textContent = '₩' + OB.formatNumber(data.totalAmount || 0);
+
+      billingSummary.classList.add('active');
+    }
+
+    function hideBillingSummary() {
+      billingSummary.classList.remove('active');
+    }
+
+    // 테이블 렌더링
+    function renderBillingTable(items) {
+      if (!items || items.length === 0) {
+        renderBillingEmpty();
+        return;
+      }
+
+      billingTbody.innerHTML = '';
+
+      items.forEach(function(item) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + (item.orderCode || '') + '</td>' +
+          '<td>' + (item.orderDate || '') + '</td>' +
+          '<td>' + (item.supplier || '') + '</td>' +
+          '<td>' + (item.brand || '') + '</td>' +
+          '<td>' + (item.productName || '') + '</td>' +
+          '<td>' + (item.productCode || '') + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.orderQty || 0) + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.confirmedQty || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(item.supplyPrice || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(item.supplyAmount || 0) + '</td>';
+
+        billingTbody.appendChild(tr);
+      });
+    }
+
+    function renderBillingEmpty() {
+      billingTbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">거래처와 기간을 선택하여 조회하세요</td></tr>';
+    }
+
+    function showBillingActions() {
+      billingActions.style.display = 'flex';
+    }
+
+    function hideBillingActions() {
+      billingActions.style.display = 'none';
+    }
+
+    // 엑셀 다운로드
+    var billingExportXlsxBtn = document.getElementById('billing-export-xlsx');
+    if (billingExportXlsxBtn) {
+      billingExportXlsxBtn.addEventListener('click', function() {
+        if (!billingState.currentData || !billingState.currentData.items) {
+          alert('다운로드할 데이터가 없습니다.');
+          return;
+        }
+
+        var csv = [];
+        csv.push(['발주번호', '발주일', '매입처', '브랜드', '제품명', '품목코드', '발주수량', '확정수량', '공급가', '공급액'].join(','));
+
+        billingState.currentData.items.forEach(function(item) {
+          var row = [
+            item.orderCode || '',
+            item.orderDate || '',
+            item.supplier || '',
+            item.brand || '',
+            item.productName || '',
+            item.productCode || '',
+            item.orderQty || 0,
+            item.confirmedQty || 0,
+            item.supplyPrice || 0,
+            item.supplyAmount || 0
+          ];
+          csv.push(row.join(','));
+        });
+
+        var csvContent = '\uFEFF' + csv.join('\n');
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var link = document.createElement('a');
+        var url = URL.createObjectURL(blob);
+
+        var fileName = '청구서_' + billingState.company + '_' +
+          billingState.startDate.replace(/-/g, '') + '-' +
+          billingState.endDate.replace(/-/g, '') + '.csv';
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('✅ 엑셀 다운로드 완료');
+      });
+    }
+
+    // PDF 청구서 생성 (기존 명세서 템플릿 활용)
+    var billingExportPdfBtn = document.getElementById('billing-export-pdf');
+    if (billingExportPdfBtn) {
+      billingExportPdfBtn.addEventListener('click', function() {
+        if (!billingState.currentData || !billingState.currentData.items) {
+          alert('생성할 데이터가 없습니다.');
+          return;
+        }
+
+        alert('PDF 청구서 생성은 기존 명세서 출력 기능을 활용합니다.\n발주번호별 출력 탭에서 해당 거래처의 발주서를 선택하여 "거래명세서" 유형으로 출력하세요.');
+      });
+    }
+
+    // 청구서 DB 저장 + 발행
+    var billingSaveDbBtn = document.getElementById('billing-save-db');
+    if (billingSaveDbBtn) {
+      billingSaveDbBtn.addEventListener('click', function() {
+        if (!billingState.currentData || !billingState.currentData.items) {
+          alert('저장할 데이터가 없습니다.');
+          return;
+        }
+
+        if (!confirm('청구서를 DB에 저장하고 발행하시겠습니까?')) {
+          return;
+        }
+
+        var params = {
+          settlementId: '',
+          type: 'SALES',
+          company: billingState.company,
+          billingDate: new Date(),
+          amount: billingState.currentData.totalAmount,
+          notes: billingState.startDate + ' ~ ' + billingState.endDate + ' 청구'
+        };
+
+        OB.showLoading('청구서 저장 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+
+            if (!result || !result.success) {
+              alert('저장 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              return;
+            }
+
+            alert('청구서가 저장되었습니다!\n청구ID: ' + result.billingId);
+            console.log('✅ 청구서 저장 완료:', result.billingId);
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            alert('저장 실패: ' + error.message);
+          })
+          .createBillingApi(params);
+      });
+    }
+
     console.log('✅ InvoiceOutput 페이지 초기화 완료');
   };
 

@@ -1,6 +1,49 @@
 <style>
 .ob-container{padding:20px;}
 
+/* 탭 네비게이션 */
+.tab-navigation{
+  display:flex;
+  gap:0;
+  background:white;
+  border-radius:8px 8px 0 0;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:0;
+  border-bottom:2px solid #e5e7eb;
+}
+.tab-nav-item{
+  padding:12px 24px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  color:#6b7280;
+  border-bottom:3px solid transparent;
+  transition:all 0.2s;
+  user-select:none;
+}
+.tab-nav-item:hover{
+  color:#2563eb;
+  background:#f9fafb;
+}
+.tab-nav-item.active{
+  color:#2563eb;
+  border-bottom-color:#2563eb;
+  background:white;
+}
+
+/* 탭 콘텐츠 */
+.tab-content{
+  display:none;
+  animation:fadeIn 0.3s;
+}
+.tab-content.active{
+  display:block;
+}
+@keyframes fadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+
 /* 상단 옵션바 */
 .ob-topbar{
   display:flex;
@@ -8,7 +51,7 @@
   flex-wrap:wrap;
   background:white;
   padding:12px;
-  border-radius:8px;
+  border-radius:0 8px 8px 8px;
   box-shadow:0 1px 4px rgba(0,0,0,0.1);
   margin-bottom:16px;
   align-items:center;
@@ -57,6 +100,34 @@
 .bulk-select-btn:hover{
   background:#f3f4f6;
   border-color:#9ca3af;
+}
+
+/* 청구서 요약 카드 */
+.billing-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:12px;
+  margin-bottom:16px;
+  display:none;
+}
+.billing-summary.active{
+  display:grid;
+}
+.billing-summary-card{
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.billing-summary-label{
+  font-size:12px;
+  color:#64748b;
+  margin-bottom:4px;
+}
+.billing-summary-value{
+  font-size:20px;
+  font-weight:700;
+  color:#1e293b;
 }
 
 /* 테이블 */
@@ -155,93 +226,179 @@
 
 <div class="ob-container">
 
-  <!-- 상단 옵션바 -->
-  <div class="ob-topbar">
-    <label>문서 유형</label>
-    <select id="inv-doc-type">
-      <option value="발주서(매입)">발주서(매입)</option>
-      <option value="발주서(매입)_롬앤">발주서(매입)_롬앤</option>
-      <option value="발주서(매입)_종근당">발주서(매입)_종근당</option>
-      <option value="발주서(매입)_삐아계열">발주서(매입)_삐아계열</option>
-      <option value="거래명세서(영세)">거래명세서(영세)</option>
-      <option value="거래명세서(부포)">거래명세서(부포)</option>
-      <option value="거래명세서(해외)">거래명세서(해외)</option>
-    </select>
-
-    <label>출력 방식</label>
-    <select id="inv-default-mode">
-      <option value="auto">자동(5행 기준)</option>
-      <option value="full">전체내역</option>
-      <option value="short">단축내역</option>
-    </select>
-
-    <label>발주번호</label>
-    <input id="inv-order-code" placeholder="OB2025-...">
-
-    <label>기간</label>
-    <input id="inv-start-date" type="date">
-    <input id="inv-end-date" type="date">
-
-    <label>매입처</label>
-    <input id="inv-supplier" placeholder="업체명">
-
-    <button id="inv-search-btn" class="ob-btn primary">조회</button>
-    <button id="inv-export-xlsx" class="ob-btn secondary">Excel 출력</button>
-    <button id="inv-export-pdf" class="ob-btn success">PDF 출력</button>
-
-    <div style="display:flex;gap:8px;align-items:center;margin-left:auto;padding:6px 12px;background:#f0f9ff;border-radius:6px;border:1px solid #bfdbfe;">
-      <input type="checkbox" id="inv-merge-by-supplier" style="width:16px;height:16px;cursor:pointer;">
-      <label for="inv-merge-by-supplier" style="margin:0;font-size:13px;font-weight:500;color:#1e40af;cursor:pointer;">매입처별 통합 출력</label>
+  <!-- 탭 네비게이션 -->
+  <div class="tab-navigation">
+    <div class="tab-nav-item active" data-tab="order-output">
+      📋 발주번호별 출력
+    </div>
+    <div class="tab-nav-item" data-tab="bulk-billing">
+      💳 일괄 청구서
     </div>
   </div>
 
-  <!-- 일괄 선택 버튼 그룹 -->
-  <div class="bulk-select-group" id="inv-bulk-select" style="display:none;">
-    <span style="font-size:12px;font-weight:bold;color:#6b7280;">빠른 선택:</span>
-    <button class="bulk-select-btn" id="inv-select-all">전체 선택</button>
-    <button class="bulk-select-btn" id="inv-deselect-all">전체 해제</button>
-    <span style="border-left:1px solid #d1d5db;height:20px;"></span>
-    <span style="font-size:12px;color:#6b7280;">브랜드별:</span>
-    <div id="inv-brand-btns"></div>
-    <span style="border-left:1px solid #d1d5db;height:20px;"></span>
-    <span style="font-size:12px;color:#6b7280;">매입처별:</span>
-    <div id="inv-supplier-btns"></div>
-  </div>
+  <!-- =============================================== -->
+  <!-- 탭 1: 발주번호별 출력 (기존) -->
+  <!-- =============================================== -->
+  <div id="tab-order-output" class="tab-content active">
 
-  <!-- 테이블 -->
-  <div class="ob-table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th><input type="checkbox" id="inv-check-all"></th>
-          <th class="sortable" data-sort="orderDate">발주일</th>
-          <th class="sortable" data-sort="orderCode">발주번호</th>
-          <th class="sortable" data-sort="brand">브랜드</th>
-          <th class="sortable" data-sort="supplier">매입처</th>
-          <th class="sortable" data-sort="buyer">발주처</th>
-          <th class="sortable num" data-sort="itemCount">품목수</th>
-          <th class="sortable num" data-sort="totalPurchaseAmount">매입액합계</th>
-          <th class="sortable num" data-sort="totalAmount">공급액합계</th>
-          <th>출력방식</th>
-        </tr>
-      </thead>
-      <tbody id="inv-result-tbody">
-        <tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <!-- 상단 옵션바 -->
+    <div class="ob-topbar">
+      <label>문서 유형</label>
+      <select id="inv-doc-type">
+        <option value="발주서(매입)">발주서(매입)</option>
+        <option value="발주서(매입)_롬앤">발주서(매입)_롬앤</option>
+        <option value="발주서(매입)_종근당">발주서(매입)_종근당</option>
+        <option value="발주서(매입)_삐아계열">발주서(매입)_삐아계열</option>
+        <option value="거래명세서(영세)">거래명세서(영세)</option>
+        <option value="거래명세서(부포)">거래명세서(부포)</option>
+        <option value="거래명세서(해외)">거래명세서(해외)</option>
+      </select>
 
-  <!-- 페이지네이션 -->
-  <div class="pagination-container" id="inv-pagination" style="display:none;">
-    <div class="page-info" id="inv-page-info">0-0 / 0</div>
-    <div class="pagination-controls">
-      <button class="pagination-btn" id="inv-page-first">처음</button>
-      <button class="pagination-btn" id="inv-page-prev">이전</button>
-      <div id="inv-page-numbers" style="display:flex;gap:4px;"></div>
-      <button class="pagination-btn" id="inv-page-next">다음</button>
-      <button class="pagination-btn" id="inv-page-last">마지막</button>
+      <label>출력 방식</label>
+      <select id="inv-default-mode">
+        <option value="auto">자동(5행 기준)</option>
+        <option value="full">전체내역</option>
+        <option value="short">단축내역</option>
+      </select>
+
+      <label>발주번호</label>
+      <input id="inv-order-code" placeholder="OB2025-...">
+
+      <label>기간</label>
+      <input id="inv-start-date" type="date">
+      <input id="inv-end-date" type="date">
+
+      <label>매입처</label>
+      <input id="inv-supplier" placeholder="업체명">
+
+      <button id="inv-search-btn" class="ob-btn primary">조회</button>
+      <button id="inv-export-xlsx" class="ob-btn secondary">Excel 출력</button>
+      <button id="inv-export-pdf" class="ob-btn success">PDF 출력</button>
+
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto;padding:6px 12px;background:#f0f9ff;border-radius:6px;border:1px solid #bfdbfe;">
+        <input type="checkbox" id="inv-merge-by-supplier" style="width:16px;height:16px;cursor:pointer;">
+        <label for="inv-merge-by-supplier" style="margin:0;font-size:13px;font-weight:500;color:#1e40af;cursor:pointer;">매입처별 통합 출력</label>
+      </div>
     </div>
+
+    <!-- 일괄 선택 버튼 그룹 -->
+    <div class="bulk-select-group" id="inv-bulk-select" style="display:none;">
+      <span style="font-size:12px;font-weight:bold;color:#6b7280;">빠른 선택:</span>
+      <button class="bulk-select-btn" id="inv-select-all">전체 선택</button>
+      <button class="bulk-select-btn" id="inv-deselect-all">전체 해제</button>
+      <span style="border-left:1px solid #d1d5db;height:20px;"></span>
+      <span style="font-size:12px;color:#6b7280;">브랜드별:</span>
+      <div id="inv-brand-btns"></div>
+      <span style="border-left:1px solid #d1d5db;height:20px;"></span>
+      <span style="font-size:12px;color:#6b7280;">매입처별:</span>
+      <div id="inv-supplier-btns"></div>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="ob-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="inv-check-all"></th>
+            <th class="sortable" data-sort="orderDate">발주일</th>
+            <th class="sortable" data-sort="orderCode">발주번호</th>
+            <th class="sortable" data-sort="brand">브랜드</th>
+            <th class="sortable" data-sort="supplier">매입처</th>
+            <th class="sortable" data-sort="buyer">발주처</th>
+            <th class="sortable num" data-sort="itemCount">품목수</th>
+            <th class="sortable num" data-sort="totalPurchaseAmount">매입액합계</th>
+            <th class="sortable num" data-sort="totalAmount">공급액합계</th>
+            <th>출력방식</th>
+          </tr>
+        </thead>
+        <tbody id="inv-result-tbody">
+          <tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 페이지네이션 -->
+    <div class="pagination-container" id="inv-pagination" style="display:none;">
+      <div class="page-info" id="inv-page-info">0-0 / 0</div>
+      <div class="pagination-controls">
+        <button class="pagination-btn" id="inv-page-first">처음</button>
+        <button class="pagination-btn" id="inv-page-prev">이전</button>
+        <div id="inv-page-numbers" style="display:flex;gap:4px;"></div>
+        <button class="pagination-btn" id="inv-page-next">다음</button>
+        <button class="pagination-btn" id="inv-page-last">마지막</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- =============================================== -->
+  <!-- 탭 2: 일괄 청구서 (신규) -->
+  <!-- =============================================== -->
+  <div id="tab-bulk-billing" class="tab-content">
+
+    <!-- 검색 옵션바 -->
+    <div class="ob-topbar">
+      <label>거래처</label>
+      <input id="billing-company" placeholder="발주처 입력" style="min-width:200px;">
+
+      <label>기간</label>
+      <input id="billing-start-date" type="date">
+      <input id="billing-end-date" type="date">
+
+      <button id="billing-search-btn" class="ob-btn primary">🔍 조회</button>
+      <button id="billing-reset-btn" class="ob-btn secondary">초기화</button>
+    </div>
+
+    <!-- 청구서 요약 -->
+    <div class="billing-summary" id="billing-summary">
+      <div class="billing-summary-card">
+        <div class="billing-summary-label">총 품목수</div>
+        <div class="billing-summary-value" id="billing-total-items">0</div>
+      </div>
+      <div class="billing-summary-card">
+        <div class="billing-summary-label">총 발주수량</div>
+        <div class="billing-summary-value" id="billing-total-order-qty">0</div>
+      </div>
+      <div class="billing-summary-card">
+        <div class="billing-summary-label">총 확정수량</div>
+        <div class="billing-summary-value" id="billing-total-confirmed-qty">0</div>
+      </div>
+      <div class="billing-summary-card">
+        <div class="billing-summary-label">총 청구금액</div>
+        <div class="billing-summary-value" id="billing-total-amount">₩0</div>
+      </div>
+    </div>
+
+    <!-- 상세 테이블 -->
+    <div class="ob-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>발주번호</th>
+            <th>발주일</th>
+            <th>매입처</th>
+            <th>브랜드</th>
+            <th>제품명</th>
+            <th>품목코드</th>
+            <th class="num">발주수량</th>
+            <th class="num">확정수량</th>
+            <th class="num">공급가</th>
+            <th class="num">공급액</th>
+          </tr>
+        </thead>
+        <tbody id="billing-result-tbody">
+          <tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">거래처와 기간을 선택하여 조회하세요</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 액션 버튼 -->
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:16px;background:white;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);" id="billing-actions" style="display:none;">
+      <button class="ob-btn secondary" id="billing-export-xlsx">📥 엑셀 다운로드</button>
+      <button class="ob-btn success" id="billing-export-pdf">📄 PDF 청구서 생성</button>
+      <button class="ob-btn primary" id="billing-save-db">💾 청구서 DB 저장 + 발행</button>
+    </div>
+
   </div>
 
 </div>
-

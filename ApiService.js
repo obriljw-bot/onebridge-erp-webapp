@@ -687,6 +687,30 @@ function getSalesSettlementsApi(params) {
 }
 
 /**
+ * 매입 마감 데이터 집계
+ */
+function aggregatePurchaseOrdersApi(params) {
+  var result = aggregatePurchaseOrders(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매출 마감 데이터 집계
+ */
+function aggregateSalesOrdersApi(params) {
+  var result = aggregateSalesOrders(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서용 데이터 집계
+ */
+function aggregateBillingDataApi(params) {
+  var result = aggregateBillingData(params);
+  return safeReturn(result);
+}
+
+/**
  * ============================================================
  * 청구서 관리 API (Phase 2)
  * ============================================================

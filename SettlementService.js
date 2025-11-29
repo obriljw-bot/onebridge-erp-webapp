@@ -32,13 +32,7 @@ function aggregatePurchaseOrders(params) {
     var startDate = params.startDate || '';
     var endDate = params.endDate || '';
 
-    if (!supplier) {
-      return {
-        success: false,
-        error: '매입처를 선택해주세요.'
-      };
-    }
-
+    // 기간은 필수
     if (!startDate || !endDate) {
       return {
         success: false,
@@ -46,7 +40,7 @@ function aggregatePurchaseOrders(params) {
       };
     }
 
-    Logger.log('[aggregatePurchaseOrders] 매입처: ' + supplier + ', 기간: ' + startDate + ' ~ ' + endDate);
+    Logger.log('[aggregatePurchaseOrders] 매입처: ' + (supplier || '전체') + ', 기간: ' + startDate + ' ~ ' + endDate);
 
     // 거래원장에서 데이터 조회
     var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
@@ -95,8 +89,8 @@ function aggregatePurchaseOrders(params) {
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
 
-      // 매입처 필터
-      if (row[cSupplier] !== supplier) continue;
+      // 매입처 필터 (매입처가 지정된 경우만)
+      if (supplier && row[cSupplier] !== supplier) continue;
 
       // 날짜 필터
       var orderDate = parseDate(row[cOrderDate]);
@@ -166,13 +160,7 @@ function aggregateSalesOrders(params) {
     var startDate = params.startDate || '';
     var endDate = params.endDate || '';
 
-    if (!buyer) {
-      return {
-        success: false,
-        error: '발주처를 선택해주세요.'
-      };
-    }
-
+    // 기간은 필수
     if (!startDate || !endDate) {
       return {
         success: false,
@@ -180,7 +168,7 @@ function aggregateSalesOrders(params) {
       };
     }
 
-    Logger.log('[aggregateSalesOrders] 발주처: ' + buyer + ', 기간: ' + startDate + ' ~ ' + endDate);
+    Logger.log('[aggregateSalesOrders] 발주처: ' + (buyer || '전체') + ', 기간: ' + startDate + ' ~ ' + endDate);
 
     var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
     var sheet = ss.getSheetByName(OB_ORDER_LEDGER_SHEET);
@@ -224,8 +212,8 @@ function aggregateSalesOrders(params) {
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
 
-      // 발주처 필터
-      if (row[cBuyer] !== buyer) continue;
+      // 발주처 필터 (발주처가 지정된 경우만)
+      if (buyer && row[cBuyer] !== buyer) continue;
 
       // 날짜 필터
       var orderDate = parseDate(row[cOrderDate]);
@@ -640,6 +628,127 @@ function formatYearMonth(date) {
 
   return year + month;
 }
+
+/**
+ * 청구서용 거래 데이터 집계
+ * @param {Object} params - { company, startDate, endDate }
+ * @returns {Object} 집계 결과
+ */
+function aggregateBillingData(params) {
+  try {
+    var company = params.company || '';
+    var startDate = params.startDate || '';
+    var endDate = params.endDate || '';
+
+    if (!company) {
+      return {
+        success: false,
+        error: '거래처를 입력해주세요.'
+      };
+    }
+
+    if (!startDate || !endDate) {
+      return {
+        success: false,
+        error: '기간을 선택해주세요.'
+      };
+    }
+
+    Logger.log('[aggregateBillingData] 거래처: ' + company + ', 기간: ' + startDate + ' ~ ' + endDate);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_ORDER_LEDGER_SHEET);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '거래원장 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    var col = function(name) { return header.indexOf(name); };
+    var cOrderDate = col('발주일');
+    var cOrderCode = col('발주번호');
+    var cSupplier = col('매입처');
+    var cBuyer = col('발주처');
+    var cBrand = col('브랜드');
+    var cProductName = col('제품명');
+    var cProductCode = col('품목코드');
+    var cOrderQty = col('발주수량');
+    var cConfirmedQty = col('확정수량');
+    var cSupplyPrice = col('공급가');
+
+    var parseDate = function(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      return new Date(d);
+    };
+
+    var start = parseDate(startDate);
+    var end = parseDate(endDate);
+
+    var items = [];
+    var totalOrderQty = 0;
+    var totalConfirmedQty = 0;
+    var totalAmount = 0;
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // 발주처 필터
+      if (row[cBuyer] !== company) continue;
+
+      // 날짜 필터
+      var orderDate = parseDate(row[cOrderDate]);
+      if (!orderDate || orderDate < start || orderDate > end) continue;
+
+      var orderQty = Number(row[cOrderQty]) || 0;
+      var confirmedQty = Number(row[cConfirmedQty]) || 0;
+      var supplyPrice = Number(row[cSupplyPrice]) || 0;
+      var supplyAmount = confirmedQty * supplyPrice;
+
+      items.push({
+        orderCode: row[cOrderCode],
+        orderDate: formatDateString(row[cOrderDate]),
+        supplier: row[cSupplier],
+        brand: row[cBrand],
+        productName: row[cProductName],
+        productCode: row[cProductCode],
+        orderQty: orderQty,
+        confirmedQty: confirmedQty,
+        supplyPrice: supplyPrice,
+        supplyAmount: supplyAmount
+      });
+
+      totalOrderQty += orderQty;
+      totalConfirmedQty += confirmedQty;
+      totalAmount += supplyAmount;
+    }
+
+    return {
+      success: true,
+      company: company,
+      startDate: startDate,
+      endDate: endDate,
+      totalItems: items.length,
+      totalOrderQty: totalOrderQty,
+      totalConfirmedQty: totalConfirmedQty,
+      totalAmount: totalAmount,
+      items: items
+    };
+
+  } catch (err) {
+    Logger.log('[aggregateBillingData Error] ' + err.message);
+    return {
+      success: false,
+      error: '집계 중 오류 발생: ' + err.message
+    };
+  }
+}
+
 
 /**
  * ============================================================
