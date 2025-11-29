@@ -1,0 +1,265 @@
+<style>
+.monthly-closing-wrap{padding:20px;}
+
+/* 페이지 헤더 */
+.monthly-closing-header{
+  margin-bottom:20px;
+}
+.monthly-closing-header h1{
+  font-size:24px;
+  font-weight:700;
+  color:#1e293b;
+  margin:0 0 8px 0;
+}
+.monthly-closing-header p{
+  color:#64748b;
+  margin:0;
+  font-size:14px;
+}
+
+/* 선택 바 */
+.monthly-closing-select{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+  align-items:flex-end;
+}
+
+.monthly-closing-select-field{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.monthly-closing-select-field label{
+  font-size:13px;
+  font-weight:500;
+  color:#475569;
+}
+.monthly-closing-select-field input{
+  padding:8px 12px;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+  font-size:14px;
+  min-width:150px;
+}
+
+.monthly-btn{
+  padding:8px 16px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  transition:all 0.2s;
+}
+.monthly-btn.primary{background:#2563eb;color:white;}
+.monthly-btn.primary:hover{background:#1d4ed8;}
+.monthly-btn.danger{background:#ef4444;color:white;}
+.monthly-btn.danger:hover{background:#dc2626;}
+.monthly-btn.success{background:#10b981;color:white;}
+.monthly-btn.success:hover{background:#059669;}
+
+/* 현재 상태 카드 */
+.monthly-status{
+  background:white;
+  padding:20px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+  display:none;
+}
+.monthly-status.open{border-left:4px solid #10b981;}
+.monthly-status.closed{border-left:4px solid #ef4444;}
+
+.monthly-status-title{
+  font-size:16px;
+  font-weight:600;
+  color:#1e293b;
+  margin-bottom:12px;
+}
+
+.monthly-status-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:16px;
+  margin-bottom:16px;
+}
+
+.monthly-status-item{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.monthly-status-label{
+  font-size:12px;
+  color:#64748b;
+}
+.monthly-status-value{
+  font-size:18px;
+  font-weight:700;
+  color:#1e293b;
+}
+.monthly-status-value.status{
+  padding:4px 12px;
+  border-radius:4px;
+  font-size:14px;
+  display:inline-block;
+  width:fit-content;
+}
+.monthly-status-value.status.open{background:#d1fae5;color:#065f46;}
+.monthly-status-value.status.closed{background:#fee2e2;color:#991b1b;}
+
+.monthly-status-actions{
+  display:flex;
+  gap:8px;
+  padding-top:12px;
+  border-top:1px solid #e2e8f0;
+}
+
+/* 마감 내역 테이블 */
+.monthly-table-wrap{
+  overflow:auto;
+  max-height:500px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.monthly-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.monthly-table th,
+.monthly-table td{
+  padding:10px;
+  border-bottom:1px solid #e2e8f0;
+  text-align:left;
+}
+.monthly-table th{
+  background:#f1f5f9;
+  font-weight:600;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.monthly-table td.num{text-align:right;}
+.monthly-table td.status{text-align:center;}
+
+.status-badge{
+  padding:4px 8px;
+  border-radius:4px;
+  font-size:12px;
+  font-weight:500;
+}
+.status-badge.open{background:#d1fae5;color:#065f46;}
+.status-badge.closed{background:#fee2e2;color:#991b1b;}
+
+.monthly-empty{
+  text-align:center;
+  padding:60px 20px;
+  color:#64748b;
+}
+.monthly-empty-icon{
+  font-size:48px;
+  margin-bottom:12px;
+}
+.monthly-empty-text{
+  font-size:14px;
+}
+</style>
+
+<div class="monthly-closing-wrap">
+  <!-- 페이지 헤더 -->
+  <div class="monthly-closing-header">
+    <h1>📅 월별 마감</h1>
+    <p>월 단위로 매입/매출 마감을 확정하고 관리합니다</p>
+  </div>
+
+  <!-- 월 선택 -->
+  <div class="monthly-closing-select">
+    <div class="monthly-closing-select-field">
+      <label>마감 월</label>
+      <input type="month" id="monthly-closing-month">
+    </div>
+
+    <button class="monthly-btn primary" id="monthly-closing-check-btn">
+      🔍 조회
+    </button>
+
+    <button class="monthly-btn success" id="monthly-closing-execute-btn" style="display:none;">
+      ✅ 마감 실행
+    </button>
+
+    <button class="monthly-btn danger" id="monthly-closing-unlock-btn" style="display:none;">
+      🔓 마감 해제
+    </button>
+  </div>
+
+  <!-- 현재 상태 -->
+  <div class="monthly-status" id="monthly-closing-status">
+    <div class="monthly-status-title" id="monthly-status-title">2025년 1월 마감 상태</div>
+
+    <div class="monthly-status-grid">
+      <div class="monthly-status-item">
+        <div class="monthly-status-label">마감 상태</div>
+        <div class="monthly-status-value status" id="monthly-status-value">OPEN</div>
+      </div>
+
+      <div class="monthly-status-item">
+        <div class="monthly-status-label">총 매입 건수</div>
+        <div class="monthly-status-value" id="monthly-purchase-count">0</div>
+      </div>
+
+      <div class="monthly-status-item">
+        <div class="monthly-status-label">총 매입액</div>
+        <div class="monthly-status-value" id="monthly-purchase-amount">₩0</div>
+      </div>
+
+      <div class="monthly-status-item">
+        <div class="monthly-status-label">총 매출 건수</div>
+        <div class="monthly-status-value" id="monthly-sales-count">0</div>
+      </div>
+
+      <div class="monthly-status-item">
+        <div class="monthly-status-label">총 매출액</div>
+        <div class="monthly-status-value" id="monthly-sales-amount">₩0</div>
+      </div>
+    </div>
+
+    <div class="monthly-status-info" id="monthly-status-info" style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:4px;font-size:13px;color:#64748b;display:none;">
+      <div id="monthly-closed-info"></div>
+    </div>
+  </div>
+
+  <!-- 마감 내역 테이블 -->
+  <div class="monthly-table-wrap">
+    <table class="monthly-table">
+      <thead>
+        <tr>
+          <th>년월</th>
+          <th class="status">상태</th>
+          <th class="num">매입 건수</th>
+          <th class="num">매입액</th>
+          <th class="num">매출 건수</th>
+          <th class="num">매출액</th>
+          <th>마감일시</th>
+          <th>마감자</th>
+          <th>해제일시</th>
+        </tr>
+      </thead>
+      <tbody id="monthly-closing-tbody">
+        <tr>
+          <td colspan="9" class="monthly-empty">
+            <div class="monthly-empty-icon">📋</div>
+            <div class="monthly-empty-text">마감 내역이 없습니다</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

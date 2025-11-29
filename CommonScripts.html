@@ -44,6 +44,9 @@
       case 'salesSettlement':
         initFuncName = 'initSalesSettlementPage';
         break;
+      case 'monthlyClosing':
+        initFuncName = 'initMonthlyClosingPage';
+        break;
       case 'settings':
         initFuncName = 'initSettingsPage';
         break;
@@ -1971,6 +1974,274 @@
     }
 
     console.log('✅ SalesSettlement 페이지 초기화 완료');
+  };
+
+  // ========================================
+  // 월별 마감 페이지
+  // ========================================
+
+  OB.monthlyClosingState = {
+    currentMonth: '',
+    currentStatus: null,
+    closingsList: []
+  };
+
+  OB.initMonthlyClosingPage = function() {
+    console.log('🔧 MonthlyClosing 페이지 초기화 시작');
+
+    var state = OB.monthlyClosingState;
+
+    // DOM 요소
+    var monthInput = document.getElementById('monthly-closing-month');
+    var checkBtn = document.getElementById('monthly-closing-check-btn');
+    var executeBtn = document.getElementById('monthly-closing-execute-btn');
+    var unlockBtn = document.getElementById('monthly-closing-unlock-btn');
+    var statusDiv = document.getElementById('monthly-closing-status');
+    var tbody = document.getElementById('monthly-closing-tbody');
+
+    // 기본 월 설정 (이번 달)
+    setDefaultMonth();
+
+    function setDefaultMonth() {
+      var now = new Date();
+      var year = now.getFullYear();
+      var month = String(now.getMonth() + 1).padStart(2, '0');
+      monthInput.value = year + '-' + month;
+    }
+
+    // 전체 마감 내역 로드
+    loadAllClosings();
+
+    function loadAllClosings() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (!result || !result.success) {
+            console.error('마감 내역 조회 실패:', result);
+            return;
+          }
+
+          state.closingsList = result.closings || [];
+          renderClosingsTable(state.closingsList);
+        })
+        .withFailureHandler(function(error) {
+          console.error('마감 내역 조회 실패:', error);
+        })
+        .getMonthlyClosingsApi();
+    }
+
+    // 조회 버튼
+    if (checkBtn) {
+      checkBtn.addEventListener('click', function() {
+        var month = monthInput.value;
+        if (!month) {
+          alert('마감 월을 선택해주세요.');
+          return;
+        }
+
+        state.currentMonth = month.replace('-', '');
+        checkMonthStatus(state.currentMonth);
+      });
+    }
+
+    // 마감 실행 버튼
+    if (executeBtn) {
+      executeBtn.addEventListener('click', function() {
+        if (!confirm('월 마감을 실행하시겠습니까?\n마감 후에는 해당 월의 CONFIRMED 상태인 모든 마감이 LOCKED 됩니다.')) {
+          return;
+        }
+
+        OB.showLoading('월 마감 실행 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+
+            if (!result || !result.success) {
+              alert('마감 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              return;
+            }
+
+            alert(result.message || '월 마감 완료');
+            console.log('✅ 월 마감 완료:', result);
+
+            // 상태 다시 조회
+            checkMonthStatus(state.currentMonth);
+            loadAllClosings();
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 마감 실패:', error);
+            alert('마감 실패: ' + error.message);
+          })
+          .executeMonthlyClosingApi({
+            yearMonth: state.currentMonth
+          });
+      });
+    }
+
+    // 마감 해제 버튼
+    if (unlockBtn) {
+      unlockBtn.addEventListener('click', function() {
+        if (!confirm('월 마감을 해제하시겠습니까?\n해당 월의 모든 LOCKED 마감이 CONFIRMED로 변경됩니다.')) {
+          return;
+        }
+
+        OB.showLoading('월 마감 해제 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+
+            if (!result || !result.success) {
+              alert('해제 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              return;
+            }
+
+            alert(result.message || '월 마감 해제 완료');
+            console.log('✅ 월 마감 해제 완료:', result);
+
+            // 상태 다시 조회
+            checkMonthStatus(state.currentMonth);
+            loadAllClosings();
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 해제 실패:', error);
+            alert('해제 실패: ' + error.message);
+          })
+          .unlockMonthlyClosingApi({
+            yearMonth: state.currentMonth
+          });
+      });
+    }
+
+    // 월 상태 확인
+    function checkMonthStatus(yearMonth) {
+      // 마감 내역에서 해당 월 찾기
+      var closing = null;
+      for (var i = 0; i < state.closingsList.length; i++) {
+        if (state.closingsList[i].yearMonth === yearMonth) {
+          closing = state.closingsList[i];
+          break;
+        }
+      }
+
+      state.currentStatus = closing;
+      renderStatus(closing, yearMonth);
+      updateButtons(closing);
+    }
+
+    // 상태 렌더링
+    function renderStatus(closing, yearMonth) {
+      var year = yearMonth.substring(0, 4);
+      var month = yearMonth.substring(4, 6);
+
+      document.getElementById('monthly-status-title').textContent =
+        year + '년 ' + parseInt(month) + '월 마감 상태';
+
+      if (closing) {
+        // 마감 완료
+        document.getElementById('monthly-status-value').textContent = closing.status;
+        document.getElementById('monthly-status-value').className =
+          'monthly-status-value status ' + closing.status.toLowerCase();
+
+        document.getElementById('monthly-purchase-count').textContent =
+          OB.formatNumber(closing.purchaseCount || 0);
+        document.getElementById('monthly-purchase-amount').textContent =
+          '₩' + OB.formatNumber(closing.purchaseAmount || 0);
+        document.getElementById('monthly-sales-count').textContent =
+          OB.formatNumber(closing.salesCount || 0);
+        document.getElementById('monthly-sales-amount').textContent =
+          '₩' + OB.formatNumber(closing.salesAmount || 0);
+
+        statusDiv.className = 'monthly-status ' + closing.status.toLowerCase();
+
+        // 마감 정보 표시
+        var infoDiv = document.getElementById('monthly-status-info');
+        var infoText = '';
+        if (closing.status === 'CLOSED') {
+          infoText = '📌 마감일시: ' + closing.closedAt + ' (마감자: ' + closing.closedBy + ')';
+        } else if (closing.status === 'OPEN') {
+          infoText = '🔓 마감 해제일시: ' + closing.unlockedAt + ' (해제자: ' + closing.unlockedBy + ')';
+        }
+        document.getElementById('monthly-closed-info').textContent = infoText;
+        infoDiv.style.display = infoText ? 'block' : 'none';
+
+      } else {
+        // 마감 전
+        document.getElementById('monthly-status-value').textContent = 'OPEN';
+        document.getElementById('monthly-status-value').className =
+          'monthly-status-value status open';
+
+        document.getElementById('monthly-purchase-count').textContent = '-';
+        document.getElementById('monthly-purchase-amount').textContent = '-';
+        document.getElementById('monthly-sales-count').textContent = '-';
+        document.getElementById('monthly-sales-amount').textContent = '-';
+
+        statusDiv.className = 'monthly-status open';
+
+        document.getElementById('monthly-status-info').style.display = 'none';
+      }
+
+      statusDiv.style.display = 'block';
+    }
+
+    // 버튼 업데이트
+    function updateButtons(closing) {
+      if (closing && closing.status === 'CLOSED') {
+        executeBtn.style.display = 'none';
+        unlockBtn.style.display = 'inline-block';
+      } else {
+        executeBtn.style.display = 'inline-block';
+        unlockBtn.style.display = 'none';
+      }
+    }
+
+    // 마감 내역 테이블 렌더링
+    function renderClosingsTable(closings) {
+      if (!closings || closings.length === 0) {
+        tbody.innerHTML =
+          '<tr><td colspan="9" class="monthly-empty">' +
+          '<div class="monthly-empty-icon">📋</div>' +
+          '<div class="monthly-empty-text">마감 내역이 없습니다</div>' +
+          '</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      // 년월 내림차순 정렬
+      closings.sort(function(a, b) {
+        return b.yearMonth.localeCompare(a.yearMonth);
+      });
+
+      closings.forEach(function(closing) {
+        var tr = document.createElement('tr');
+
+        var year = closing.yearMonth.substring(0, 4);
+        var month = closing.yearMonth.substring(4, 6);
+        var displayMonth = year + '년 ' + month + '월';
+
+        var statusBadge = '<span class="status-badge ' +
+          closing.status.toLowerCase() + '">' +
+          closing.status + '</span>';
+
+        tr.innerHTML =
+          '<td>' + displayMonth + '</td>' +
+          '<td class="status">' + statusBadge + '</td>' +
+          '<td class="num">' + OB.formatNumber(closing.purchaseCount || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(closing.purchaseAmount || 0) + '</td>' +
+          '<td class="num">' + OB.formatNumber(closing.salesCount || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(closing.salesAmount || 0) + '</td>' +
+          '<td>' + (closing.closedAt || '-') + '</td>' +
+          '<td>' + (closing.closedBy || '-') + '</td>' +
+          '<td>' + (closing.unlockedAt || '-') + '</td>';
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    console.log('✅ MonthlyClosing 페이지 초기화 완료');
   };
 
 </script>

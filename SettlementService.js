@@ -12,6 +12,8 @@ const OB_ORDER_LEDGER_SHEET = '거래원장';
 const OB_PURCHASE_SETTLEMENT_SHEET = '매입마감DB';
 const OB_SALES_SETTLEMENT_SHEET = '매출마감DB';
 const OB_SETTLEMENT_DETAIL_SHEET = '마감상세DB';
+const OB_BILLING_SHEET = '청구DB';
+const OB_MONTHLY_CLOSING_SHEET = '월마감DB';
 
 /**
  * ============================================================
@@ -637,4 +639,504 @@ function formatYearMonth(date) {
   var month = String(d.getMonth() + 1).padStart(2, '0');
 
   return year + month;
+}
+
+/**
+ * ============================================================
+ * 4. 청구서 관리 (Phase 2)
+ * ============================================================
+ */
+
+/**
+ * 청구서 생성
+ * @param {Object} params - { settlementId, type, company, billingDate, amount, notes }
+ * @returns {Object} 생성 결과
+ */
+function createBilling(params) {
+  try {
+    var settlementId = params.settlementId || '';
+    var type = params.type || '';
+    var company = params.company || '';
+    var billingDate = params.billingDate || new Date();
+    var amount = params.amount || 0;
+    var notes = params.notes || '';
+
+    if (!settlementId || !type || !company) {
+      return {
+        success: false,
+        error: '필수 정보를 입력해주세요.'
+      };
+    }
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      sheet = ss.insertSheet(OB_BILLING_SHEET);
+      sheet.appendRow([
+        '청구ID', '청구유형', '업체명', '마감ID', '청구일', '청구금액',
+        '청구상태', '비고', '생성일시', '생성자', '발행일시', '발행자', '결제일시'
+      ]);
+    }
+
+    // 청구 ID 생성: BL-YYYYMMDD-순번
+    var today = new Date();
+    var dateStr = formatYearMonth(today) + String(today.getDate()).padStart(2, '0');
+    var data = sheet.getDataRange().getValues();
+    var count = 1;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].startsWith('BL-' + dateStr)) {
+        count++;
+      }
+    }
+    var billingId = 'BL-' + dateStr + '-' + String(count).padStart(3, '0');
+
+    var now = new Date();
+    var user = Session.getActiveUser().getEmail();
+
+    var rowData = [
+      billingId,
+      type,
+      company,
+      settlementId,
+      billingDate,
+      amount,
+      'DRAFT',
+      notes,
+      now,
+      user,
+      '',
+      '',
+      ''
+    ];
+
+    sheet.appendRow(rowData);
+    Logger.log('[createBilling] 청구서 생성: ' + billingId);
+
+    return {
+      success: true,
+      billingId: billingId,
+      message: '청구서가 생성되었습니다.'
+    };
+
+  } catch (err) {
+    Logger.log('[createBilling Error] ' + err.message);
+    return {
+      success: false,
+      error: '청구서 생성 중 오류 발생: ' + err.message
+    };
+  }
+}
+
+/**
+ * 청구서 목록 조회
+ * @param {Object} params - { type, status, startDate, endDate }
+ * @returns {Object} 조회 결과
+ */
+function getBillings(params) {
+  try {
+    var type = params.type || '';
+    var status = params.status || '';
+    var startDate = params.startDate || '';
+    var endDate = params.endDate || '';
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      return {
+        success: true,
+        billings: []
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var billings = [];
+
+    var parseDate = function(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      return new Date(d);
+    };
+
+    var start = startDate ? parseDate(startDate) : null;
+    var end = endDate ? parseDate(endDate) : null;
+
+    for (var i = 1; i < data.length; i++) {
+      // 타입 필터
+      if (type && data[i][1] !== type) continue;
+
+      // 상태 필터
+      if (status && data[i][6] !== status) continue;
+
+      // 날짜 필터
+      if (start || end) {
+        var billingDate = parseDate(data[i][4]);
+        if (start && billingDate < start) continue;
+        if (end && billingDate > end) continue;
+      }
+
+      billings.push({
+        billingId: data[i][0],
+        type: data[i][1],
+        company: data[i][2],
+        settlementId: data[i][3],
+        billingDate: formatDateString(data[i][4]),
+        amount: data[i][5],
+        status: data[i][6],
+        notes: data[i][7],
+        createdAt: formatDateString(data[i][8]),
+        createdBy: data[i][9],
+        issuedAt: formatDateString(data[i][10]),
+        issuedBy: data[i][11],
+        paidAt: formatDateString(data[i][12])
+      });
+    }
+
+    return {
+      success: true,
+      billings: billings
+    };
+
+  } catch (err) {
+    Logger.log('[getBillings Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
+ * 청구서 상태 업데이트
+ * @param {Object} params - { billingId, status }
+ * @returns {Object} 업데이트 결과
+ */
+function updateBillingStatus(params) {
+  try {
+    var billingId = params.billingId || '';
+    var status = params.status || '';
+
+    if (!billingId || !status) {
+      return {
+        success: false,
+        error: '청구ID와 상태를 입력해주세요.'
+      };
+    }
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var rowIndex = -1;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === billingId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      return {
+        success: false,
+        error: '청구서를 찾을 수 없습니다.'
+      };
+    }
+
+    var now = new Date();
+    var user = Session.getActiveUser().getEmail();
+
+    // 상태 업데이트
+    sheet.getRange(rowIndex, 7).setValue(status);
+
+    // ISSUED로 변경 시 발행 정보 기록
+    if (status === 'ISSUED') {
+      sheet.getRange(rowIndex, 11).setValue(now);
+      sheet.getRange(rowIndex, 12).setValue(user);
+    }
+
+    // PAID로 변경 시 결제 일시 기록
+    if (status === 'PAID') {
+      sheet.getRange(rowIndex, 13).setValue(now);
+    }
+
+    Logger.log('[updateBillingStatus] 청구서 상태 업데이트: ' + billingId + ' -> ' + status);
+
+    return {
+      success: true,
+      message: '청구서 상태가 업데이트되었습니다.'
+    };
+
+  } catch (err) {
+    Logger.log('[updateBillingStatus Error] ' + err.message);
+    return {
+      success: false,
+      error: '상태 업데이트 중 오류 발생: ' + err.message
+    };
+  }
+}
+
+/**
+ * ============================================================
+ * 5. 월별 마감 관리 (Phase 2)
+ * ============================================================
+ */
+
+/**
+ * 월별 마감 실행
+ * @param {Object} params - { yearMonth }
+ * @returns {Object} 마감 결과
+ */
+function executeMonthlyClosing(params) {
+  try {
+    var yearMonth = params.yearMonth || '';
+
+    if (!yearMonth) {
+      return {
+        success: false,
+        error: '마감 월을 선택해주세요.'
+      };
+    }
+
+    Logger.log('[executeMonthlyClosing] 월 마감 시작: ' + yearMonth);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+
+    // 1. 해당 월의 모든 마감 건수 및 금액 집계
+    var purchaseSheet = ss.getSheetByName(OB_PURCHASE_SETTLEMENT_SHEET);
+    var salesSheet = ss.getSheetByName(OB_SALES_SETTLEMENT_SHEET);
+
+    var purchaseCount = 0;
+    var purchaseAmount = 0;
+    var salesCount = 0;
+    var salesAmount = 0;
+
+    // 매입 마감 집계
+    if (purchaseSheet) {
+      var pData = purchaseSheet.getDataRange().getValues();
+      for (var i = 1; i < pData.length; i++) {
+        var startDate = formatYearMonth(pData[i][3]);
+        if (startDate === yearMonth && pData[i][5] === 'CONFIRMED') {
+          purchaseCount++;
+          purchaseAmount += Number(pData[i][9]) || 0;
+          // 상태를 LOCKED로 변경
+          purchaseSheet.getRange(i + 1, 6).setValue('LOCKED');
+        }
+      }
+    }
+
+    // 매출 마감 집계
+    if (salesSheet) {
+      var sData = salesSheet.getDataRange().getValues();
+      for (var i = 1; i < sData.length; i++) {
+        var startDate = formatYearMonth(sData[i][3]);
+        if (startDate === yearMonth && sData[i][5] === 'CONFIRMED') {
+          salesCount++;
+          salesAmount += Number(sData[i][9]) || 0;
+          // 상태를 LOCKED로 변경
+          salesSheet.getRange(i + 1, 6).setValue('LOCKED');
+        }
+      }
+    }
+
+    // 2. 월마감DB에 기록
+    var closingSheet = ss.getSheetByName(OB_MONTHLY_CLOSING_SHEET);
+
+    if (!closingSheet) {
+      closingSheet = ss.insertSheet(OB_MONTHLY_CLOSING_SHEET);
+      closingSheet.appendRow([
+        '월마감ID', '년월', '마감상태', '총매입건수', '총매입액',
+        '총매출건수', '총매출액', '마감일시', '마감자', '해제일시', '해제자'
+      ]);
+    }
+
+    // 기존 마감 확인
+    var cData = closingSheet.getDataRange().getValues();
+    var existingRowIndex = -1;
+    for (var i = 1; i < cData.length; i++) {
+      if (cData[i][0] === 'MC-' + yearMonth) {
+        existingRowIndex = i + 1;
+        break;
+      }
+    }
+
+    var now = new Date();
+    var user = Session.getActiveUser().getEmail();
+
+    var rowData = [
+      'MC-' + yearMonth,
+      yearMonth,
+      'CLOSED',
+      purchaseCount,
+      purchaseAmount,
+      salesCount,
+      salesAmount,
+      now,
+      user,
+      '',
+      ''
+    ];
+
+    if (existingRowIndex > 0) {
+      closingSheet.getRange(existingRowIndex, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      closingSheet.appendRow(rowData);
+    }
+
+    Logger.log('[executeMonthlyClosing] 월 마감 완료: ' + yearMonth);
+
+    return {
+      success: true,
+      yearMonth: yearMonth,
+      purchaseCount: purchaseCount,
+      purchaseAmount: purchaseAmount,
+      salesCount: salesCount,
+      salesAmount: salesAmount,
+      message: yearMonth + ' 월 마감이 완료되었습니다.'
+    };
+
+  } catch (err) {
+    Logger.log('[executeMonthlyClosing Error] ' + err.message);
+    return {
+      success: false,
+      error: '월 마감 중 오류 발생: ' + err.message
+    };
+  }
+}
+
+/**
+ * 월별 마감 해제
+ * @param {Object} params - { yearMonth }
+ * @returns {Object} 해제 결과
+ */
+function unlockMonthlyClosing(params) {
+  try {
+    var yearMonth = params.yearMonth || '';
+
+    if (!yearMonth) {
+      return {
+        success: false,
+        error: '해제할 월을 선택해주세요.'
+      };
+    }
+
+    Logger.log('[unlockMonthlyClosing] 월 마감 해제 시작: ' + yearMonth);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+
+    // 1. 해당 월의 모든 마감을 CONFIRMED로 변경
+    var purchaseSheet = ss.getSheetByName(OB_PURCHASE_SETTLEMENT_SHEET);
+    var salesSheet = ss.getSheetByName(OB_SALES_SETTLEMENT_SHEET);
+
+    // 매입 마감 해제
+    if (purchaseSheet) {
+      var pData = purchaseSheet.getDataRange().getValues();
+      for (var i = 1; i < pData.length; i++) {
+        var startDate = formatYearMonth(pData[i][3]);
+        if (startDate === yearMonth && pData[i][5] === 'LOCKED') {
+          purchaseSheet.getRange(i + 1, 6).setValue('CONFIRMED');
+        }
+      }
+    }
+
+    // 매출 마감 해제
+    if (salesSheet) {
+      var sData = salesSheet.getDataRange().getValues();
+      for (var i = 1; i < sData.length; i++) {
+        var startDate = formatYearMonth(sData[i][3]);
+        if (startDate === yearMonth && sData[i][5] === 'LOCKED') {
+          salesSheet.getRange(i + 1, 6).setValue('CONFIRMED');
+        }
+      }
+    }
+
+    // 2. 월마감DB 업데이트
+    var closingSheet = ss.getSheetByName(OB_MONTHLY_CLOSING_SHEET);
+
+    if (closingSheet) {
+      var cData = closingSheet.getDataRange().getValues();
+      for (var i = 1; i < cData.length; i++) {
+        if (cData[i][0] === 'MC-' + yearMonth) {
+          var now = new Date();
+          var user = Session.getActiveUser().getEmail();
+          closingSheet.getRange(i + 1, 3).setValue('OPEN');
+          closingSheet.getRange(i + 1, 10).setValue(now);
+          closingSheet.getRange(i + 1, 11).setValue(user);
+          break;
+        }
+      }
+    }
+
+    Logger.log('[unlockMonthlyClosing] 월 마감 해제 완료: ' + yearMonth);
+
+    return {
+      success: true,
+      yearMonth: yearMonth,
+      message: yearMonth + ' 월 마감이 해제되었습니다.'
+    };
+
+  } catch (err) {
+    Logger.log('[unlockMonthlyClosing Error] ' + err.message);
+    return {
+      success: false,
+      error: '월 마감 해제 중 오류 발생: ' + err.message
+    };
+  }
+}
+
+/**
+ * 월별 마감 목록 조회
+ * @returns {Object} 조회 결과
+ */
+function getMonthlyClosings() {
+  try {
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_MONTHLY_CLOSING_SHEET);
+
+    if (!sheet) {
+      return {
+        success: true,
+        closings: []
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var closings = [];
+
+    for (var i = 1; i < data.length; i++) {
+      closings.push({
+        closingId: data[i][0],
+        yearMonth: data[i][1],
+        status: data[i][2],
+        purchaseCount: data[i][3],
+        purchaseAmount: data[i][4],
+        salesCount: data[i][5],
+        salesAmount: data[i][6],
+        closedAt: formatDateString(data[i][7]),
+        closedBy: data[i][8],
+        unlockedAt: formatDateString(data[i][9]),
+        unlockedBy: data[i][10]
+      });
+    }
+
+    return {
+      success: true,
+      closings: closings
+    };
+
+  } catch (err) {
+    Logger.log('[getMonthlyClosings Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
 }

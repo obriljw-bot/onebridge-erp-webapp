@@ -685,3 +685,63 @@ function getSalesSettlementsApi(params) {
   var result = getSalesSettlements(params);
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * 청구서 관리 API (Phase 2)
+ * ============================================================
+ */
+
+/**
+ * 청구서 생성
+ */
+function createBillingApi(params) {
+  var result = createBilling(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 목록 조회
+ */
+function getBillingsApi(params) {
+  var result = getBillings(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 상태 업데이트
+ */
+function updateBillingStatusApi(params) {
+  var result = updateBillingStatus(params);
+  return safeReturn(result);
+}
+
+/**
+ * ============================================================
+ * 월별 마감 API (Phase 2)
+ * ============================================================
+ */
+
+/**
+ * 월별 마감 실행
+ */
+function executeMonthlyClosingApi(params) {
+  var result = executeMonthlyClosing(params);
+  return safeReturn(result);
+}
+
+/**
+ * 월별 마감 해제
+ */
+function unlockMonthlyClosingApi(params) {
+  var result = unlockMonthlyClosing(params);
+  return safeReturn(result);
+}
+
+/**
+ * 월별 마감 목록 조회
+ */
+function getMonthlyClosingsApi() {
+  var result = getMonthlyClosings();
+  return safeReturn(result);
+}

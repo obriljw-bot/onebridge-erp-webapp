@@ -26,6 +26,8 @@ function getPageTemplateName_(page) {
       return 'Page_PurchaseSettlement';
     case 'salesSettlement':
       return 'Page_SalesSettlement';
+    case 'monthlyClosing':
+      return 'Page_MonthlyClosing';
     case 'settings':
       return 'Page_Settings';
     default:
