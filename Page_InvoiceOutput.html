@@ -188,6 +188,11 @@
     <button id="inv-search-btn" class="ob-btn primary">조회</button>
     <button id="inv-export-xlsx" class="ob-btn secondary">Excel 출력</button>
     <button id="inv-export-pdf" class="ob-btn success">PDF 출력</button>
+
+    <div style="display:flex;gap:8px;align-items:center;margin-left:auto;padding:6px 12px;background:#f0f9ff;border-radius:6px;border:1px solid #bfdbfe;">
+      <input type="checkbox" id="inv-merge-by-supplier" style="width:16px;height:16px;cursor:pointer;">
+      <label for="inv-merge-by-supplier" style="margin:0;font-size:13px;font-weight:500;color:#1e40af;cursor:pointer;">매입처별 통합 출력</label>
+    </div>
   </div>
 
   <!-- 일괄 선택 버튼 그룹 -->
@@ -686,14 +691,21 @@
       modes[sel.dataset.oc] = sel.value || "auto";
     });
 
+    // 매입처별 통합 출력 체크 여부
+    var mergeBySupplier = document.getElementById("inv-merge-by-supplier").checked;
+
     var params = {
       orderCodes: selected,
       docType: docType,
       printMode: "auto",
-      modesByOrder: modes
+      modesByOrder: modes,
+      mergeBySupplier: mergeBySupplier
     };
 
     console.log('📄 PDF 생성 파라미터:', params);
+    if (mergeBySupplier) {
+      console.log('🔗 매입처별 통합 출력 모드 활성화');
+    }
 
     OB.showLoading('PDF 생성 중... (' + selected.length + '건)');
 
