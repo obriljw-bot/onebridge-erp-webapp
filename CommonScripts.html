@@ -2523,6 +2523,292 @@
     console.log('✅ MonthlyClosing 페이지 초기화 완료');
   };
 
+  // ========================================
+  // 청구서 관리 페이지 (BillingManagement)
+  // ========================================
+  window.initBillingManagementPage = function() {
+    console.log('🔄 BillingManagement 페이지 초기화 시작...');
+
+    // DOM 요소
+    var companyInput = document.getElementById('billing-mgmt-company');
+    var statusSelect = document.getElementById('billing-mgmt-status');
+    var startDateInput = document.getElementById('billing-mgmt-start-date');
+    var endDateInput = document.getElementById('billing-mgmt-end-date');
+    var searchBtn = document.getElementById('billing-mgmt-search-btn');
+    var resetBtn = document.getElementById('billing-mgmt-reset-btn');
+
+    var summaryDiv = document.getElementById('billing-mgmt-summary');
+    var totalCountSpan = document.getElementById('billing-mgmt-total-count');
+    var totalAmountSpan = document.getElementById('billing-mgmt-total-amount');
+    var issuedAmountSpan = document.getElementById('billing-mgmt-issued-amount');
+    var unpaidAmountSpan = document.getElementById('billing-mgmt-unpaid-amount');
+
+    var tbody = document.getElementById('billing-mgmt-tbody');
+
+    var detailModal = document.getElementById('billing-detail-modal');
+    var modalCloseBtn = document.getElementById('billing-modal-close-btn');
+    var detailReprintBtn = document.getElementById('billing-detail-reprint-btn');
+    var detailChangeStatusBtn = document.getElementById('billing-detail-change-status-btn');
+
+    // 현재 선택된 청구서
+    var currentBilling = null;
+
+    // 날짜 기본값 설정 (당월 1일 ~ 말일)
+    var today = new Date();
+    var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    startDateInput.value = formatDateInput(firstDay);
+    endDateInput.value = formatDateInput(lastDay);
+
+    function formatDateInput(date) {
+      var year = date.getFullYear();
+      var month = String(date.getMonth() + 1).padStart(2, '0');
+      var day = String(date.getDate()).padStart(2, '0');
+      return year + '-' + month + '-' + day;
+    }
+
+    // 검색 버튼 클릭
+    searchBtn.addEventListener('click', function() {
+      var company = companyInput.value.trim();
+      var status = statusSelect.value;
+      var startDate = startDateInput.value;
+      var endDate = endDateInput.value;
+
+      console.log('📋 청구서 조회:', { company: company, status: status, startDate: startDate, endDate: endDate });
+
+      OB.showLoading('청구서 조회 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+          console.log('✅ 청구서 조회 완료:', result);
+
+          if (!result || !result.success) {
+            alert('조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          renderSummary(result.billings || []);
+          renderTable(result.billings || []);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('❌ 청구서 조회 실패:', error);
+          alert('청구서 조회 실패: ' + error.message);
+        })
+        .getBillingsApi({
+          type: '',
+          company: company,
+          status: status,
+          startDate: startDate,
+          endDate: endDate
+        });
+    });
+
+    // 초기화 버튼 클릭
+    resetBtn.addEventListener('click', function() {
+      companyInput.value = '';
+      statusSelect.value = '';
+      startDateInput.value = formatDateInput(firstDay);
+      endDateInput.value = formatDateInput(lastDay);
+
+      summaryDiv.style.display = 'none';
+      tbody.innerHTML =
+        '<tr><td colspan="8" class="billing-empty">' +
+        '<div class="billing-empty-icon">📋</div>' +
+        '<div class="billing-empty-text">조회 버튼을 눌러 청구서 목록을 확인하세요</div>' +
+        '</td></tr>';
+    });
+
+    // 요약 카드 렌더링
+    function renderSummary(billings) {
+      if (!billings || billings.length === 0) {
+        summaryDiv.style.display = 'none';
+        return;
+      }
+
+      summaryDiv.style.display = 'grid';
+
+      var totalCount = billings.length;
+      var totalAmount = 0;
+      var issuedAmount = 0;
+      var paidAmount = 0;
+
+      billings.forEach(function(billing) {
+        var amount = Number(billing.amount) || 0;
+        totalAmount += amount;
+
+        if (billing.status === 'ISSUED' || billing.status === 'PAID') {
+          issuedAmount += amount;
+        }
+
+        if (billing.status === 'PAID') {
+          paidAmount += amount;
+        }
+      });
+
+      var unpaidAmount = issuedAmount - paidAmount;
+
+      totalCountSpan.textContent = OB.formatNumber(totalCount);
+      totalAmountSpan.textContent = '₩' + OB.formatNumber(totalAmount);
+      issuedAmountSpan.textContent = '₩' + OB.formatNumber(issuedAmount);
+      unpaidAmountSpan.textContent = '₩' + OB.formatNumber(unpaidAmount);
+    }
+
+    // 테이블 렌더링
+    function renderTable(billings) {
+      if (!billings || billings.length === 0) {
+        tbody.innerHTML =
+          '<tr><td colspan="8" class="billing-empty">' +
+          '<div class="billing-empty-icon">📋</div>' +
+          '<div class="billing-empty-text">조회 결과가 없습니다</div>' +
+          '</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+
+      billings.forEach(function(billing) {
+        var tr = document.createElement('tr');
+
+        var statusBadge = '<span class="billing-status-badge ' +
+          billing.status + '">' +
+          getStatusText(billing.status) + '</span>';
+
+        var typeText = billing.type === 'PURCHASE' ? '매입' : '매출';
+
+        tr.innerHTML =
+          '<td>' + billing.billingId + '</td>' +
+          '<td>' + typeText + '</td>' +
+          '<td>' + billing.company + '</td>' +
+          '<td>' + billing.billingDate + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(billing.amount) + '</td>' +
+          '<td class="center">' + statusBadge + '</td>' +
+          '<td>' + (billing.notes || '-') + '</td>' +
+          '<td class="center">' +
+          '<button class="billing-btn primary small" data-billing-id="' + billing.billingId + '">상세</button>' +
+          '</td>';
+
+        tbody.appendChild(tr);
+      });
+
+      // 상세보기 버튼 이벤트
+      tbody.querySelectorAll('button[data-billing-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var billingId = this.getAttribute('data-billing-id');
+          var billing = billings.find(function(b) { return b.billingId === billingId; });
+          if (billing) {
+            showDetailModal(billing);
+          }
+        });
+      });
+    }
+
+    function getStatusText(status) {
+      switch (status) {
+        case 'DRAFT': return '임시저장';
+        case 'ISSUED': return '발행완료';
+        case 'PAID': return '입금완료';
+        default: return status;
+      }
+    }
+
+    // 상세보기 모달 열기
+    function showDetailModal(billing) {
+      currentBilling = billing;
+
+      document.getElementById('detail-billing-id').textContent = billing.billingId || '-';
+      document.getElementById('detail-type').textContent = billing.type === 'PURCHASE' ? '매입' : '매출';
+      document.getElementById('detail-company').textContent = billing.company || '-';
+      document.getElementById('detail-settlement-id').textContent = billing.settlementId || '-';
+      document.getElementById('detail-billing-date').textContent = billing.billingDate || '-';
+      document.getElementById('detail-amount').textContent = '₩' + OB.formatNumber(billing.amount);
+      document.getElementById('detail-status').textContent = getStatusText(billing.status);
+      document.getElementById('detail-notes').textContent = billing.notes || '-';
+
+      document.getElementById('detail-created-at').textContent = billing.createdAt || '-';
+      document.getElementById('detail-created-by').textContent = billing.createdBy || '-';
+      document.getElementById('detail-issued-at').textContent = billing.issuedAt || '-';
+      document.getElementById('detail-issued-by').textContent = billing.issuedBy || '-';
+      document.getElementById('detail-paid-at').textContent = billing.paidAt || '-';
+
+      detailModal.classList.add('active');
+    }
+
+    // 모달 닫기
+    modalCloseBtn.addEventListener('click', function() {
+      detailModal.classList.remove('active');
+      currentBilling = null;
+    });
+
+    // 모달 배경 클릭 시 닫기
+    detailModal.addEventListener('click', function(e) {
+      if (e.target === detailModal) {
+        detailModal.classList.remove('active');
+        currentBilling = null;
+      }
+    });
+
+    // 재출력 버튼
+    detailReprintBtn.addEventListener('click', function() {
+      if (!currentBilling) return;
+      alert('청구서 재출력 기능은 추후 구현 예정입니다.');
+      // TODO: 청구서 PDF 재출력 기능 구현
+    });
+
+    // 상태 변경 버튼
+    detailChangeStatusBtn.addEventListener('click', function() {
+      if (!currentBilling) return;
+
+      var nextStatus = '';
+      var nextStatusText = '';
+
+      if (currentBilling.status === 'DRAFT') {
+        nextStatus = 'ISSUED';
+        nextStatusText = '발행완료';
+      } else if (currentBilling.status === 'ISSUED') {
+        nextStatus = 'PAID';
+        nextStatusText = '입금완료';
+      } else {
+        alert('더 이상 변경할 수 없는 상태입니다.');
+        return;
+      }
+
+      var confirmMsg = '청구서 상태를 "' + nextStatusText + '"로 변경하시겠습니까?';
+      if (!confirm(confirmMsg)) return;
+
+      OB.showLoading('상태 변경 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            alert('상태 변경 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          alert('상태가 변경되었습니다!');
+          detailModal.classList.remove('active');
+          currentBilling = null;
+
+          // 목록 새로고침
+          searchBtn.click();
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          alert('상태 변경 실패: ' + error.message);
+        })
+        .updateBillingStatusApi({
+          billingId: currentBilling.billingId,
+          status: nextStatus
+        });
+    });
+
+    console.log('✅ BillingManagement 페이지 초기화 완료');
+  };
+
 </script>
 
 <!-- 전역 로딩 오버레이 -->

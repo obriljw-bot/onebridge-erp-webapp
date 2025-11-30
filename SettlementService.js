@@ -839,12 +839,13 @@ function createBilling(params) {
 
 /**
  * 청구서 목록 조회
- * @param {Object} params - { type, status, startDate, endDate }
+ * @param {Object} params - { type, company, status, startDate, endDate }
  * @returns {Object} 조회 결과
  */
 function getBillings(params) {
   try {
     var type = params.type || '';
+    var company = params.company || '';
     var status = params.status || '';
     var startDate = params.startDate || '';
     var endDate = params.endDate || '';
@@ -874,6 +875,9 @@ function getBillings(params) {
     for (var i = 1; i < data.length; i++) {
       // 타입 필터
       if (type && data[i][1] !== type) continue;
+
+      // 거래처 필터
+      if (company && data[i][2].indexOf(company) === -1) continue;
 
       // 상태 필터
       if (status && data[i][6] !== status) continue;

@@ -1,0 +1,426 @@
+<style>
+.billing-wrap{padding:20px;}
+
+/* 페이지 헤더 */
+.billing-header{
+  margin-bottom:20px;
+}
+.billing-header h1{
+  font-size:24px;
+  font-weight:700;
+  color:#1e293b;
+  margin:0 0 8px 0;
+}
+.billing-header p{
+  color:#64748b;
+  margin:0;
+  font-size:14px;
+}
+
+/* 검색 바 */
+.billing-search{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+  align-items:flex-end;
+}
+
+.billing-search-field{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.billing-search-field label{
+  font-size:13px;
+  font-weight:500;
+  color:#475569;
+}
+.billing-search-field select,
+.billing-search-field input{
+  padding:8px 12px;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+  font-size:14px;
+  min-width:150px;
+}
+
+.billing-btn{
+  padding:8px 16px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  transition:all 0.2s;
+}
+.billing-btn.primary{background:#2563eb;color:white;}
+.billing-btn.primary:hover{background:#1d4ed8;}
+.billing-btn.secondary{background:#e5e7eb;color:#1e293b;}
+.billing-btn.secondary:hover{background:#d1d5db;}
+.billing-btn.small{padding:4px 8px;font-size:12px;}
+
+/* 요약 카드 */
+.billing-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+
+.billing-summary-card{
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.billing-summary-card-label{
+  font-size:12px;
+  color:#64748b;
+  margin-bottom:4px;
+}
+.billing-summary-card-value{
+  font-size:20px;
+  font-weight:700;
+  color:#1e293b;
+}
+.billing-summary-card-value.primary{color:#2563eb;}
+.billing-summary-card-value.success{color:#10b981;}
+.billing-summary-card-value.warning{color:#f59e0b;}
+
+/* 테이블 */
+.billing-table-wrap{
+  overflow:auto;
+  max-height:600px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+}
+.billing-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.billing-table th,
+.billing-table td{
+  padding:10px;
+  border-bottom:1px solid #e2e8f0;
+  text-align:left;
+}
+.billing-table th{
+  background:#f1f5f9;
+  font-weight:600;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.billing-table td.num{text-align:right;}
+.billing-table td.center{text-align:center;}
+
+.billing-empty{
+  text-align:center;
+  padding:60px 20px;
+  color:#64748b;
+}
+.billing-empty-icon{
+  font-size:48px;
+  margin-bottom:12px;
+}
+.billing-empty-text{
+  font-size:14px;
+}
+
+/* 상태 뱃지 */
+.billing-status-badge{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:4px;
+  font-size:11px;
+  font-weight:600;
+}
+.billing-status-badge.DRAFT{
+  background:#e5e7eb;
+  color:#6b7280;
+}
+.billing-status-badge.ISSUED{
+  background:#dbeafe;
+  color:#2563eb;
+}
+.billing-status-badge.PAID{
+  background:#d1fae5;
+  color:#10b981;
+}
+
+/* 모달 */
+.billing-modal{
+  display:none;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.5);
+  z-index:9999;
+  justify-content:center;
+  align-items:center;
+}
+.billing-modal.active{display:flex;}
+
+.billing-modal-content{
+  background:white;
+  border-radius:12px;
+  width:90%;
+  max-width:800px;
+  max-height:90vh;
+  overflow:auto;
+  box-shadow:0 4px 16px rgba(0,0,0,0.2);
+}
+
+.billing-modal-header{
+  padding:20px;
+  border-bottom:1px solid #e2e8f0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.billing-modal-header h2{
+  margin:0;
+  font-size:18px;
+  font-weight:700;
+  color:#1e293b;
+}
+.billing-modal-close{
+  background:transparent;
+  border:none;
+  font-size:24px;
+  cursor:pointer;
+  color:#64748b;
+}
+
+.billing-modal-body{
+  padding:20px;
+}
+
+.billing-detail-section{
+  margin-bottom:24px;
+}
+.billing-detail-section h3{
+  font-size:14px;
+  font-weight:600;
+  color:#475569;
+  margin:0 0 12px 0;
+}
+
+.billing-detail-grid{
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:12px;
+}
+.billing-detail-item{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.billing-detail-item-label{
+  font-size:12px;
+  color:#64748b;
+}
+.billing-detail-item-value{
+  font-size:14px;
+  font-weight:500;
+  color:#1e293b;
+}
+
+.billing-modal-footer{
+  padding:16px 20px;
+  border-top:1px solid #e2e8f0;
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+</style>
+
+<div class="billing-wrap">
+  <!-- 페이지 헤더 -->
+  <div class="billing-header">
+    <h1>📋 청구서 관리</h1>
+    <p>발행된 청구서를 조회하고 관리합니다</p>
+  </div>
+
+  <!-- 검색 바 -->
+  <div class="billing-search">
+    <div class="billing-search-field">
+      <label>거래처</label>
+      <input type="text" id="billing-mgmt-company" placeholder="거래처명 입력">
+    </div>
+
+    <div class="billing-search-field">
+      <label>상태</label>
+      <select id="billing-mgmt-status">
+        <option value="">전체</option>
+        <option value="DRAFT">임시저장</option>
+        <option value="ISSUED">발행완료</option>
+        <option value="PAID">입금완료</option>
+      </select>
+    </div>
+
+    <div class="billing-search-field">
+      <label>시작일</label>
+      <input type="date" id="billing-mgmt-start-date">
+    </div>
+
+    <div class="billing-search-field">
+      <label>종료일</label>
+      <input type="date" id="billing-mgmt-end-date">
+    </div>
+
+    <button class="billing-btn primary" id="billing-mgmt-search-btn">
+      🔍 조회
+    </button>
+
+    <button class="billing-btn secondary" id="billing-mgmt-reset-btn">
+      초기화
+    </button>
+  </div>
+
+  <!-- 요약 카드 -->
+  <div class="billing-summary" id="billing-mgmt-summary" style="display:none;">
+    <div class="billing-summary-card">
+      <div class="billing-summary-card-label">총 청구건수</div>
+      <div class="billing-summary-card-value" id="billing-mgmt-total-count">0</div>
+    </div>
+
+    <div class="billing-summary-card">
+      <div class="billing-summary-card-label">총 청구액</div>
+      <div class="billing-summary-card-value primary" id="billing-mgmt-total-amount">₩0</div>
+    </div>
+
+    <div class="billing-summary-card">
+      <div class="billing-summary-card-label">발행금액</div>
+      <div class="billing-summary-card-value success" id="billing-mgmt-issued-amount">₩0</div>
+    </div>
+
+    <div class="billing-summary-card">
+      <div class="billing-summary-card-label">미수금</div>
+      <div class="billing-summary-card-value warning" id="billing-mgmt-unpaid-amount">₩0</div>
+    </div>
+  </div>
+
+  <!-- 청구서 목록 테이블 -->
+  <div class="billing-table-wrap">
+    <table class="billing-table">
+      <thead>
+        <tr>
+          <th>청구ID</th>
+          <th>유형</th>
+          <th>거래처</th>
+          <th>청구일</th>
+          <th class="num">청구금액</th>
+          <th class="center">상태</th>
+          <th>비고</th>
+          <th class="center">액션</th>
+        </tr>
+      </thead>
+      <tbody id="billing-mgmt-tbody">
+        <tr>
+          <td colspan="8" class="billing-empty">
+            <div class="billing-empty-icon">📋</div>
+            <div class="billing-empty-text">조회 버튼을 눌러 청구서 목록을 확인하세요</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 청구서 상세보기 모달 -->
+<div class="billing-modal" id="billing-detail-modal">
+  <div class="billing-modal-content">
+    <div class="billing-modal-header">
+      <h2>📄 청구서 상세</h2>
+      <button class="billing-modal-close" id="billing-modal-close-btn">×</button>
+    </div>
+
+    <div class="billing-modal-body" id="billing-detail-body">
+      <!-- 기본 정보 -->
+      <div class="billing-detail-section">
+        <h3>📋 기본 정보</h3>
+        <div class="billing-detail-grid">
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">청구ID</div>
+            <div class="billing-detail-item-value" id="detail-billing-id">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">청구유형</div>
+            <div class="billing-detail-item-value" id="detail-type">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">거래처</div>
+            <div class="billing-detail-item-value" id="detail-company">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">마감ID</div>
+            <div class="billing-detail-item-value" id="detail-settlement-id">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">청구일</div>
+            <div class="billing-detail-item-value" id="detail-billing-date">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">청구금액</div>
+            <div class="billing-detail-item-value" id="detail-amount">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">상태</div>
+            <div class="billing-detail-item-value" id="detail-status">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">비고</div>
+            <div class="billing-detail-item-value" id="detail-notes">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 발행 정보 -->
+      <div class="billing-detail-section">
+        <h3>🗓️ 발행 정보</h3>
+        <div class="billing-detail-grid">
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">생성일시</div>
+            <div class="billing-detail-item-value" id="detail-created-at">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">생성자</div>
+            <div class="billing-detail-item-value" id="detail-created-by">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">발행일시</div>
+            <div class="billing-detail-item-value" id="detail-issued-at">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">발행자</div>
+            <div class="billing-detail-item-value" id="detail-issued-by">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">결제일시</div>
+            <div class="billing-detail-item-value" id="detail-paid-at">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="billing-modal-footer">
+      <button class="billing-btn secondary" id="billing-detail-reprint-btn">
+        📄 청구서 재출력
+      </button>
+      <button class="billing-btn primary" id="billing-detail-change-status-btn">
+        ✏️ 상태 변경
+      </button>
+    </div>
+  </div>
+</div>
