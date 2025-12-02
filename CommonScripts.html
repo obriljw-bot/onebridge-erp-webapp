@@ -1231,6 +1231,22 @@
           bVal = new Date(bVal).getTime();
         }
 
+        // 마진 계산 (정렬용)
+        if (column === 'marginAmount') {
+          aVal = (Number(a.totalAmount) || 0) - (Number(a.totalPurchaseAmount) || 0);
+          bVal = (Number(b.totalAmount) || 0) - (Number(b.totalPurchaseAmount) || 0);
+        }
+
+        if (column === 'marginRate') {
+          var aSupply = Number(a.totalAmount) || 0;
+          var aPurchase = Number(a.totalPurchaseAmount) || 0;
+          var bSupply = Number(b.totalAmount) || 0;
+          var bPurchase = Number(b.totalPurchaseAmount) || 0;
+
+          aVal = aSupply > 0 ? ((aSupply - aPurchase) / aSupply * 100) : 0;
+          bVal = bSupply > 0 ? ((bSupply - bPurchase) / bSupply * 100) : 0;
+        }
+
         // 숫자 처리
         if (column === 'itemCount' || column === 'totalPurchaseAmount' || column === 'totalAmount') {
           aVal = Number(aVal) || 0;
@@ -1283,6 +1299,44 @@
         var tr = document.createElement('tr');
         tr.dataset.orderCode = order.orderCode;
 
+        // 마진 계산
+        var purchaseAmount = Number(order.totalPurchaseAmount) || 0;
+        var supplyAmount = Number(order.totalAmount) || 0;
+        var marginAmount = supplyAmount - purchaseAmount;
+        var marginRate = supplyAmount > 0 ? (marginAmount / supplyAmount * 100) : 0;
+
+        var marginAmountClass = marginAmount >= 0 ? 'orderlist-margin-positive' : 'orderlist-margin-negative';
+        var marginRateClass = marginRate >= 0 ? 'orderlist-margin-positive' : 'orderlist-margin-negative';
+
+        // 상태 정보 생성 (거래원장의 결제, 발주, 출고 컬럼 확인)
+        var statusHtml = '<div class="orderlist-status-badges">';
+
+        // 결제 상태
+        var paymentStatus = order.payment || '';
+        if (paymentStatus === 'Y' || paymentStatus === '완료') {
+          statusHtml += '<span class="orderlist-status-badge payment completed">💳</span>';
+        } else if (paymentStatus) {
+          statusHtml += '<span class="orderlist-status-badge payment">💳</span>';
+        }
+
+        // 발주 상태
+        var orderStatus = order.orderStatus || '';
+        if (orderStatus === 'Y' || orderStatus === '완료') {
+          statusHtml += '<span class="orderlist-status-badge order completed">📋</span>';
+        } else if (orderStatus) {
+          statusHtml += '<span class="orderlist-status-badge order">📋</span>';
+        }
+
+        // 출고 상태
+        var deliveryStatus = order.delivery || '';
+        if (deliveryStatus === 'Y' || deliveryStatus === '완료') {
+          statusHtml += '<span class="orderlist-status-badge delivery completed">🚚</span>';
+        } else if (deliveryStatus) {
+          statusHtml += '<span class="orderlist-status-badge delivery">🚚</span>';
+        }
+
+        statusHtml += '</div>';
+
         tr.innerHTML =
           '<td>' + formatDate(order.orderDate) + '</td>' +
           '<td><span class="orderlist-ordercode">' + (order.orderCode || '') + '</span></td>' +
@@ -1291,7 +1345,10 @@
           '<td>' + (order.supplier || '') + '</td>' +
           '<td class="text-center">' + (order.itemCount || 0) + '개</td>' +
           '<td class="text-right">₩' + formatNumber(order.totalPurchaseAmount) + '</td>' +
-          '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>';
+          '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>' +
+          '<td class="text-right ' + marginAmountClass + '">₩' + formatNumber(marginAmount) + '</td>' +
+          '<td class="text-right orderlist-margin-rate ' + marginRateClass + '">' + marginRate.toFixed(1) + '%</td>' +
+          '<td class="text-center">' + statusHtml + '</td>';
 
         tr.addEventListener('click', function() {
           loadOrderDetail(order.orderCode);
@@ -1407,7 +1464,7 @@
           console.error('❌ 발주 상세 조회 실패:', error);
           alert('상세 조회 실패: ' + error.message);
         })
-        .getOrderDetail(orderCode);
+        .getOrderDetailApi(orderCode);
     }
 
     // ============================================================

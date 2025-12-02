@@ -214,6 +214,71 @@
     font-weight: 600;
   }
 
+  /* 마진 컬럼 스타일 */
+  .orderlist-margin-positive {
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .orderlist-margin-negative {
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  .orderlist-margin-rate {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* 상태 뱃지 */
+  .orderlist-status-badges {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .orderlist-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .orderlist-status-badge.payment {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .orderlist-status-badge.payment.completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .orderlist-status-badge.order {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .orderlist-status-badge.order.completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .orderlist-status-badge.delivery {
+    background: #e0e7ff;
+    color: #3730a3;
+  }
+
+  .orderlist-status-badge.delivery.completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+
   /* 페이지네이션 */
   .orderlist-pagination {
     padding: 16px 20px;
@@ -497,11 +562,14 @@
             <th class="sortable text-center" data-sort="itemCount">품목수</th>
             <th class="sortable text-right" data-sort="totalPurchaseAmount">매입액</th>
             <th class="sortable text-right" data-sort="totalAmount">공급액</th>
+            <th class="sortable text-right" data-sort="marginAmount">마진액</th>
+            <th class="sortable text-right" data-sort="marginRate">마진율</th>
+            <th class="text-center">상태</th>
           </tr>
         </thead>
         <tbody id="orderlist-tbody">
           <tr>
-            <td colspan="8" class="orderlist-empty">
+            <td colspan="11" class="orderlist-empty">
               <div class="orderlist-empty-icon">📋</div>
               <div class="orderlist-empty-text">조회 버튼을 클릭하여 발주 내역을 확인하세요</div>
             </td>
