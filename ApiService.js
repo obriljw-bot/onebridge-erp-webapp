@@ -631,9 +631,11 @@ function getPrintableOrders(params) {
     var cBuyer     = col('발주처');
     var cPurchaseAmount = col('매입액');
     var cSupplyAmount   = col('공급액');
-    var cPayment   = col('결제');
-    var cOrderStatus = col('발주');
-    var cDelivery  = col('출고');
+
+    // 상태 컬럼 (여러 이름 시도)
+    var cPayment   = col('결제') >= 0 ? col('결제') : (col('매입결제') >= 0 ? col('매입결제') : col('매출결제'));
+    var cOrderStatus = col('발주') >= 0 ? col('발주') : col('매입발주');
+    var cDelivery  = col('출고') >= 0 ? col('출고') : col('출고상태');
 
     // ---- 필터링 ----
     var filtered = rows.filter(function (row) {
@@ -705,21 +707,21 @@ function getPrintableOrders(params) {
       // 상태 정보 수집 (모든 품목이 완료되어야 완료로 표시)
       if (cPayment >= 0) {
         var paymentVal = String(row[cPayment] || '').trim();
-        if (paymentVal === 'Y' || paymentVal === '완료') {
+        if (paymentVal === 'Y' || paymentVal === '완료' || paymentVal === '결제완료') {
           orderGroups[orderCode].paymentCount++;
         }
       }
 
       if (cOrderStatus >= 0) {
         var orderStatusVal = String(row[cOrderStatus] || '').trim();
-        if (orderStatusVal === 'Y' || orderStatusVal === '완료') {
+        if (orderStatusVal === 'Y' || orderStatusVal === '완료' || orderStatusVal === '발주완료') {
           orderGroups[orderCode].orderStatusCount++;
         }
       }
 
       if (cDelivery >= 0) {
         var deliveryVal = String(row[cDelivery] || '').trim();
-        if (deliveryVal === 'Y' || deliveryVal === '완료') {
+        if (deliveryVal === 'Y' || deliveryVal === '완료' || deliveryVal === '출고완료') {
           orderGroups[orderCode].deliveryCount++;
         }
       }
@@ -730,10 +732,30 @@ function getPrintableOrders(params) {
     for (var code in orderGroups) {
       var group = orderGroups[code];
 
-      // 모든 품목이 완료되었는지 확인
-      group.payment = group.paymentCount === group.itemCount ? '완료' : '';
-      group.orderStatus = group.orderStatusCount === group.itemCount ? '완료' : '';
-      group.delivery = group.deliveryCount === group.itemCount ? '완료' : '';
+      // 상태 판정: 미완료 / 진행중 / 완료
+      if (group.paymentCount === 0) {
+        group.payment = '미완료';
+      } else if (group.paymentCount < group.itemCount) {
+        group.payment = '진행중';
+      } else {
+        group.payment = '완료';
+      }
+
+      if (group.orderStatusCount === 0) {
+        group.orderStatus = '미완료';
+      } else if (group.orderStatusCount < group.itemCount) {
+        group.orderStatus = '진행중';
+      } else {
+        group.orderStatus = '완료';
+      }
+
+      if (group.deliveryCount === 0) {
+        group.delivery = '미완료';
+      } else if (group.deliveryCount < group.itemCount) {
+        group.delivery = '진행중';
+      } else {
+        group.delivery = '완료';
+      }
 
       // 임시 카운트 필드 제거
       delete group.paymentCount;

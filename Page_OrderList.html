@@ -249,32 +249,20 @@
     white-space: nowrap;
   }
 
-  .orderlist-status-badge.payment {
-    background: #dbeafe;
-    color: #1e40af;
+  /* 미완료 상태 (회색) */
+  .orderlist-status-badge.pending {
+    background: #f3f4f6;
+    color: #6b7280;
   }
 
-  .orderlist-status-badge.payment.completed {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .orderlist-status-badge.order {
+  /* 진행중 상태 (노란색) */
+  .orderlist-status-badge.inprogress {
     background: #fef3c7;
     color: #92400e;
   }
 
-  .orderlist-status-badge.order.completed {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .orderlist-status-badge.delivery {
-    background: #e0e7ff;
-    color: #3730a3;
-  }
-
-  .orderlist-status-badge.delivery.completed {
+  /* 완료 상태 (녹색) */
+  .orderlist-status-badge.completed {
     background: #dcfce7;
     color: #166534;
   }

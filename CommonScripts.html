@@ -1314,27 +1314,33 @@
         var statusHtml = '<div class="orderlist-status-badges">';
 
         // 결제 상태
-        var paymentStatus = order.payment || '';
-        if (paymentStatus === 'Y' || paymentStatus === '완료') {
+        var paymentStatus = order.payment || '미완료';
+        if (paymentStatus === '완료') {
           statusHtml += '<span class="orderlist-status-badge payment completed">💳</span>';
-        } else if (paymentStatus) {
-          statusHtml += '<span class="orderlist-status-badge payment">💳</span>';
+        } else if (paymentStatus === '진행중') {
+          statusHtml += '<span class="orderlist-status-badge payment inprogress">💳</span>';
+        } else {
+          statusHtml += '<span class="orderlist-status-badge payment pending">💳</span>';
         }
 
         // 발주 상태
-        var orderStatus = order.orderStatus || '';
-        if (orderStatus === 'Y' || orderStatus === '완료') {
+        var orderStatus = order.orderStatus || '미완료';
+        if (orderStatus === '완료') {
           statusHtml += '<span class="orderlist-status-badge order completed">📋</span>';
-        } else if (orderStatus) {
-          statusHtml += '<span class="orderlist-status-badge order">📋</span>';
+        } else if (orderStatus === '진행중') {
+          statusHtml += '<span class="orderlist-status-badge order inprogress">📋</span>';
+        } else {
+          statusHtml += '<span class="orderlist-status-badge order pending">📋</span>';
         }
 
         // 출고 상태
-        var deliveryStatus = order.delivery || '';
-        if (deliveryStatus === 'Y' || deliveryStatus === '완료') {
+        var deliveryStatus = order.delivery || '미완료';
+        if (deliveryStatus === '완료') {
           statusHtml += '<span class="orderlist-status-badge delivery completed">🚚</span>';
-        } else if (deliveryStatus) {
-          statusHtml += '<span class="orderlist-status-badge delivery">🚚</span>';
+        } else if (deliveryStatus === '진행중') {
+          statusHtml += '<span class="orderlist-status-badge delivery inprogress">🚚</span>';
+        } else {
+          statusHtml += '<span class="orderlist-status-badge delivery pending">🚚</span>';
         }
 
         statusHtml += '</div>';
