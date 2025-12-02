@@ -8,12 +8,64 @@
 
 // ====== 스프레드시트 ID / 시트명 상수 ======
 const OB_SETTLEMENT_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs'; // 발주_통합DB (기존)
+const OB_MASTER_DB_SS_ID = '1vjAjykSQGK2DnFXvmQcH2zuI8WbOvAq_smqvW8u_bao'; // 마스터DB
 const OB_ORDER_LEDGER_SHEET = '거래원장';
 const OB_PURCHASE_SETTLEMENT_SHEET = '매입마감DB';
 const OB_SALES_SETTLEMENT_SHEET = '매출마감DB';
 const OB_SETTLEMENT_DETAIL_SHEET = '마감상세DB';
 const OB_BILLING_SHEET = '청구DB';
 const OB_MONTHLY_CLOSING_SHEET = '월마감DB';
+const OB_CUSTOMER_DB_SHEET = '거래처DB';
+
+/**
+ * ============================================================
+ * 0. 헬퍼 함수
+ * ============================================================
+ */
+
+/**
+ * 거래처명으로 거래처코드 조회
+ * @param {string} companyName - 거래처명
+ * @returns {string} 거래처코드 (없으면 거래처명 그대로 반환)
+ */
+function getCompanyCode_(companyName) {
+  if (!companyName) return '';
+
+  try {
+    var ss = SpreadsheetApp.openById(OB_MASTER_DB_SS_ID);
+    var sheet = ss.getSheetByName(OB_CUSTOMER_DB_SHEET);
+
+    if (!sheet) {
+      Logger.log('[getCompanyCode_] 거래처DB 시트를 찾을 수 없습니다.');
+      return companyName; // 시트 없으면 회사명 그대로 반환
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+    var nameIdx = header.indexOf('거래처명');
+    var codeIdx = header.indexOf('거래처코드');
+
+    if (nameIdx === -1 || codeIdx === -1) {
+      Logger.log('[getCompanyCode_] 필수 컬럼을 찾을 수 없습니다.');
+      return companyName;
+    }
+
+    // 거래처명으로 검색
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][nameIdx] === companyName) {
+        var code = data[i][codeIdx];
+        return code || companyName; // 코드가 없으면 회사명 반환
+      }
+    }
+
+    // 못 찾으면 회사명 그대로 반환
+    return companyName;
+
+  } catch (err) {
+    Logger.log('[getCompanyCode_ Error] ' + err.message);
+    return companyName;
+  }
+}
 
 /**
  * ============================================================
@@ -298,8 +350,9 @@ function savePurchaseSettlement(params) {
       };
     }
 
-    // 마감 ID 생성
-    var settlementId = 'PS-' + formatYearMonth(startDate) + '-' + supplier;
+    // 마감 ID 생성 (거래처코드 사용)
+    var supplierCode = getCompanyCode_(supplier);
+    var settlementId = 'PS-' + formatYearMonth(startDate) + '-' + supplierCode;
 
     // 집계 데이터 계산
     var totalItems = items.length;
@@ -408,7 +461,9 @@ function saveSalesSettlement(params) {
       };
     }
 
-    var settlementId = 'SS-' + formatYearMonth(startDate) + '-' + buyer;
+    // 마감 ID 생성 (거래처코드 사용)
+    var buyerCode = getCompanyCode_(buyer);
+    var settlementId = 'SS-' + formatYearMonth(startDate) + '-' + buyerCode;
 
     var totalItems = items.length;
     var totalOrderQty = 0;

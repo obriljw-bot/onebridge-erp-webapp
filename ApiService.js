@@ -338,6 +338,14 @@ function getOrderDetail(orderId) {
 }
 
 /**
+ * 발주 상세조회 API
+ */
+function getOrderDetailApi(orderId) {
+  var result = getOrderDetail(orderId);
+  return safeReturn(result);
+}
+
+/**
  * ============================================================
  * 발주 상태 업데이트
  * ============================================================

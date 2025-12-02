@@ -269,7 +269,7 @@ function saveParsedOrdersToDB(items) {
 
   // 공통 값 생성
   var now = new Date();
-  var todaySerial = now; // Excel 날짜 형식 (Date 객체)
+  var todaySerial = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // 시간 제거 (날짜만)
   var dateStr = Utilities.formatDate(now, 'Asia/Seoul', 'yyyyMMdd');
   var timeStr = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
 
