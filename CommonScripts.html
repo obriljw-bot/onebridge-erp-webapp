@@ -1495,40 +1495,25 @@
       html += '</div>';
       html += '</div>';
 
-      // 상태 수정 폼
+      // 상태 수정 (더블클릭 방식)
       html += '<div class="orderlist-detail-section">';
-      html += '<div class="orderlist-detail-section-title">상태 관리</div>';
-      html += '<div class="orderlist-status-form">';
-      html += '<div class="orderlist-status-item">';
-      html += '<label class="orderlist-detail-label">출고 상태</label>';
-      html += '<select id="orderlist-status-ship" class="orderlist-status-select">';
-      html += '<option value="미출고"' + (firstItem['출고'] === '미출고' ? ' selected' : '') + '>미출고</option>';
-      html += '<option value="출고완료"' + (firstItem['출고'] === '출고완료' ? ' selected' : '') + '>출고완료</option>';
-      html += '<option value="부분출고"' + (firstItem['출고'] === '부분출고' ? ' selected' : '') + '>부분출고</option>';
-      html += '</select>';
+      html += '<div class="orderlist-detail-section-title">상태 관리 (더블클릭하여 변경)</div>';
+      html += '<div class="orderlist-detail-grid">';
+      html += '<div class="orderlist-detail-item">';
+      html += '<div class="orderlist-detail-label">출고 상태</div>';
+      html += '<div class="orderlist-detail-value"><span class="orderlist-status-clickable" data-status-type="출고" data-current="' + (firstItem['출고'] || '미출고') + '">' + (firstItem['출고'] || '미출고') + '</span></div>';
       html += '</div>';
-      html += '<div class="orderlist-status-item">';
-      html += '<label class="orderlist-detail-label">매입 결제</label>';
-      html += '<select id="orderlist-status-pay-buy" class="orderlist-status-select">';
-      html += '<option value="미결제"' + (firstItem['매입결제'] === '미결제' ? ' selected' : '') + '>미결제</option>';
-      html += '<option value="결제완료"' + (firstItem['매입결제'] === '결제완료' ? ' selected' : '') + '>결제완료</option>';
-      html += '<option value="부분결제"' + (firstItem['매입결제'] === '부분결제' ? ' selected' : '') + '>부분결제</option>';
-      html += '</select>';
+      html += '<div class="orderlist-detail-item">';
+      html += '<div class="orderlist-detail-label">매입 결제</div>';
+      html += '<div class="orderlist-detail-value"><span class="orderlist-status-clickable" data-status-type="매입결제" data-current="' + (firstItem['매입결제'] || '미결제') + '">' + (firstItem['매입결제'] || '미결제') + '</span></div>';
       html += '</div>';
-      html += '<div class="orderlist-status-item">';
-      html += '<label class="orderlist-detail-label">매출 결제</label>';
-      html += '<select id="orderlist-status-pay-sell" class="orderlist-status-select">';
-      html += '<option value="미결제"' + (firstItem['매출결제'] === '미결제' ? ' selected' : '') + '>미결제</option>';
-      html += '<option value="결제완료"' + (firstItem['매출결제'] === '결제완료' ? ' selected' : '') + '>결제완료</option>';
-      html += '<option value="부분결제"' + (firstItem['매출결제'] === '부분결제' ? ' selected' : '') + '>부분결제</option>';
-      html += '</select>';
+      html += '<div class="orderlist-detail-item">';
+      html += '<div class="orderlist-detail-label">매출 결제</div>';
+      html += '<div class="orderlist-detail-value"><span class="orderlist-status-clickable" data-status-type="매출결제" data-current="' + (firstItem['매출결제'] || '미결제') + '">' + (firstItem['매출결제'] || '미결제') + '</span></div>';
       html += '</div>';
-      html += '<div class="orderlist-status-item">';
-      html += '<label class="orderlist-detail-label">매입 발주</label>';
-      html += '<select id="orderlist-status-buy-order" class="orderlist-status-select">';
-      html += '<option value="미처리"' + (firstItem['매입발주'] === '미처리' ? ' selected' : '') + '>미처리</option>';
-      html += '<option value="발주완료"' + (firstItem['매입발주'] === '발주완료' ? ' selected' : '') + '>발주완료</option>';
-      html += '</select>';
+      html += '<div class="orderlist-detail-item">';
+      html += '<div class="orderlist-detail-label">매입 발주</div>';
+      html += '<div class="orderlist-detail-value"><span class="orderlist-status-clickable" data-status-type="매입발주" data-current="' + (firstItem['매입발주'] || '미처리') + '">' + (firstItem['매입발주'] || '미처리') + '</span></div>';
       html += '</div>';
       html += '</div>';
       html += '</div>';
@@ -1536,6 +1521,7 @@
       // 품목 목록
       html += '<div class="orderlist-detail-section">';
       html += '<div class="orderlist-detail-section-title">품목 목록 (' + items.length + '개)</div>';
+      html += '<div class="orderlist-detail-table-wrap">';
       html += '<table class="orderlist-detail-table">';
       html += '<thead><tr>';
       html += '<th>제품명</th>';
@@ -1546,28 +1532,39 @@
       html += '<th class="text-right">공급가</th>';
       html += '<th class="text-right">매입액</th>';
       html += '<th class="text-right">공급액</th>';
+      html += '<th class="text-right">마진액</th>';
+      html += '<th class="text-right">마진율</th>';
       html += '</tr></thead>';
       html += '<tbody>';
 
       var totalPurchaseAmount = 0;
       var totalSupplyAmount = 0;
+      var totalMarginAmount = 0;
 
-      items.forEach(function(item) {
+      items.forEach(function(item, index) {
         var purchaseAmount = Number(item['매입액'] || 0);
         var supplyAmount = Number(item['공급액'] || 0);
+        var marginAmount = supplyAmount - purchaseAmount;
+        var marginRate = supplyAmount > 0 ? (marginAmount / supplyAmount * 100) : 0;
 
         totalPurchaseAmount += purchaseAmount;
         totalSupplyAmount += supplyAmount;
+        totalMarginAmount += marginAmount;
 
-        html += '<tr>';
+        var marginClass = marginAmount >= 0 ? 'orderlist-detail-margin-positive' : 'orderlist-detail-margin-negative';
+        var marginRateClass = marginRate >= 0 ? 'orderlist-detail-margin-positive' : 'orderlist-detail-margin-negative';
+
+        html += '<tr data-row-index="' + index + '">';
         html += '<td>' + (item['제품명'] || '') + '</td>';
         html += '<td>' + (item['품목코드'] || '') + '</td>';
         html += '<td class="text-right">' + formatNumber(item['발주수량']) + '</td>';
-        html += '<td class="text-right">' + formatNumber(item['확정수량']) + '</td>';
+        html += '<td class="text-right"><input type="number" class="orderlist-qty-edit-input" data-row-index="' + index + '" value="' + (item['확정수량'] || 0) + '" /></td>';
         html += '<td class="text-right">₩' + formatNumber(item['매입가']) + '</td>';
         html += '<td class="text-right">₩' + formatNumber(item['공급가']) + '</td>';
         html += '<td class="text-right">₩' + formatNumber(purchaseAmount) + '</td>';
         html += '<td class="text-right">₩' + formatNumber(supplyAmount) + '</td>';
+        html += '<td class="text-right ' + marginClass + '">₩' + formatNumber(marginAmount) + '</td>';
+        html += '<td class="text-right ' + marginRateClass + '">' + marginRate.toFixed(1) + '%</td>';
         html += '</tr>';
       });
 
@@ -1577,12 +1574,107 @@
       html += '<td colspan="6" class="text-right">합계</td>';
       html += '<td class="text-right">₩' + formatNumber(totalPurchaseAmount) + '</td>';
       html += '<td class="text-right">₩' + formatNumber(totalSupplyAmount) + '</td>';
+
+      var totalMarginRate = totalSupplyAmount > 0 ? (totalMarginAmount / totalSupplyAmount * 100) : 0;
+      var totalMarginClass = totalMarginAmount >= 0 ? 'orderlist-detail-margin-positive' : 'orderlist-detail-margin-negative';
+
+      html += '<td class="text-right ' + totalMarginClass + '">₩' + formatNumber(totalMarginAmount) + '</td>';
+      html += '<td class="text-right ' + totalMarginClass + '">' + totalMarginRate.toFixed(1) + '%</td>';
       html += '</tr>';
       html += '</tfoot>';
       html += '</table>';
+      html += '</div>'; // Close orderlist-detail-table-wrap
       html += '</div>';
 
       modalBody.innerHTML = html;
+
+      // 확정수량 입력 필드 이벤트 리스너 (자동 금액 계산)
+      var qtyInputs = modalBody.querySelectorAll('.orderlist-qty-edit-input');
+      qtyInputs.forEach(function(input) {
+        input.addEventListener('input', function() {
+          var rowIndex = parseInt(this.getAttribute('data-row-index'));
+          var newQty = Number(this.value) || 0;
+          var item = items[rowIndex];
+
+          // 매입가와 공급가를 기준으로 금액 재계산
+          var purchasePrice = Number(item['매입가'] || 0);
+          var supplyPrice = Number(item['공급가'] || 0);
+          var newPurchaseAmount = purchasePrice * newQty;
+          var newSupplyAmount = supplyPrice * newQty;
+          var newMarginAmount = newSupplyAmount - newPurchaseAmount;
+          var newMarginRate = newSupplyAmount > 0 ? (newMarginAmount / newSupplyAmount * 100) : 0;
+
+          // 해당 행의 금액 셀 업데이트
+          var row = this.closest('tr');
+          var cells = row.querySelectorAll('td');
+          cells[6].textContent = '₩' + formatNumber(newPurchaseAmount); // 매입액
+          cells[7].textContent = '₩' + formatNumber(newSupplyAmount);   // 공급액
+
+          var marginClass = newMarginAmount >= 0 ? 'orderlist-detail-margin-positive' : 'orderlist-detail-margin-negative';
+          cells[8].className = 'text-right ' + marginClass;
+          cells[8].textContent = '₩' + formatNumber(newMarginAmount);   // 마진액
+          cells[9].className = 'text-right ' + marginClass;
+          cells[9].textContent = newMarginRate.toFixed(1) + '%';        // 마진율
+
+          // 합계 행 재계산
+          var allRows = modalBody.querySelectorAll('.orderlist-detail-table tbody tr');
+          var newTotalPurchase = 0;
+          var newTotalSupply = 0;
+          var newTotalMargin = 0;
+
+          allRows.forEach(function(r, idx) {
+            var qtyInput = r.querySelector('.orderlist-qty-edit-input');
+            if (qtyInput) {
+              var qty = Number(qtyInput.value) || 0;
+              var purchasePrice = Number(items[idx]['매입가'] || 0);
+              var supplyPrice = Number(items[idx]['공급가'] || 0);
+              newTotalPurchase += purchasePrice * qty;
+              newTotalSupply += supplyPrice * qty;
+            }
+          });
+
+          newTotalMargin = newTotalSupply - newTotalPurchase;
+          var newTotalMarginRate = newTotalSupply > 0 ? (newTotalMargin / newTotalSupply * 100) : 0;
+          var totalMarginClass = newTotalMargin >= 0 ? 'orderlist-detail-margin-positive' : 'orderlist-detail-margin-negative';
+
+          var footerCells = modalBody.querySelectorAll('.orderlist-detail-table tfoot td');
+          footerCells[1].textContent = '₩' + formatNumber(newTotalPurchase);
+          footerCells[2].textContent = '₩' + formatNumber(newTotalSupply);
+          footerCells[3].className = 'text-right ' + totalMarginClass;
+          footerCells[3].textContent = '₩' + formatNumber(newTotalMargin);
+          footerCells[4].className = 'text-right ' + totalMarginClass;
+          footerCells[4].textContent = newTotalMarginRate.toFixed(1) + '%';
+        });
+      });
+
+      // 상태 더블클릭 이벤트 리스너
+      var statusElements = modalBody.querySelectorAll('.orderlist-status-clickable');
+      statusElements.forEach(function(elem) {
+        elem.addEventListener('dblclick', function() {
+          var statusType = this.getAttribute('data-status-type');
+          var currentValue = this.getAttribute('data-current');
+          var options = [];
+          var nextValue = '';
+
+          // 상태 타입별 옵션 정의
+          if (statusType === '출고') {
+            options = ['미출고', '출고완료', '부분출고'];
+          } else if (statusType === '매입결제' || statusType === '매출결제') {
+            options = ['미결제', '결제완료', '부분결제'];
+          } else if (statusType === '매입발주') {
+            options = ['미처리', '발주완료'];
+          }
+
+          // 현재 값의 다음 값으로 순환
+          var currentIndex = options.indexOf(currentValue);
+          nextValue = options[(currentIndex + 1) % options.length];
+
+          // UI 업데이트
+          this.textContent = nextValue;
+          this.setAttribute('data-current', nextValue);
+        });
+      });
+
       modal.classList.add('show');
     }
 
@@ -1596,8 +1688,15 @@
           return;
         }
 
-        // 상태 값 수집 (하지만 현재 백엔드 API는 단일 상태만 지원)
-        var shipStatus = document.getElementById('orderlist-status-ship').value;
+        // 상태 값 수집 (clickable span에서)
+        var statusElements = modalBody.querySelectorAll('.orderlist-status-clickable');
+        var shipStatus = '';
+
+        statusElements.forEach(function(elem) {
+          if (elem.getAttribute('data-status-type') === '출고') {
+            shipStatus = elem.getAttribute('data-current');
+          }
+        });
 
         if (!confirm('출고 상태를 "' + shipStatus + '"(으)로 변경하시겠습니까?')) {
           return;

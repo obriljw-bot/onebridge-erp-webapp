@@ -338,9 +338,9 @@
   .orderlist-modal {
     background: white;
     border-radius: 12px;
-    max-width: 1000px;
-    width: 90%;
-    max-height: 85vh;
+    max-width: 1200px;
+    width: 95%;
+    max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -473,6 +473,57 @@
     border: 1px solid #d1d5db;
     border-radius: 6px;
     font-size: 13px;
+  }
+
+  /* 품목 테이블 래퍼 (50개 이상 품목 대응) */
+  .orderlist-detail-table-wrap {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-top: 8px;
+  }
+
+  /* 마진 컬럼 스타일 */
+  .orderlist-detail-margin-positive {
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .orderlist-detail-margin-negative {
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  /* 확정수량 수정 필드 */
+  .orderlist-qty-edit-input {
+    width: 70px;
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 12px;
+    text-align: right;
+  }
+
+  .orderlist-qty-edit-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  }
+
+  /* 상태 더블클릭 스타일 */
+  .orderlist-status-clickable {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    display: inline-block;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .orderlist-status-clickable:hover {
+    background: #f3f4f6;
   }
 
   .orderlist-empty {
