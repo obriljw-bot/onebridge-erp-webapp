@@ -8,7 +8,7 @@
 
 // ====== 스프레드시트 ID / 시트명 상수 ======
 const OB_SETTLEMENT_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs'; // 발주_통합DB (기존)
-const OB_MASTER_DB_SS_ID = '1vjAjykSQGK2DnFXvmQcH2zuI8WbOvAq_smqvW8u_bao'; // 마스터DB
+// OB_MASTER_DB_SS_ID는 OrderParsingService.js에서 선언됨 (중복 방지)
 const OB_ORDER_LEDGER_SHEET = '거래원장';
 const OB_PURCHASE_SETTLEMENT_SHEET = '매입마감DB';
 const OB_SALES_SETTLEMENT_SHEET = '매출마감DB';
