@@ -414,6 +414,11 @@
     gap: 16px;
   }
 
+  .orderlist-detail-grid.status-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
   .orderlist-detail-item {
     display: flex;
     flex-direction: column;
@@ -656,6 +661,9 @@
         🗑️ 발주 삭제
       </button>
       <div style="flex: 1;"></div>
+      <button type="button" id="orderlist-btn-save-qty" class="orderlist-btn orderlist-btn-sm orderlist-btn-primary">
+        📝 수량 저장
+      </button>
       <button type="button" id="orderlist-btn-save-status" class="orderlist-btn orderlist-btn-sm orderlist-btn-success">
         💾 상태 저장
       </button>

@@ -398,6 +398,82 @@ function updateOrderStatus(orderId, status) {
 
 /**
  * ============================================================
+ * 확정수량 업데이트 API
+ * ============================================================
+ */
+function updateOrderQuantitiesApi(updates) {
+  try {
+    if (!updates || updates.length === 0) {
+      return {
+        success: false,
+        error: '업데이트할 수량 정보가 없습니다.'
+      };
+    }
+
+    var sheet = getOrderMergedSheet();
+    var data = sheet.getDataRange().getValues();
+
+    var header = data[0];
+    var colOrderCode = header.indexOf('발주번호');
+    var colProductName = header.indexOf('제품명');
+    var colItemCode = header.indexOf('품목코드');
+    var colConfirmedQty = header.indexOf('확정수량');
+
+    if (colConfirmedQty < 0) {
+      return {
+        success: false,
+        error: '확정수량 컬럼을 찾을 수 없습니다.'
+      };
+    }
+
+    var updated = 0;
+
+    // 각 업데이트 항목에 대해 처리
+    for (var u = 0; u < updates.length; u++) {
+      var update = updates[u];
+
+      // 거래원장에서 해당 행 찾기
+      for (var i = 1; i < data.length; i++) {
+        var rowOrderCode = data[i][colOrderCode];
+        var rowProductName = data[i][colProductName];
+        var rowItemCode = data[i][colItemCode];
+
+        // 발주번호와 제품명(또는 품목코드)로 매칭
+        if (rowOrderCode === update.orderCode) {
+          var isMatch = false;
+
+          if (colItemCode >= 0 && rowItemCode && update.itemCode) {
+            // 품목코드로 매칭
+            isMatch = (rowItemCode === update.itemCode);
+          } else if (colProductName >= 0 && rowProductName && update.productName) {
+            // 제품명으로 매칭
+            isMatch = (rowProductName === update.productName);
+          }
+
+          if (isMatch) {
+            sheet.getRange(i + 1, colConfirmedQty + 1).setValue(update.confirmedQty);
+            updated++;
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      updated: updated
+    };
+
+  } catch (err) {
+    Logger.log('[updateOrderQuantitiesApi Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
+ * ============================================================
  * 발주 삭제 (실제로는 상태 변경)
  * ============================================================
  */
