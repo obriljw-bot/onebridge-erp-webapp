@@ -555,6 +555,9 @@ function getPrintableOrders(params) {
     var cBuyer     = col('발주처');
     var cPurchaseAmount = col('매입액');
     var cSupplyAmount   = col('공급액');
+    var cPayment   = col('결제');
+    var cOrderStatus = col('발주');
+    var cDelivery  = col('출고');
 
     // ---- 필터링 ----
     var filtered = rows.filter(function (row) {
@@ -600,28 +603,68 @@ function getPrintableOrders(params) {
           buyer: row[cBuyer] || '',
           itemCount: 0,
           totalPurchaseAmount: 0,
-          totalAmount: 0
+          totalAmount: 0,
+          payment: '',
+          orderStatus: '',
+          delivery: '',
+          paymentCount: 0,
+          orderStatusCount: 0,
+          deliveryCount: 0
         };
       }
-      
+
       // 품목 수 증가
       orderGroups[orderCode].itemCount++;
-      
+
       // 매입액 합계
       if (cPurchaseAmount >= 0) {
         orderGroups[orderCode].totalPurchaseAmount += Number(row[cPurchaseAmount] || 0);
       }
-      
+
       // 공급액 합계
       if (cSupplyAmount >= 0) {
         orderGroups[orderCode].totalAmount += Number(row[cSupplyAmount] || 0);
+      }
+
+      // 상태 정보 수집 (모든 품목이 완료되어야 완료로 표시)
+      if (cPayment >= 0) {
+        var paymentVal = String(row[cPayment] || '').trim();
+        if (paymentVal === 'Y' || paymentVal === '완료') {
+          orderGroups[orderCode].paymentCount++;
+        }
+      }
+
+      if (cOrderStatus >= 0) {
+        var orderStatusVal = String(row[cOrderStatus] || '').trim();
+        if (orderStatusVal === 'Y' || orderStatusVal === '완료') {
+          orderGroups[orderCode].orderStatusCount++;
+        }
+      }
+
+      if (cDelivery >= 0) {
+        var deliveryVal = String(row[cDelivery] || '').trim();
+        if (deliveryVal === 'Y' || deliveryVal === '완료') {
+          orderGroups[orderCode].deliveryCount++;
+        }
       }
     }
 
     // 객체를 배열로 변환
     var results = [];
     for (var code in orderGroups) {
-      results.push(orderGroups[code]);
+      var group = orderGroups[code];
+
+      // 모든 품목이 완료되었는지 확인
+      group.payment = group.paymentCount === group.itemCount ? '완료' : '';
+      group.orderStatus = group.orderStatusCount === group.itemCount ? '완료' : '';
+      group.delivery = group.deliveryCount === group.itemCount ? '완료' : '';
+
+      // 임시 카운트 필드 제거
+      delete group.paymentCount;
+      delete group.orderStatusCount;
+      delete group.deliveryCount;
+
+      results.push(group);
     }
 
     return {
