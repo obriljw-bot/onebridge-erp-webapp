@@ -474,6 +474,165 @@ function updateOrderQuantitiesApi(updates) {
 
 /**
  * ============================================================
+ * 확정수량 업데이트 API v2.2 ⭐⭐⭐ NEW!
+ * ============================================================
+ * v2.2 표준 준수:
+ * - 상태별 수정 권한 검증 (ORDERED, CONFIRMED_OPEN만 수정 가능)
+ * - 확정수량 변경 시 금액 자동 재계산 (매입액, 공급액, 마진액, 마진율)
+ * - 상태 전이 관리 (ORDERED → CONFIRMED_OPEN)
+ * - safeReturn() 직렬화 적용
+ *
+ * @param {Array} updates - [{ rowIndex, confirmedQty }, ...]
+ * @returns {Object} { success, updatedCount, errors }
+ */
+function updateConfirmedQuantitiesApi(updates) {
+  try {
+    // 1. 입력 검증
+    if (!updates || updates.length === 0) {
+      return errorResponse('업데이트할 수량 정보가 없습니다.', 'INVALID_PARAMS');
+    }
+
+    Logger.log('[updateConfirmedQuantitiesApi] 시작: ' + updates.length + '개 항목');
+
+    var sheet = getOrderMergedSheet();
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    // 2. 컬럼 인덱스 매핑
+    var cols = {
+      confirmedQty: header.indexOf('확정수량'),
+      purchasePrice: header.indexOf('매입가'),
+      supplyPrice: header.indexOf('공급가'),
+      purchaseAmount: header.indexOf('매입액'),
+      supplyAmount: header.indexOf('공급액'),
+      marginAmount: header.indexOf('마진액'),
+      marginRate: header.indexOf('마진율'),
+      state: header.indexOf('거래상태'),
+      updatedAt: header.indexOf('수정일시')
+    };
+
+    // 필수 컬럼 확인
+    if (cols.confirmedQty < 0) {
+      return errorResponse('확정수량 컬럼을 찾을 수 없습니다.', 'MISSING_COLUMN');
+    }
+    if (cols.purchasePrice < 0 || cols.supplyPrice < 0) {
+      return errorResponse('매입가 또는 공급가 컬럼을 찾을 수 없습니다.', 'MISSING_COLUMN');
+    }
+
+    var updateRanges = [];
+    var errors = [];
+    var now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
+
+    // 3. 각 업데이트 처리
+    for (var u = 0; u < updates.length; u++) {
+      var update = updates[u];
+      var rowIndex = update.rowIndex;
+
+      if (rowIndex < 1 || rowIndex >= data.length) {
+        errors.push('행 ' + rowIndex + ': 유효하지 않은 행 번호');
+        continue;
+      }
+
+      var row = data[rowIndex];
+
+      // 3-1. 상태 확인 (SETTLED 이상이면 수정 불가)
+      var state = (cols.state >= 0) ? (row[cols.state] || 'ORDERED') : 'ORDERED';
+
+      if (state !== 'ORDERED' && state !== 'CONFIRMED_OPEN') {
+        errors.push('행 ' + (rowIndex + 1) + ': 마감된 거래는 수정할 수 없습니다 (상태: ' + state + '). Adjustment를 사용하세요.');
+        Logger.log('❌ 행 ' + (rowIndex + 1) + ' 수정 불가: 상태 = ' + state);
+        continue;
+      }
+
+      // 3-2. 확정수량 업데이트
+      var confirmedQty = parseFloat(update.confirmedQty);
+      if (isNaN(confirmedQty) || confirmedQty < 0) {
+        errors.push('행 ' + (rowIndex + 1) + ': 유효하지 않은 확정수량 (' + update.confirmedQty + ')');
+        continue;
+      }
+
+      // 3-3. 금액 재계산
+      var purchasePrice = parseFloat(row[cols.purchasePrice]) || 0;
+      var supplyPrice = parseFloat(row[cols.supplyPrice]) || 0;
+
+      var purchaseAmount = confirmedQty * purchasePrice;
+      var supplyAmount = confirmedQty * supplyPrice;
+      var marginAmount = supplyAmount - purchaseAmount;
+      var marginRate = supplyAmount > 0 ? (marginAmount / supplyAmount * 100) : 0;
+
+      // 3-4. 상태 업데이트 (ORDERED → CONFIRMED_OPEN)
+      var newState = state;
+      if (state === 'ORDERED') {
+        newState = 'CONFIRMED_OPEN';
+      }
+
+      // 3-5. 업데이트 범위 저장
+      updateRanges.push({
+        rowNum: rowIndex + 1, // 1-based row number for sheet
+        confirmedQty: confirmedQty,
+        purchaseAmount: purchaseAmount,
+        supplyAmount: supplyAmount,
+        marginAmount: marginAmount,
+        marginRate: marginRate,
+        state: newState,
+        updatedAt: now
+      });
+
+      Logger.log('✅ 행 ' + (rowIndex + 1) + ' 재계산 완료: 확정수량=' + confirmedQty +
+                 ', 매입액=' + purchaseAmount + ', 공급액=' + supplyAmount +
+                 ', 마진액=' + marginAmount + ', 상태=' + newState);
+    }
+
+    // 4. 시트에 일괄 반영
+    for (var i = 0; i < updateRanges.length; i++) {
+      var range = updateRanges[i];
+
+      // 확정수량
+      sheet.getRange(range.rowNum, cols.confirmedQty + 1).setValue(range.confirmedQty);
+
+      // 금액 필드들
+      if (cols.purchaseAmount >= 0) {
+        sheet.getRange(range.rowNum, cols.purchaseAmount + 1).setValue(range.purchaseAmount);
+      }
+      if (cols.supplyAmount >= 0) {
+        sheet.getRange(range.rowNum, cols.supplyAmount + 1).setValue(range.supplyAmount);
+      }
+      if (cols.marginAmount >= 0) {
+        sheet.getRange(range.rowNum, cols.marginAmount + 1).setValue(range.marginAmount);
+      }
+      if (cols.marginRate >= 0) {
+        sheet.getRange(range.rowNum, cols.marginRate + 1).setValue(range.marginRate);
+      }
+
+      // 상태
+      if (cols.state >= 0) {
+        sheet.getRange(range.rowNum, cols.state + 1).setValue(range.state);
+      }
+
+      // 수정일시
+      if (cols.updatedAt >= 0) {
+        sheet.getRange(range.rowNum, cols.updatedAt + 1).setValue(range.updatedAt);
+      }
+    }
+
+    Logger.log('[updateConfirmedQuantitiesApi] 완료: ' + updateRanges.length + '개 업데이트, ' + errors.length + '개 오류');
+
+    // 5. 성공 응답 (safeReturn 직렬화)
+    return safeReturn({
+      success: true,
+      updatedCount: updateRanges.length,
+      totalRequested: updates.length,
+      errors: errors.length > 0 ? errors : null
+    });
+
+  } catch (e) {
+    Logger.log('[updateConfirmedQuantitiesApi Error] ' + e.message + '\n' + e.stack);
+    return errorResponse(e.message, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * ============================================================
  * 발주 삭제 (실제로는 상태 변경)
  * ============================================================
  */

@@ -264,7 +264,11 @@ function saveParsedOrdersToDB(items) {
     billingDate:    col('청구일'),
     sheetRowNumber:      col('행번호'),
     createdAt:      col('생성일시'),
-    updatedAt:      col('수정일시')
+    updatedAt:      col('수정일시'),
+    // ⭐ v2.2 상태 관리 컬럼
+    state:          col('거래상태'),
+    purchaseSettlementId: col('매입마감ID'),
+    salesSettlementId:    col('매출마감ID')
   };
 
   // 공통 값 생성
@@ -390,6 +394,11 @@ function saveParsedOrdersToDB(items) {
       if (c.rowNumber      >= 0) row[c.rowNumber]      = '';
       if (c.createdAt      >= 0) row[c.createdAt]      = timeStr;
       if (c.updatedAt      >= 0) row[c.updatedAt]      = timeStr;
+
+      // ⭐ v2.2 상태 관리 - 신규 발주는 ORDERED 상태로 시작
+      if (c.state                >= 0) row[c.state]                = 'ORDERED';
+      if (c.purchaseSettlementId >= 0) row[c.purchaseSettlementId] = '';
+      if (c.salesSettlementId    >= 0) row[c.salesSettlementId]    = '';
 
       sheet.appendRow(row);
       saved++;
