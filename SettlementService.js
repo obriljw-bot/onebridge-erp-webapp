@@ -68,6 +68,120 @@ function getCompanyCode_(companyName) {
 }
 
 /**
+ * 마감 시 거래원장 상태 업데이트 (v2.2)
+ * @param {Object} params - { settlementId, settlementType, supplier, buyer, startDate, endDate, state }
+ * @returns {Object} { success, updatedRows, error }
+ */
+function updateLedgerStateForSettlement_(params) {
+  try {
+    var settlementId = params.settlementId;
+    var settlementType = params.settlementType; // 'PURCHASE' or 'SALES'
+    var supplier = params.supplier;
+    var buyer = params.buyer;
+    var startDate = params.startDate;
+    var endDate = params.endDate;
+    var state = params.state; // 'SETTLED' or 'CONFIRMED_OPEN'
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_ORDER_LEDGER_SHEET);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '거래원장 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    // 컬럼 인덱스
+    var col = function(name) { return header.indexOf(name); };
+    var cOrderDate = col('발주일');
+    var cSupplier = col('매입처');
+    var cBuyer = col('발주처');
+    var cState = col('거래상태');
+    var cPurchaseSettlementId = col('매입마감ID');
+    var cSalesSettlementId = col('매출마감ID');
+    var cUpdatedAt = col('수정일시');
+
+    if (cState < 0) {
+      return {
+        success: false,
+        error: '거래상태 컬럼을 찾을 수 없습니다. 마이그레이션을 먼저 실행하세요.'
+      };
+    }
+
+    // 날짜 파싱
+    var parseDate = function(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      return new Date(d);
+    };
+
+    var start = parseDate(startDate);
+    var end = parseDate(endDate);
+    var now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
+
+    var updatedRows = 0;
+
+    // 해당 기간의 거래원장 데이터 찾아서 상태 업데이트
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // 매입처/발주처 필터
+      if (settlementType === 'PURCHASE' && supplier && row[cSupplier] !== supplier) continue;
+      if (settlementType === 'SALES' && buyer && row[cBuyer] !== buyer) continue;
+
+      // 날짜 필터
+      var orderDate = parseDate(row[cOrderDate]);
+      if (!orderDate || orderDate < start || orderDate > end) continue;
+
+      // 상태 업데이트
+      var rowNum = i + 1; // 1-based row number
+      sheet.getRange(rowNum, cState + 1).setValue(state);
+
+      // 마감 ID 기록
+      if (state === 'SETTLED') {
+        if (settlementType === 'PURCHASE' && cPurchaseSettlementId >= 0) {
+          sheet.getRange(rowNum, cPurchaseSettlementId + 1).setValue(settlementId);
+        }
+        if (settlementType === 'SALES' && cSalesSettlementId >= 0) {
+          sheet.getRange(rowNum, cSalesSettlementId + 1).setValue(settlementId);
+        }
+      } else {
+        // 상태 복구 시 마감 ID 초기화
+        if (settlementType === 'PURCHASE' && cPurchaseSettlementId >= 0) {
+          sheet.getRange(rowNum, cPurchaseSettlementId + 1).setValue('');
+        }
+        if (settlementType === 'SALES' && cSalesSettlementId >= 0) {
+          sheet.getRange(rowNum, cSalesSettlementId + 1).setValue('');
+        }
+      }
+
+      // 수정일시 업데이트
+      if (cUpdatedAt >= 0) {
+        sheet.getRange(rowNum, cUpdatedAt + 1).setValue(now);
+      }
+
+      updatedRows++;
+    }
+
+    return {
+      success: true,
+      updatedRows: updatedRows
+    };
+
+  } catch (err) {
+    Logger.log('[updateLedgerStateForSettlement_ Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
  * ============================================================
  * 1. 매입/매출 데이터 집계
  * ============================================================
@@ -425,6 +539,33 @@ function savePurchaseSettlement(params) {
       Logger.log('[savePurchaseSettlement] 새 마감 생성: ' + settlementId);
     }
 
+    // ⭐ v2.2: 마감 확정 시 거래원장 상태 업데이트
+    if (status === 'CONFIRMED') {
+      Logger.log('[savePurchaseSettlement] 거래원장 상태 업데이트 시작');
+      var updateResult = updateLedgerStateForSettlement_({
+        settlementId: settlementId,
+        settlementType: 'PURCHASE',
+        supplier: supplier,
+        buyer: null,
+        startDate: startDate,
+        endDate: endDate,
+        state: 'SETTLED'
+      });
+
+      if (!updateResult.success) {
+        Logger.log('⚠️ 거래원장 상태 업데이트 실패: ' + updateResult.error);
+        // 마감은 저장되었지만 상태 업데이트 실패 경고
+        return {
+          success: true,
+          settlementId: settlementId,
+          message: '마감 확정 완료 (경고: 거래원장 상태 업데이트 실패)',
+          warning: updateResult.error
+        };
+      }
+
+      Logger.log('[savePurchaseSettlement] 거래원장 ' + updateResult.updatedRows + '개 행 상태 업데이트 완료');
+    }
+
     return {
       success: true,
       settlementId: settlementId,
@@ -528,6 +669,32 @@ function saveSalesSettlement(params) {
     } else {
       sheet.appendRow(rowData);
       Logger.log('[saveSalesSettlement] 새 마감 생성: ' + settlementId);
+    }
+
+    // ⭐ v2.2: 마감 확정 시 거래원장 상태 업데이트
+    if (status === 'CONFIRMED') {
+      Logger.log('[saveSalesSettlement] 거래원장 상태 업데이트 시작');
+      var updateResult = updateLedgerStateForSettlement_({
+        settlementId: settlementId,
+        settlementType: 'SALES',
+        supplier: null,
+        buyer: buyer,
+        startDate: startDate,
+        endDate: endDate,
+        state: 'SETTLED'
+      });
+
+      if (!updateResult.success) {
+        Logger.log('⚠️ 거래원장 상태 업데이트 실패: ' + updateResult.error);
+        return {
+          success: true,
+          settlementId: settlementId,
+          message: '마감 확정 완료 (경고: 거래원장 상태 업데이트 실패)',
+          warning: updateResult.error
+        };
+      }
+
+      Logger.log('[saveSalesSettlement] 거래원장 ' + updateResult.updatedRows + '개 행 상태 업데이트 완료');
     }
 
     return {
@@ -643,6 +810,111 @@ function getSalesSettlements(params) {
     return {
       success: false,
       error: err.message
+    };
+  }
+}
+
+/**
+ * 마감 해제 (v2.2) - 거래원장 상태 복구
+ * @param {Object} params - { settlementId, type }
+ * @returns {Object} 해제 결과
+ */
+function unlockSettlement(params) {
+  try {
+    var settlementId = params.settlementId || '';
+    var type = params.type || ''; // 'PURCHASE' or 'SALES'
+
+    if (!settlementId || !type) {
+      return {
+        success: false,
+        error: '마감ID와 유형을 입력해주세요.'
+      };
+    }
+
+    Logger.log('[unlockSettlement] 마감 해제 시작: ' + settlementId);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheetName = type === 'PURCHASE' ? OB_PURCHASE_SETTLEMENT_SHEET : OB_SALES_SETTLEMENT_SHEET;
+    var sheet = ss.getSheetByName(sheetName);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '마감 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    // 마감 데이터 찾기
+    var data = sheet.getDataRange().getValues();
+    var rowIndex = -1;
+    var settlementData = null;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === settlementId) {
+        rowIndex = i + 1;
+        settlementData = {
+          supplier: type === 'PURCHASE' ? data[i][2] : null,
+          buyer: type === 'SALES' ? data[i][2] : null,
+          startDate: data[i][3],
+          endDate: data[i][4],
+          status: data[i][5]
+        };
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      return {
+        success: false,
+        error: '마감 데이터를 찾을 수 없습니다.'
+      };
+    }
+
+    // LOCKED 상태는 해제 불가
+    if (settlementData.status === 'LOCKED') {
+      return {
+        success: false,
+        error: '월마감 완료된 항목은 해제할 수 없습니다. 먼저 월마감을 해제하세요.'
+      };
+    }
+
+    // 마감 상태를 DRAFT로 변경
+    sheet.getRange(rowIndex, 6).setValue('DRAFT'); // status column
+    Logger.log('[unlockSettlement] 마감 상태 DRAFT로 변경');
+
+    // ⭐ v2.2: 거래원장 상태 복구 (SETTLED → CONFIRMED_OPEN)
+    var updateResult = updateLedgerStateForSettlement_({
+      settlementId: settlementId,
+      settlementType: type,
+      supplier: settlementData.supplier,
+      buyer: settlementData.buyer,
+      startDate: settlementData.startDate,
+      endDate: settlementData.endDate,
+      state: 'CONFIRMED_OPEN'
+    });
+
+    if (!updateResult.success) {
+      Logger.log('⚠️ 거래원장 상태 복구 실패: ' + updateResult.error);
+      return {
+        success: false,
+        error: '거래원장 상태 복구 실패: ' + updateResult.error
+      };
+    }
+
+    Logger.log('[unlockSettlement] 거래원장 ' + updateResult.updatedRows + '개 행 상태 복구 완료');
+
+    return {
+      success: true,
+      settlementId: settlementId,
+      updatedRows: updateResult.updatedRows,
+      message: '마감이 해제되었습니다.'
+    };
+
+  } catch (err) {
+    Logger.log('[unlockSettlement Error] ' + err.message);
+    return {
+      success: false,
+      error: '마감 해제 중 오류 발생: ' + err.message
     };
   }
 }
