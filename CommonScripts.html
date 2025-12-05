@@ -172,6 +172,9 @@
     setupNavLinks();
     OB.highlightActiveNav(OB.state.currentPage);
     OB.initCurrentPage(OB.state.currentPage);
+
+    // 초기 페이지 로드 완료 후 로딩 오버레이 숨김
+    OB.hideLoading();
   });
 
   // ===== 유틸리티 함수 =====
