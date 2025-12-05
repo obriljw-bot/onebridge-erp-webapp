@@ -555,6 +555,11 @@ function getPrintableOrders(params) {
     var cBuyer     = col('발주처');
     var cPurchaseAmount = col('매입액');
     var cSupplyAmount   = col('공급액');
+    // 상태 컬럼
+    var cBuyOrder = col('매입발주');
+    var cPayBuy   = col('매입결제');
+    var cPaySell  = col('매출결제');
+    var cShip     = col('출고');
 
     // ---- 필터링 ----
     var filtered = rows.filter(function (row) {
@@ -600,7 +605,12 @@ function getPrintableOrders(params) {
           buyer: row[cBuyer] || '',
           itemCount: 0,
           totalPurchaseAmount: 0,
-          totalAmount: 0
+          totalAmount: 0,
+          // 상태 정보
+          buyOrder: cBuyOrder >= 0 ? (row[cBuyOrder] || '') : '',
+          payBuy: cPayBuy >= 0 ? (row[cPayBuy] || '') : '',
+          paySell: cPaySell >= 0 ? (row[cPaySell] || '') : '',
+          ship: cShip >= 0 ? (row[cShip] || '') : ''
         };
       }
       

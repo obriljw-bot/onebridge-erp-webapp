@@ -424,6 +424,75 @@
   .orderlist-empty-text {
     font-size: 14px;
   }
+
+  /* 상태 뱃지 */
+  .orderlist-status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* 매입발주 상태 */
+  .orderlist-status-badge.buy-order-pending {
+    background: #fef3c7;
+    color: #d97706;
+  }
+  .orderlist-status-badge.buy-order-done {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  /* 매입결제 상태 */
+  .orderlist-status-badge.pay-buy-pending {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+  .orderlist-status-badge.pay-buy-partial {
+    background: #fef3c7;
+    color: #d97706;
+  }
+  .orderlist-status-badge.pay-buy-done {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  /* 매출결제 상태 */
+  .orderlist-status-badge.pay-sell-pending {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+  .orderlist-status-badge.pay-sell-partial {
+    background: #fef3c7;
+    color: #d97706;
+  }
+  .orderlist-status-badge.pay-sell-done {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  /* 출고 상태 */
+  .orderlist-status-badge.ship-pending {
+    background: #e5e7eb;
+    color: #6b7280;
+  }
+  .orderlist-status-badge.ship-partial {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+  .orderlist-status-badge.ship-done {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  /* 상태 칼럼 */
+  .orderlist-table th.status-col,
+  .orderlist-table td.status-col {
+    text-align: center;
+    min-width: 80px;
+  }
 </style>
 
 <div class="orderlist-wrap">
@@ -497,11 +566,15 @@
             <th class="sortable text-center" data-sort="itemCount">품목수</th>
             <th class="sortable text-right" data-sort="totalPurchaseAmount">매입액</th>
             <th class="sortable text-right" data-sort="totalAmount">공급액</th>
+            <th class="status-col">매입발주</th>
+            <th class="status-col">매입결제</th>
+            <th class="status-col">매출결제</th>
+            <th class="status-col">출고</th>
           </tr>
         </thead>
         <tbody id="orderlist-tbody">
           <tr>
-            <td colspan="8" class="orderlist-empty">
+            <td colspan="12" class="orderlist-empty">
               <div class="orderlist-empty-icon">📋</div>
               <div class="orderlist-empty-text">조회 버튼을 클릭하여 발주 내역을 확인하세요</div>
             </td>

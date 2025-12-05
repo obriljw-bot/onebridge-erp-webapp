@@ -1283,6 +1283,49 @@
         var tr = document.createElement('tr');
         tr.dataset.orderCode = order.orderCode;
 
+        // 상태 뱃지 생성 함수
+        function getStatusBadge(type, value) {
+          var badge = { emoji: '', css: '', text: '' };
+
+          if (type === 'buyOrder') {
+            // 매입발주
+            if (value === '발주완료') {
+              badge = { emoji: '✅', css: 'buy-order-done', text: '발주완료' };
+            } else {
+              badge = { emoji: '⏳', css: 'buy-order-pending', text: '미처리' };
+            }
+          } else if (type === 'payBuy') {
+            // 매입결제
+            if (value === '결제완료') {
+              badge = { emoji: '✅', css: 'pay-buy-done', text: '결제완료' };
+            } else if (value === '부분결제') {
+              badge = { emoji: '🔸', css: 'pay-buy-partial', text: '부분결제' };
+            } else {
+              badge = { emoji: '❌', css: 'pay-buy-pending', text: '미결제' };
+            }
+          } else if (type === 'paySell') {
+            // 매출결제
+            if (value === '결제완료') {
+              badge = { emoji: '✅', css: 'pay-sell-done', text: '결제완료' };
+            } else if (value === '부분결제') {
+              badge = { emoji: '🔸', css: 'pay-sell-partial', text: '부분결제' };
+            } else {
+              badge = { emoji: '❌', css: 'pay-sell-pending', text: '미결제' };
+            }
+          } else if (type === 'ship') {
+            // 출고
+            if (value === '출고완료') {
+              badge = { emoji: '✅', css: 'ship-done', text: '출고완료' };
+            } else if (value === '부분출고') {
+              badge = { emoji: '📦', css: 'ship-partial', text: '부분출고' };
+            } else {
+              badge = { emoji: '⬜', css: 'ship-pending', text: '미출고' };
+            }
+          }
+
+          return '<span class="orderlist-status-badge ' + badge.css + '">' + badge.emoji + ' ' + badge.text + '</span>';
+        }
+
         tr.innerHTML =
           '<td>' + formatDate(order.orderDate) + '</td>' +
           '<td><span class="orderlist-ordercode">' + (order.orderCode || '') + '</span></td>' +
@@ -1291,7 +1334,11 @@
           '<td>' + (order.supplier || '') + '</td>' +
           '<td class="text-center">' + (order.itemCount || 0) + '개</td>' +
           '<td class="text-right">₩' + formatNumber(order.totalPurchaseAmount) + '</td>' +
-          '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>';
+          '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>' +
+          '<td class="status-col">' + getStatusBadge('buyOrder', order.buyOrder || '') + '</td>' +
+          '<td class="status-col">' + getStatusBadge('payBuy', order.payBuy || '') + '</td>' +
+          '<td class="status-col">' + getStatusBadge('paySell', order.paySell || '') + '</td>' +
+          '<td class="status-col">' + getStatusBadge('ship', order.ship || '') + '</td>';
 
         tr.addEventListener('click', function() {
           loadOrderDetail(order.orderCode);
@@ -1370,7 +1417,7 @@
     // ============================================================
     function renderEmpty() {
       tbody.innerHTML =
-        '<tr><td colspan="8" class="orderlist-empty">' +
+        '<tr><td colspan="12" class="orderlist-empty">' +
         '<div class="orderlist-empty-icon">📋</div>' +
         '<div class="orderlist-empty-text">조회 결과가 없습니다</div>' +
         '</td></tr>';
@@ -1438,39 +1485,39 @@
       html += '</div>';
       html += '</div>';
 
-      // 상태 수정 폼
+      // 상태 수정 폼 (순서: 매입발주 → 매입결제 → 매출결제 → 출고상태)
       html += '<div class="orderlist-detail-section">';
       html += '<div class="orderlist-detail-section-title">상태 관리</div>';
       html += '<div class="orderlist-status-form">';
       html += '<div class="orderlist-status-item">';
-      html += '<label class="orderlist-detail-label">출고 상태</label>';
-      html += '<select id="orderlist-status-ship" class="orderlist-status-select">';
-      html += '<option value="미출고"' + (firstItem['출고'] === '미출고' ? ' selected' : '') + '>미출고</option>';
-      html += '<option value="출고완료"' + (firstItem['출고'] === '출고완료' ? ' selected' : '') + '>출고완료</option>';
-      html += '<option value="부분출고"' + (firstItem['출고'] === '부분출고' ? ' selected' : '') + '>부분출고</option>';
+      html += '<label class="orderlist-detail-label">매입 발주</label>';
+      html += '<select id="orderlist-status-buy-order" class="orderlist-status-select">';
+      html += '<option value="미처리"' + (firstItem['매입발주'] === '미처리' || !firstItem['매입발주'] ? ' selected' : '') + '>⏳ 미처리</option>';
+      html += '<option value="발주완료"' + (firstItem['매입발주'] === '발주완료' ? ' selected' : '') + '>✅ 발주완료</option>';
       html += '</select>';
       html += '</div>';
       html += '<div class="orderlist-status-item">';
       html += '<label class="orderlist-detail-label">매입 결제</label>';
       html += '<select id="orderlist-status-pay-buy" class="orderlist-status-select">';
-      html += '<option value="미결제"' + (firstItem['매입결제'] === '미결제' ? ' selected' : '') + '>미결제</option>';
-      html += '<option value="결제완료"' + (firstItem['매입결제'] === '결제완료' ? ' selected' : '') + '>결제완료</option>';
-      html += '<option value="부분결제"' + (firstItem['매입결제'] === '부분결제' ? ' selected' : '') + '>부분결제</option>';
+      html += '<option value="미결제"' + (firstItem['매입결제'] === '미결제' || !firstItem['매입결제'] ? ' selected' : '') + '>❌ 미결제</option>';
+      html += '<option value="부분결제"' + (firstItem['매입결제'] === '부분결제' ? ' selected' : '') + '>🔸 부분결제</option>';
+      html += '<option value="결제완료"' + (firstItem['매입결제'] === '결제완료' ? ' selected' : '') + '>✅ 결제완료</option>';
       html += '</select>';
       html += '</div>';
       html += '<div class="orderlist-status-item">';
       html += '<label class="orderlist-detail-label">매출 결제</label>';
       html += '<select id="orderlist-status-pay-sell" class="orderlist-status-select">';
-      html += '<option value="미결제"' + (firstItem['매출결제'] === '미결제' ? ' selected' : '') + '>미결제</option>';
-      html += '<option value="결제완료"' + (firstItem['매출결제'] === '결제완료' ? ' selected' : '') + '>결제완료</option>';
-      html += '<option value="부분결제"' + (firstItem['매출결제'] === '부분결제' ? ' selected' : '') + '>부분결제</option>';
+      html += '<option value="미결제"' + (firstItem['매출결제'] === '미결제' || !firstItem['매출결제'] ? ' selected' : '') + '>❌ 미결제</option>';
+      html += '<option value="부분결제"' + (firstItem['매출결제'] === '부분결제' ? ' selected' : '') + '>🔸 부분결제</option>';
+      html += '<option value="결제완료"' + (firstItem['매출결제'] === '결제완료' ? ' selected' : '') + '>✅ 결제완료</option>';
       html += '</select>';
       html += '</div>';
       html += '<div class="orderlist-status-item">';
-      html += '<label class="orderlist-detail-label">매입 발주</label>';
-      html += '<select id="orderlist-status-buy-order" class="orderlist-status-select">';
-      html += '<option value="미처리"' + (firstItem['매입발주'] === '미처리' ? ' selected' : '') + '>미처리</option>';
-      html += '<option value="발주완료"' + (firstItem['매입발주'] === '발주완료' ? ' selected' : '') + '>발주완료</option>';
+      html += '<label class="orderlist-detail-label">출고 상태</label>';
+      html += '<select id="orderlist-status-ship" class="orderlist-status-select">';
+      html += '<option value="미출고"' + (firstItem['출고'] === '미출고' || !firstItem['출고'] ? ' selected' : '') + '>⬜ 미출고</option>';
+      html += '<option value="부분출고"' + (firstItem['출고'] === '부분출고' ? ' selected' : '') + '>📦 부분출고</option>';
+      html += '<option value="출고완료"' + (firstItem['출고'] === '출고완료' ? ' selected' : '') + '>✅ 출고완료</option>';
       html += '</select>';
       html += '</div>';
       html += '</div>';
