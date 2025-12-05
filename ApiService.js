@@ -634,6 +634,36 @@ function getPrintableOrders(params) {
 
 /**
  * ============================================================
+ * Transaction API (거래원장 관리)
+ * ============================================================
+ */
+
+/**
+ * 확정수량 업데이트 및 금액 자동 재계산
+ */
+function updateConfirmedQuantitiesApi(params) {
+  var result = updateConfirmedQuantities(params);
+  return safeReturn(result);
+}
+
+/**
+ * 발주 상태 업데이트
+ */
+function updateTransactionStateApi(params) {
+  var result = updateTransactionState(params);
+  return safeReturn(result);
+}
+
+/**
+ * 거래원장 조회
+ */
+function getTransactionsApi(params) {
+  var result = getTransactions(params);
+  return safeReturn(result);
+}
+
+/**
+ * ============================================================
  * 회계 마감 API (클라이언트용 래퍼)
  * ============================================================
  */
