@@ -78,9 +78,12 @@
   };
 
   OB.hideLoading = function () {
-    var overlay = document.getElementById('ob-loading-overlay');
-    if (!overlay) return;
-    overlay.classList.remove('show');
+    // 중복된 오버레이가 있을 수 있으므로 모두 숨김
+    var overlays = document.querySelectorAll('#ob-loading-overlay, .ob-loading-overlay');
+    overlays.forEach(function(overlay) {
+      overlay.classList.remove('show');
+      overlay.style.display = 'none';
+    });
     OB.state.isLoading = false;
   };
 
