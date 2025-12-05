@@ -717,20 +717,10 @@ function getSalesSettlementsApi(params) {
 }
 
 /**
- * 매입 마감 데이터 집계
+ * ============================================================
+ * 청구서 관리 API (InvoiceService)
+ * ============================================================
  */
-function aggregatePurchaseOrdersApi(params) {
-  var result = aggregatePurchaseOrders(params);
-  return safeReturn(result);
-}
-
-/**
- * 매출 마감 데이터 집계
- */
-function aggregateSalesOrdersApi(params) {
-  var result = aggregateSalesOrders(params);
-  return safeReturn(result);
-}
 
 /**
  * 청구서용 데이터 집계
@@ -739,12 +729,6 @@ function aggregateInvoiceDataApi(params) {
   var result = aggregateInvoiceData(params);
   return safeReturn(result);
 }
-
-/**
- * ============================================================
- * 청구서 관리 API (InvoiceService)
- * ============================================================
- */
 
 /**
  * Settlement 기반 청구서 생성
