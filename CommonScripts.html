@@ -78,12 +78,9 @@
   };
 
   OB.hideLoading = function () {
-    // 중복된 오버레이가 있을 수 있으므로 모두 숨김
-    var overlays = document.querySelectorAll('#ob-loading-overlay, .ob-loading-overlay');
-    overlays.forEach(function(overlay) {
-      overlay.classList.remove('show');
-      overlay.style.display = 'none';
-    });
+    var overlay = document.getElementById('ob-loading-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
     OB.state.isLoading = false;
   };
 
@@ -175,9 +172,6 @@
     setupNavLinks();
     OB.highlightActiveNav(OB.state.currentPage);
     OB.initCurrentPage(OB.state.currentPage);
-
-    // 초기 페이지 로드 완료 후 로딩 오버레이 숨김
-    OB.hideLoading();
   });
 
   // ===== 유틸리티 함수 =====
