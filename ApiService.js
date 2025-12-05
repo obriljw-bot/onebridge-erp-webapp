@@ -705,39 +705,73 @@ function aggregateSalesOrdersApi(params) {
 /**
  * 청구서용 데이터 집계
  */
-function aggregateBillingDataApi(params) {
-  var result = aggregateBillingData(params);
+function aggregateInvoiceDataApi(params) {
+  var result = aggregateInvoiceData(params);
   return safeReturn(result);
 }
 
 /**
  * ============================================================
- * 청구서 관리 API (Phase 2)
+ * 청구서 관리 API (InvoiceService)
  * ============================================================
  */
 
 /**
- * 청구서 생성
+ * Settlement 기반 청구서 생성
  */
-function createBillingApi(params) {
-  var result = createBilling(params);
+function createInvoiceFromSettlementApi(params) {
+  var result = createInvoiceFromSettlement(params);
   return safeReturn(result);
 }
 
 /**
  * 청구서 목록 조회
  */
-function getBillingsApi(params) {
-  var result = getBillings(params);
+function getInvoicesApi(params) {
+  var result = getInvoices(params);
   return safeReturn(result);
 }
 
 /**
  * 청구서 상태 업데이트
  */
-function updateBillingStatusApi(params) {
-  var result = updateBillingStatus(params);
+function updateInvoiceStatusApi(params) {
+  var result = updateInvoiceStatus(params);
   return safeReturn(result);
+}
+
+/**
+ * ============================================================
+ * 하위 호환성을 위한 Deprecated API (곧 제거 예정)
+ * ============================================================
+ */
+
+/**
+ * @deprecated aggregateInvoiceDataApi 사용 권장
+ */
+function aggregateBillingDataApi(params) {
+  return aggregateInvoiceDataApi(params);
+}
+
+/**
+ * @deprecated createInvoiceFromSettlementApi 사용 권장
+ */
+function createBillingApi(params) {
+  return createInvoiceFromSettlementApi(params);
+}
+
+/**
+ * @deprecated getInvoicesApi 사용 권장
+ */
+function getBillingsApi(params) {
+  return getInvoicesApi(params);
+}
+
+/**
+ * @deprecated updateInvoiceStatusApi 사용 권장
+ */
+function updateBillingStatusApi(params) {
+  return updateInvoiceStatusApi(params);
 }
 
 /**
