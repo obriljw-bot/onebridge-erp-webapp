@@ -431,3 +431,84 @@ function formatYearMonth(date) {
 
   return String(year) + month;
 }
+
+/**
+ * ============================================================
+ * 6. 청구서 재출력
+ * ============================================================
+ * 기존 청구서를 기반으로 PDF를 다시 생성합니다.
+ * @param {Object} params - { invoiceId, billingId, settlementId, type }
+ * @returns {Object} { success, fileId, fileName, error }
+ */
+function reprintInvoice(params) {
+  try {
+    var invoiceId = params && (params.invoiceId || params.billingId) ? (params.invoiceId || params.billingId) : '';
+    var settlementId = params && params.settlementId ? params.settlementId : '';
+    var type = params && params.type ? params.type : '';
+
+    if (!invoiceId && !settlementId) {
+      return {
+        success: false,
+        error: '인보이스 ID 또는 마감 ID가 필요합니다.'
+      };
+    }
+
+    // 마감 상세 조회
+    var detail;
+
+    if (settlementId) {
+      detail = getSettlementDetail({ settlementId: settlementId, type: type });
+    } else {
+      // invoiceId로 먼저 인보이스 정보 조회
+      var invoices = getInvoices({ invoiceId: invoiceId });
+
+      if (!invoices.success || !invoices.invoices || !invoices.invoices.length) {
+        return {
+          success: false,
+          error: '해당 인보이스를 찾을 수 없습니다.'
+        };
+      }
+
+      var inv = invoices.invoices[0];
+      detail = getSettlementDetail({ settlementId: inv.settlementId, type: inv.type });
+    }
+
+    if (!detail || !detail.success) {
+      return {
+        success: false,
+        error: detail ? detail.error : '마감 상세 조회에 실패했습니다.'
+      };
+    }
+
+    // PDF 생성
+    var zipResult = generateInvoiceZip({
+      settlementId: detail.settlement.settlementId,
+      type: detail.settlement.type,
+      partner: detail.settlement.partner,
+      items: detail.items
+    });
+
+    if (!zipResult || !zipResult.success) {
+      return {
+        success: false,
+        error: zipResult ? zipResult.error : 'PDF 생성에 실패했습니다.'
+      };
+    }
+
+    Logger.log('[reprintInvoice] 청구서 재출력 완료: ' + (invoiceId || settlementId));
+
+    return {
+      success: true,
+      fileId: zipResult.fileId,
+      fileName: zipResult.fileName,
+      message: '청구서 재출력이 완료되었습니다.'
+    };
+
+  } catch (err) {
+    Logger.log('[reprintInvoice Error] ' + err.message);
+    return {
+      success: false,
+      error: '청구서 재출력 중 오류 발생: ' + err.message
+    };
+  }
+}

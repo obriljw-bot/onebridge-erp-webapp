@@ -890,3 +890,110 @@ function getMonthlyClosings() {
     };
   }
 }
+
+/**
+ * ============================================================
+ * 마감 상세 조회
+ * ============================================================
+ * 특정 마감의 상세 정보와 집계 데이터를 조회합니다.
+ * @param {Object} params - { settlementId, type }
+ * @returns {Object} { success, settlement, items, error }
+ */
+function getSettlementDetail(params) {
+  try {
+    var settlementId = params && params.settlementId ? String(params.settlementId) : '';
+    var type = params && params.type ? String(params.type) : '';
+
+    if (!settlementId) {
+      return {
+        success: false,
+        error: '마감ID를 입력해주세요.'
+      };
+    }
+
+    var sheetName = type === 'SALES' ? OB_SALES_SETTLEMENT_SHEET : OB_PURCHASE_SETTLEMENT_SHEET;
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(sheetName);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '마감 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var settlementRow = null;
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === settlementId) {
+        settlementRow = data[i];
+        break;
+      }
+    }
+
+    if (!settlementRow) {
+      return {
+        success: false,
+        error: '해당 마감을 찾을 수 없습니다.'
+      };
+    }
+
+    var resolvedType = settlementRow[1] || type || '';
+    var isSales = resolvedType === 'SALES';
+
+    var partner = settlementRow[2] || '';
+    var startDate = formatDateString(settlementRow[3]);
+    var endDate = formatDateString(settlementRow[4]);
+
+    // 상세 아이템은 최신 집계 결과로 조회
+    var aggregateParams = isSales
+      ? { buyer: partner, startDate: startDate, endDate: endDate }
+      : { supplier: partner, startDate: startDate, endDate: endDate };
+
+    var aggregateResult = isSales
+      ? aggregateSalesOrders(aggregateParams)
+      : aggregatePurchaseOrders(aggregateParams);
+
+    if (!aggregateResult || !aggregateResult.success) {
+      return {
+        success: false,
+        error: aggregateResult && aggregateResult.error ? aggregateResult.error : '마감 상세 집계 중 오류가 발생했습니다.'
+      };
+    }
+
+    var settlement = {
+      settlementId: settlementId,
+      type: resolvedType || (isSales ? 'SALES' : 'PURCHASE'),
+      partner: partner,
+      startDate: startDate,
+      endDate: endDate,
+      status: settlementRow[5] || 'DRAFT',
+      totalItems: settlementRow[6] || aggregateResult.totalItems,
+      totalOrderQty: settlementRow[7] || aggregateResult.totalOrderQty,
+      totalConfirmedQty: settlementRow[8] || aggregateResult.totalConfirmedQty,
+      totalAmount: isSales ? (settlementRow[9] || aggregateResult.totalSupplyAmount) : (settlementRow[9] || aggregateResult.totalPurchaseAmount),
+      diffQty: settlementRow[10] || aggregateResult.diffQty,
+      notes: settlementRow[11] || '',
+      createdAt: formatDateString(settlementRow[12]),
+      createdBy: settlementRow[13] || '',
+      confirmedAt: formatDateString(settlementRow[14]),
+      confirmedBy: settlementRow[15] || ''
+    };
+
+    Logger.log('[getSettlementDetail] 마감 상세 조회 완료: ' + settlementId);
+
+    return {
+      success: true,
+      settlement: settlement,
+      items: aggregateResult.items || []
+    };
+
+  } catch (err) {
+    Logger.log('[getSettlementDetail Error] ' + err.message);
+    return {
+      success: false,
+      error: '마감 상세 조회 중 오류 발생: ' + err.message
+    };
+  }
+}

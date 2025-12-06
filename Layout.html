@@ -23,6 +23,18 @@
             <?!= include('Page_OrderList'); ?>
           <? } else if (page === 'invoiceOutput') { ?>
             <?!= include('Page_InvoiceOutput'); ?>
+          <? } else if (page === 'transactionLedger') { ?>
+            <?!= include('Page_TransactionLedger'); ?>
+          <? } else if (page === 'purchaseSettlement') { ?>
+            <?!= include('Page_PurchaseSettlement'); ?>
+          <? } else if (page === 'salesSettlement') { ?>
+            <?!= include('Page_SalesSettlement'); ?>
+          <? } else if (page === 'monthlyClosing') { ?>
+            <?!= include('Page_MonthlyClosing'); ?>
+          <? } else if (page === 'billingManagement') { ?>
+            <?!= include('Page_BillingManagement'); ?>
+          <? } else if (page === 'invoiceManagement') { ?>
+            <?!= include('Page_InvoiceManagement'); ?>
           <? } else if (page === 'settings') { ?>
             <?!= include('Page_Settings'); ?>
           <? } else { ?>
@@ -30,6 +42,99 @@
           <? } ?>
         </section>
       </main>
+    </div>
+
+    <!-- 마감 상세 모달 (공용) -->
+    <style>
+      .settlement-detail-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; }
+      .settlement-detail-modal.active { display:flex; }
+      .settlement-detail-card { background:#fff; border-radius:12px; max-width:1100px; width:95%; max-height:90vh; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.2); display:flex; flex-direction:column; }
+      .settlement-detail-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #e2e8f0; }
+      .settlement-detail-title { margin:0; font-size:18px; font-weight:700; color:#0f172a; }
+      .settlement-detail-close { background:none; border:none; font-size:24px; cursor:pointer; color:#64748b; }
+      .settlement-detail-body { padding:20px; overflow-y:auto; flex:1; }
+      .settlement-detail-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:16px; }
+      .settlement-detail-item { background:#f8fafc; padding:10px 12px; border-radius:8px; }
+      .settlement-detail-label { font-size:11px; color:#64748b; margin-bottom:4px; }
+      .settlement-detail-value { font-size:14px; font-weight:600; color:#0f172a; }
+      .settlement-detail-table-wrap { overflow:auto; max-height:360px; border:1px solid #e2e8f0; border-radius:8px; }
+      .settlement-detail-table { width:100%; border-collapse:collapse; font-size:13px; }
+      .settlement-detail-table th, .settlement-detail-table td { padding:10px; border-bottom:1px solid #e2e8f0; text-align:left; }
+      .settlement-detail-table th { background:#f1f5f9; position:sticky; top:0; z-index:1; }
+      .settlement-detail-table td.num { text-align:right; }
+      .settlement-detail-empty { text-align:center; padding:40px 10px; color:#64748b; }
+    </style>
+
+    <div id="settlement-detail-modal" class="settlement-detail-modal">
+      <div class="settlement-detail-card">
+        <div class="settlement-detail-header">
+          <h2 class="settlement-detail-title" id="settlement-detail-title">마감 상세</h2>
+          <button id="settlement-detail-close" class="settlement-detail-close">×</button>
+        </div>
+        <div class="settlement-detail-body">
+          <div class="settlement-detail-grid">
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">마감 ID</div>
+              <div class="settlement-detail-value" id="settlement-detail-id">-</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">마감 유형</div>
+              <div class="settlement-detail-value" id="settlement-detail-type">-</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">거래처</div>
+              <div class="settlement-detail-value" id="settlement-detail-partner">-</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">기간</div>
+              <div class="settlement-detail-value" id="settlement-detail-period">-</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">상태</div>
+              <div class="settlement-detail-value" id="settlement-detail-status">-</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">총 품목수</div>
+              <div class="settlement-detail-value" id="settlement-detail-items">0</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">총 발주수량</div>
+              <div class="settlement-detail-value" id="settlement-detail-order-qty">0</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">총 확정수량</div>
+              <div class="settlement-detail-value" id="settlement-detail-confirmed-qty">0</div>
+            </div>
+            <div class="settlement-detail-item">
+              <div class="settlement-detail-label">총 금액</div>
+              <div class="settlement-detail-value" id="settlement-detail-amount">₩0</div>
+            </div>
+          </div>
+
+          <div class="settlement-detail-table-wrap">
+            <table class="settlement-detail-table">
+              <thead>
+                <tr>
+                  <th>발주번호</th>
+                  <th>발주일</th>
+                  <th>거래처</th>
+                  <th>브랜드</th>
+                  <th>제품명</th>
+                  <th>품목코드</th>
+                  <th class="num">발주수량</th>
+                  <th class="num">확정수량</th>
+                  <th class="num">차이</th>
+                  <th class="num" id="settlement-detail-price-label">단가</th>
+                  <th class="num" id="settlement-detail-amount-label">금액</th>
+                </tr>
+              </thead>
+              <tbody id="settlement-detail-tbody">
+                <tr><td colspan="11" class="settlement-detail-empty">데이터가 없습니다.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <?!= include('CommonScripts'); ?>

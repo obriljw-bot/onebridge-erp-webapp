@@ -476,26 +476,53 @@ function deleteOrder(orderId) {
 
 /**
  * ============================================================
- * 거래처 목록 (발주처 + 매입처)
+ * 거래처 목록 (발주처 필터링)
  * ============================================================
+ * 거래처DB에서 '주거래처' 컬럼이 '발주처'인 거래처만 반환
+ * @returns {Object} {success, data: Array<string>, customers: Array<string>}
  */
 function getCustomers() {
   try {
     var data = getSuppliers();
-    
-    var customers = data.rows.map(function(row) {
-      var obj = {};
-      data.header.forEach(function(h, idx) {
-        obj[h] = row[idx];
-      });
-      return obj;
+
+    var header = data.header || [];
+    var rows = data.rows || [];
+
+    var nameIdx = header.indexOf('거래처명');
+    var mainTypeIdx = header.indexOf('주거래처');
+
+    if (nameIdx < 0) {
+      return {
+        success: false,
+        error: '거래처명 컬럼을 찾을 수 없습니다.',
+        data: []
+      };
+    }
+
+    var seen = {};
+    var customers = [];
+
+    rows.forEach(function(row) {
+      var name = String(row[nameIdx] || '').trim();
+      var mainType = mainTypeIdx >= 0 ? String(row[mainTypeIdx] || '').trim() : '';
+
+      // '발주처'가 포함된 거래처만 선택 (컬럼이 없으면 전체 허용)
+      var isOrderPartner = mainTypeIdx < 0 || mainType.indexOf('발주처') >= 0;
+
+      if (name && isOrderPartner && !seen[name]) {
+        customers.push(name);
+        seen[name] = true;
+      }
     });
-    
+
     return {
       success: true,
-      customers: customers
+      data: customers,
+      customers: customers,
+      header: header,
+      rows: rows
     };
-    
+
   } catch (err) {
     Logger.log('[getCustomers Error] ' + err.message);
     return {
@@ -757,6 +784,14 @@ function getSalesSettlementsApi(params) {
 }
 
 /**
+ * 마감 상세 조회
+ */
+function getSettlementDetailApi(params) {
+  var result = getSettlementDetail(params);
+  return safeReturn(result);
+}
+
+/**
  * ============================================================
  * 청구서 관리 API (InvoiceService)
  * ============================================================
@@ -791,6 +826,14 @@ function getInvoicesApi(params) {
  */
 function updateInvoiceStatusApi(params) {
   var result = updateInvoiceStatus(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 재출력 (PDF 재생성)
+ */
+function reprintInvoiceApi(params) {
+  var result = reprintInvoice(params);
   return safeReturn(result);
 }
 
