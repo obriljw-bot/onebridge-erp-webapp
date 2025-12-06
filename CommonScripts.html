@@ -1830,11 +1830,6 @@
         var startDate = startDateInput.value;
         var endDate = endDateInput.value;
 
-        if (!supplier) {
-          alert('매입처를 입력해주세요.');
-          return;
-        }
-
         if (!startDate || !endDate) {
           alert('마감 기간을 선택해주세요.');
           return;
@@ -1844,7 +1839,7 @@
         state.startDate = startDate;
         state.endDate = endDate;
 
-        console.log('📋 매입 마감 조회:', {supplier, startDate, endDate});
+        console.log('📋 매입 마감 조회:', {supplier: supplier || '전체', startDate, endDate});
 
         OB.showLoading('매입 데이터 집계 중...');
 
@@ -2073,6 +2068,100 @@
       console.log('✅ 엑셀 다운로드 완료');
     }
 
+    // ============================================================
+    // 탭 전환 기능
+    // ============================================================
+    var tabs = document.querySelectorAll('.settlement-wrap .settlement-tab');
+    var tabContents = {
+      'new': document.getElementById('purchase-settlement-tab-new'),
+      'history': document.getElementById('purchase-settlement-tab-history')
+    };
+
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var targetTab = this.dataset.tab;
+
+        // 탭 버튼 활성화 상태 변경
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        this.classList.add('active');
+
+        // 탭 내용 전환
+        Object.keys(tabContents).forEach(function(key) {
+          if (tabContents[key]) {
+            tabContents[key].style.display = key === targetTab ? 'block' : 'none';
+            tabContents[key].classList.toggle('active', key === targetTab);
+          }
+        });
+      });
+    });
+
+    // ============================================================
+    // 마감 내역 조회 기능
+    // ============================================================
+    var loadHistoryBtn = document.getElementById('purchase-settlement-load-history-btn');
+    var historyTbody = document.getElementById('purchase-settlement-history-tbody');
+
+    if (loadHistoryBtn) {
+      loadHistoryBtn.addEventListener('click', function() {
+        OB.showLoading('마감 내역 조회 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+            console.log('✅ 마감 내역 조회 완료:', result);
+
+            if (!result || !result.success) {
+              alert('조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              renderHistoryEmpty();
+              return;
+            }
+
+            renderHistoryTable(result.settlements || []);
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 마감 내역 조회 실패:', error);
+            alert('조회 실패: ' + error.message);
+            renderHistoryEmpty();
+          })
+          .getPurchaseSettlementsApi({ type: 'PURCHASE' });
+      });
+    }
+
+    function renderHistoryEmpty() {
+      historyTbody.innerHTML =
+        '<tr><td colspan="8" class="settlement-empty">' +
+        '<div class="settlement-empty-icon">📋</div>' +
+        '<div class="settlement-empty-text">마감 내역이 없습니다</div>' +
+        '</td></tr>';
+    }
+
+    function renderHistoryTable(settlements) {
+      if (!settlements || settlements.length === 0) {
+        renderHistoryEmpty();
+        return;
+      }
+
+      var html = '';
+      settlements.forEach(function(s) {
+        var statusClass = s.status === 'CONFIRMED' ? 'confirmed' : 'draft';
+        var statusText = s.status === 'CONFIRMED' ? '확정' : '임시저장';
+
+        html += '<tr>';
+        html += '<td>' + (s.settlementId || '') + '</td>';
+        html += '<td>' + OB.formatDate(s.createdAt) + '</td>';
+        html += '<td>' + (s.supplier || s.partnerName || '전체') + '</td>';
+        html += '<td>' + (s.startDate || '') + ' ~ ' + (s.endDate || '') + '</td>';
+        html += '<td class="num">' + OB.formatNumber(s.totalItems || 0) + '</td>';
+        html += '<td class="num">₩' + OB.formatNumber(s.totalAmount || 0) + '</td>';
+        html += '<td><span class="settlement-status-badge ' + statusClass + '">' + statusText + '</span></td>';
+        html += '<td><button class="settlement-btn secondary" style="padding:4px 8px;font-size:12px;" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\', \'PURCHASE\')">상세</button></td>';
+        html += '</tr>';
+      });
+
+      historyTbody.innerHTML = html;
+    }
+
     console.log('✅ PurchaseSettlement 페이지 초기화 완료');
   };
 
@@ -2129,11 +2218,6 @@
         var startDate = startDateInput.value;
         var endDate = endDateInput.value;
 
-        if (!buyer) {
-          alert('발주처를 입력해주세요.');
-          return;
-        }
-
         if (!startDate || !endDate) {
           alert('마감 기간을 선택해주세요.');
           return;
@@ -2143,7 +2227,7 @@
         state.startDate = startDate;
         state.endDate = endDate;
 
-        console.log('📋 매출 마감 조회:', {buyer, startDate, endDate});
+        console.log('📋 매출 마감 조회:', {buyer: buyer || '전체', startDate, endDate});
 
         OB.showLoading('매출 데이터 집계 중...');
 
@@ -2370,6 +2454,100 @@
       document.body.removeChild(link);
 
       console.log('✅ 엑셀 다운로드 완료');
+    }
+
+    // ============================================================
+    // 탭 전환 기능
+    // ============================================================
+    var tabs = document.querySelectorAll('.settlement-wrap .settlement-tab');
+    var tabContents = {
+      'new': document.getElementById('sales-settlement-tab-new'),
+      'history': document.getElementById('sales-settlement-tab-history')
+    };
+
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var targetTab = this.dataset.tab;
+
+        // 탭 버튼 활성화 상태 변경
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        this.classList.add('active');
+
+        // 탭 내용 전환
+        Object.keys(tabContents).forEach(function(key) {
+          if (tabContents[key]) {
+            tabContents[key].style.display = key === targetTab ? 'block' : 'none';
+            tabContents[key].classList.toggle('active', key === targetTab);
+          }
+        });
+      });
+    });
+
+    // ============================================================
+    // 마감 내역 조회 기능
+    // ============================================================
+    var loadHistoryBtn = document.getElementById('sales-settlement-load-history-btn');
+    var historyTbody = document.getElementById('sales-settlement-history-tbody');
+
+    if (loadHistoryBtn) {
+      loadHistoryBtn.addEventListener('click', function() {
+        OB.showLoading('마감 내역 조회 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+            console.log('✅ 마감 내역 조회 완료:', result);
+
+            if (!result || !result.success) {
+              alert('조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              renderHistoryEmpty();
+              return;
+            }
+
+            renderHistoryTable(result.settlements || []);
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 마감 내역 조회 실패:', error);
+            alert('조회 실패: ' + error.message);
+            renderHistoryEmpty();
+          })
+          .getSalesSettlementsApi({ type: 'SALES' });
+      });
+    }
+
+    function renderHistoryEmpty() {
+      historyTbody.innerHTML =
+        '<tr><td colspan="8" class="settlement-empty">' +
+        '<div class="settlement-empty-icon">📋</div>' +
+        '<div class="settlement-empty-text">마감 내역이 없습니다</div>' +
+        '</td></tr>';
+    }
+
+    function renderHistoryTable(settlements) {
+      if (!settlements || settlements.length === 0) {
+        renderHistoryEmpty();
+        return;
+      }
+
+      var html = '';
+      settlements.forEach(function(s) {
+        var statusClass = s.status === 'CONFIRMED' ? 'confirmed' : 'draft';
+        var statusText = s.status === 'CONFIRMED' ? '확정' : '임시저장';
+
+        html += '<tr>';
+        html += '<td>' + (s.settlementId || '') + '</td>';
+        html += '<td>' + OB.formatDate(s.createdAt) + '</td>';
+        html += '<td>' + (s.buyer || s.partnerName || '전체') + '</td>';
+        html += '<td>' + (s.startDate || '') + ' ~ ' + (s.endDate || '') + '</td>';
+        html += '<td class="num">' + OB.formatNumber(s.totalItems || 0) + '</td>';
+        html += '<td class="num">₩' + OB.formatNumber(s.totalAmount || 0) + '</td>';
+        html += '<td><span class="settlement-status-badge ' + statusClass + '">' + statusText + '</span></td>';
+        html += '<td><button class="settlement-btn secondary" style="padding:4px 8px;font-size:12px;" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\', \'SALES\')">상세</button></td>';
+        html += '</tr>';
+      });
+
+      historyTbody.innerHTML = html;
     }
 
     console.log('✅ SalesSettlement 페이지 초기화 완료');

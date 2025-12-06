@@ -134,6 +134,67 @@
   font-size:14px;
 }
 
+/* 탭 스타일 */
+.settlement-tabs{
+  display:flex;
+  gap:4px;
+  margin-bottom:16px;
+  background:#f1f5f9;
+  padding:4px;
+  border-radius:8px;
+  width:fit-content;
+}
+.settlement-tab{
+  padding:8px 16px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  background:transparent;
+  color:#64748b;
+  transition:all 0.2s;
+}
+.settlement-tab:hover{
+  background:#e2e8f0;
+}
+.settlement-tab.active{
+  background:white;
+  color:#1e293b;
+  box-shadow:0 1px 3px rgba(0,0,0,0.1);
+}
+.settlement-tab-content{
+  display:none;
+}
+.settlement-tab-content.active{
+  display:block;
+}
+.settlement-history-header{
+  margin-bottom:16px;
+}
+.settlement-history-table-wrap{
+  overflow:auto;
+  max-height:600px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.settlement-status-badge{
+  display:inline-block;
+  padding:2px 8px;
+  border-radius:4px;
+  font-size:12px;
+  font-weight:500;
+}
+.settlement-status-badge.draft{
+  background:#fef3c7;
+  color:#d97706;
+}
+.settlement-status-badge.confirmed{
+  background:#d1fae5;
+  color:#059669;
+}
+
 /* 액션 바 */
 .settlement-actions{
   display:flex;
@@ -152,6 +213,15 @@
     <h1>💰 매입처별 마감</h1>
     <p>매입처별로 발주 데이터를 집계하고 마감 처리합니다</p>
   </div>
+
+  <!-- 탭 네비게이션 -->
+  <div class="settlement-tabs">
+    <button class="settlement-tab active" data-tab="new">📝 신규 마감</button>
+    <button class="settlement-tab" data-tab="history">📋 마감 내역</button>
+  </div>
+
+  <!-- 신규 마감 탭 -->
+  <div class="settlement-tab-content active" id="purchase-settlement-tab-new">
 
   <!-- 검색 바 -->
   <div class="settlement-search">
@@ -248,4 +318,39 @@
       📥 엑셀 다운로드
     </button>
   </div>
+  </div><!-- 신규 마감 탭 끝 -->
+
+  <!-- 마감 내역 탭 -->
+  <div class="settlement-tab-content" id="purchase-settlement-tab-history" style="display:none;">
+    <div class="settlement-history-header">
+      <button class="settlement-btn primary" id="purchase-settlement-load-history-btn">
+        🔄 마감 내역 조회
+      </button>
+    </div>
+
+    <div class="settlement-history-table-wrap">
+      <table class="settlement-table">
+        <thead>
+          <tr>
+            <th>마감ID</th>
+            <th>마감일시</th>
+            <th>매입처</th>
+            <th>기간</th>
+            <th class="num">품목수</th>
+            <th class="num">총 매입액</th>
+            <th>상태</th>
+            <th>작업</th>
+          </tr>
+        </thead>
+        <tbody id="purchase-settlement-history-tbody">
+          <tr>
+            <td colspan="8" class="settlement-empty">
+              <div class="settlement-empty-icon">📋</div>
+              <div class="settlement-empty-text">'마감 내역 조회' 버튼을 클릭하세요</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div><!-- 마감 내역 탭 끝 -->
 </div>
