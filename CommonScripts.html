@@ -1283,47 +1283,30 @@
         var tr = document.createElement('tr');
         tr.dataset.orderCode = order.orderCode;
 
-        // 상태 뱃지 생성 함수
-        function getStatusBadge(type, value) {
-          var badge = { emoji: '', css: '', text: '' };
+        // 진행상태 이모지 생성 (매입발주, 매입결제, 매출결제, 출고 순)
+        function getProgressStatus(order) {
+          // 매입발주: ⏳미처리 / ✅발주완료
+          var buyOrderEmoji = order.buyOrder === '발주완료' ? '✅' : '⏳';
+          var buyOrderTitle = '매입발주: ' + (order.buyOrder || '미처리');
 
-          if (type === 'buyOrder') {
-            // 매입발주
-            if (value === '발주완료') {
-              badge = { emoji: '✅', css: 'buy-order-done', text: '발주완료' };
-            } else {
-              badge = { emoji: '⏳', css: 'buy-order-pending', text: '미처리' };
-            }
-          } else if (type === 'payBuy') {
-            // 매입결제
-            if (value === '결제완료') {
-              badge = { emoji: '✅', css: 'pay-buy-done', text: '결제완료' };
-            } else if (value === '부분결제') {
-              badge = { emoji: '🔸', css: 'pay-buy-partial', text: '부분결제' };
-            } else {
-              badge = { emoji: '❌', css: 'pay-buy-pending', text: '미결제' };
-            }
-          } else if (type === 'paySell') {
-            // 매출결제
-            if (value === '결제완료') {
-              badge = { emoji: '✅', css: 'pay-sell-done', text: '결제완료' };
-            } else if (value === '부분결제') {
-              badge = { emoji: '🔸', css: 'pay-sell-partial', text: '부분결제' };
-            } else {
-              badge = { emoji: '❌', css: 'pay-sell-pending', text: '미결제' };
-            }
-          } else if (type === 'ship') {
-            // 출고
-            if (value === '출고완료') {
-              badge = { emoji: '✅', css: 'ship-done', text: '출고완료' };
-            } else if (value === '부분출고') {
-              badge = { emoji: '📦', css: 'ship-partial', text: '부분출고' };
-            } else {
-              badge = { emoji: '⬜', css: 'ship-pending', text: '미출고' };
-            }
-          }
+          // 매입결제: ❌미결제 / 🔸부분결제 / ✅결제완료
+          var payBuyEmoji = order.payBuy === '결제완료' ? '✅' : (order.payBuy === '부분결제' ? '🔸' : '❌');
+          var payBuyTitle = '매입결제: ' + (order.payBuy || '미결제');
 
-          return '<span class="orderlist-status-badge ' + badge.css + '">' + badge.emoji + ' ' + badge.text + '</span>';
+          // 매출결제: ❌미결제 / 🔸부분결제 / ✅결제완료
+          var paySellEmoji = order.paySell === '결제완료' ? '✅' : (order.paySell === '부분결제' ? '🔸' : '❌');
+          var paySellTitle = '매출결제: ' + (order.paySell || '미결제');
+
+          // 출고: ⬜미출고 / 📦부분출고 / ✅출고완료
+          var shipEmoji = order.ship === '출고완료' ? '✅' : (order.ship === '부분출고' ? '📦' : '⬜');
+          var shipTitle = '출고: ' + (order.ship || '미출고');
+
+          return '<div class="orderlist-progress-status">' +
+            '<span title="' + buyOrderTitle + '">' + buyOrderEmoji + '</span>' +
+            '<span title="' + payBuyTitle + '">' + payBuyEmoji + '</span>' +
+            '<span title="' + paySellTitle + '">' + paySellEmoji + '</span>' +
+            '<span title="' + shipTitle + '">' + shipEmoji + '</span>' +
+            '</div>';
         }
 
         tr.innerHTML =
@@ -1335,10 +1318,7 @@
           '<td class="text-center">' + (order.itemCount || 0) + '개</td>' +
           '<td class="text-right">₩' + formatNumber(order.totalPurchaseAmount) + '</td>' +
           '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>' +
-          '<td class="status-col">' + getStatusBadge('buyOrder', order.buyOrder || '') + '</td>' +
-          '<td class="status-col">' + getStatusBadge('payBuy', order.payBuy || '') + '</td>' +
-          '<td class="status-col">' + getStatusBadge('paySell', order.paySell || '') + '</td>' +
-          '<td class="status-col">' + getStatusBadge('ship', order.ship || '') + '</td>';
+          '<td class="text-center">' + getProgressStatus(order) + '</td>';
 
         tr.addEventListener('click', function() {
           loadOrderDetail(order.orderCode);
@@ -1417,7 +1397,7 @@
     // ============================================================
     function renderEmpty() {
       tbody.innerHTML =
-        '<tr><td colspan="12" class="orderlist-empty">' +
+        '<tr><td colspan="9" class="orderlist-empty">' +
         '<div class="orderlist-empty-icon">📋</div>' +
         '<div class="orderlist-empty-text">조회 결과가 없습니다</div>' +
         '</td></tr>';
