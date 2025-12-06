@@ -22,12 +22,18 @@ function getPageTemplateName_(page) {
       return 'Page_OrderList';
     case 'invoiceOutput':
       return 'Page_InvoiceOutput';
+    case 'transactionLedger':
+      return 'Page_TransactionLedger';
     case 'purchaseSettlement':
       return 'Page_PurchaseSettlement';
     case 'salesSettlement':
       return 'Page_SalesSettlement';
     case 'monthlyClosing':
       return 'Page_MonthlyClosing';
+    case 'billingManagement':
+      return 'Page_BillingManagement';
+    case 'invoiceManagement':
+      return 'Page_InvoiceManagement';
     case 'settings':
       return 'Page_Settings';
     default:
