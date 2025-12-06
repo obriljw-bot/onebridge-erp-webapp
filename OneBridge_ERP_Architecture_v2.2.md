@@ -1,8 +1,8 @@
 # OneBridge ERP v2.2 (SSR Hybrid) — Complete Architecture & Development Standards
 
 ## Document Information
-- **Version**: 2.2.0
-- **Last Updated**: 2025-12-05
+- **Version**: 2.2.1
+- **Last Updated**: 2025-12-06
 - **Status**: Active Development
 - **Purpose**: 시스템 아키텍처 명세 + 개발 표준 + 트러블슈팅 가이드
 
@@ -361,12 +361,16 @@ function someFeatureApi(params) {
 | `getOrderDetailApi()` | 발주 상세 조회 | ✅ 적용됨 | **완료** |
 | `getPrintableOrdersApi()` | 출력용 발주 조회 | ✅ 적용됨 | 완료 |
 | `generateInvoiceZipApi()` | PDF ZIP 생성 | ✅ 적용됨 | 완료 |
+| `updateOrderStatus()` | 발주 상태 업데이트 (4개 상태) | ✅ 적용됨 | **완료** ⭐ |
+| `updateConfirmedQuantitiesApi()` | 확정수량 수정 | ✅ 적용됨 | **완료** ⭐ |
+| `updateTransactionStateApi()` | 거래 상태 변경 | ✅ 적용됨 | UI 미연결 |
+| `getTransactionsApi()` | 거래원장 조회 | ✅ 적용됨 | UI 미연결 |
 | `aggregatePurchaseOrdersApi()` | 매입 마감 집계 | ✅ 적용됨 | 완료 |
 | `aggregateSalesOrdersApi()` | 매출 마감 집계 | ✅ 적용됨 | 완료 |
 | `savePurchaseSettlementApi()` | 매입 마감 저장 | ✅ 적용됨 | 완료 |
 | `saveSalesSettlementApi()` | 매출 마감 저장 | ✅ 적용됨 | 완료 |
-| `getPurchaseSettlementsApi()` | 매입 마감 목록 | ✅ 적용됨 | 완료 |
-| `getSalesSettlementsApi()` | 매출 마감 목록 | ✅ 적용됨 | 완료 |
+| `getPurchaseSettlementsApi()` | 매입 마감 목록 | ✅ 적용됨 | **완료** ⭐ |
+| `getSalesSettlementsApi()` | 매출 마감 목록 | ✅ 적용됨 | **완료** ⭐ |
 | `aggregateBillingDataApi()` | 청구서 집계 | ✅ 적용됨 | 완료 |
 | `createBillingApi()` | 청구서 생성 | ✅ 적용됨 | 완료 |
 | `getBillingsApi()` | 청구서 목록 | ✅ 적용됨 | 완료 |
@@ -374,6 +378,10 @@ function someFeatureApi(params) {
 | `executeMonthlyClosingApi()` | 월별 마감 실행 | ✅ 적용됨 | 완료 |
 | `unlockMonthlyClosingApi()` | 월별 마감 해제 | ✅ 적용됨 | 완료 |
 | `getMonthlyClosingsApi()` | 월별 마감 목록 | ✅ 적용됨 | 완료 |
+| `aggregateInvoiceDataApi()` | 청구서 데이터 집계 | ✅ 적용됨 | UI 미연결 |
+| `createInvoiceFromSettlementApi()` | 마감→청구서 생성 | ✅ 적용됨 | UI 미연결 |
+| `getInvoicesApi()` | 청구서 목록 (상세) | ✅ 적용됨 | UI 미연결 |
+| `updateInvoiceStatusApi()` | 청구서 상태 변경 | ✅ 적용됨 | UI 미연결 |
 
 ---
 
@@ -620,7 +628,7 @@ YYYYMMDD-거래처코드-브랜드코드-SEQ
 
 ---
 
-### Issue #002: 발주 상세보기 모달 오류 (2025-12-05) ⭐ NEW
+### Issue #002: 발주 상세보기 모달 오류 (2025-12-05)
 
 **증상**:
 - 발주내역 페이지에서 상세보기 클릭 시 "알수없는 오류" 메시지 표시
@@ -681,14 +689,178 @@ YYYYMMDD-거래처코드-브랜드코드-SEQ
 
 ---
 
+### Issue #003: 확정수량 수정, 4개 상태 저장, 마진 정보 누락 (2025-12-06) ⭐ NEW
+
+**증상**:
+1. 발주 상세보기 모달에서 확정수량 수정 불가
+2. 상태정보 변경 후 저장 시 출고상태만 적용, 매입발주/매입결제/매출결제 상태 미적용
+3. 발주내역 상세보기에서 마진액/마진율 정보 미표시
+
+**원인 분석**:
+
+1. **확정수량 수정 불가**
+   - TransactionService.js에 `updateConfirmedQuantities()` 함수 존재
+   - ApiService.js에 `updateConfirmedQuantitiesApi()` 래퍼 존재
+   - **문제**: UI에서 호출하는 코드가 없었음 (확정수량이 단순 텍스트로 표시)
+
+2. **상태 저장 문제**
+   - `updateOrderStatus(orderId, status)` 함수가 단일 상태(출고)만 저장하도록 구현
+   - 4개 상태 컬럼 모두 업데이트하는 로직 없음
+   ```javascript
+   // 수정 전
+   var colStatus = header.indexOf('출고');  // 출고 컬럼만 참조
+   ```
+
+3. **마진 정보 누락**
+   - 상세보기 모달 테이블에 마진액/마진율 컬럼 없음
+   - 합계 행에도 마진 정보 없음
+
+**해결**:
+
+1. **확정수량 수정 기능 구현** (CommonScripts.html)
+   ```javascript
+   // 확정수량을 input 필드로 변경
+   html += '<td class="text-right"><input type="number" class="confirmed-qty-input" value="' + confirmedQty + '" ... /></td>';
+
+   // 실시간 금액 재계산
+   input.addEventListener('input', function() {
+     var purchaseAmt = qty * buyPrice;
+     var supplyAmt = qty * supplyPrice;
+     var marginAmt = supplyAmt - purchaseAmt;
+     // ... 테이블 업데이트
+   });
+
+   // 저장 버튼 → updateConfirmedQuantitiesApi 호출
+   google.script.run.updateConfirmedQuantitiesApi({ updates: updates });
+   ```
+
+2. **updateOrderStatus 함수 수정** (ApiService.js)
+   ```javascript
+   // 수정 후 - 4개 상태 모두 저장
+   function updateOrderStatus(orderId, statuses) {
+     // 하위 호환: 문자열로 전달된 경우 출고 상태로 처리
+     if (typeof statuses === 'string') {
+       statuses = { ship: statuses };
+     }
+
+     var colMap = {
+       buyOrder: header.indexOf('매입발주'),
+       payBuy: header.indexOf('매입결제'),
+       paySell: header.indexOf('매출결제'),
+       ship: header.indexOf('출고')
+     };
+
+     // 각 상태 업데이트
+     for (var key in statuses) {
+       if (colMap[key] >= 0) {
+         sheet.getRange(i + 1, colMap[key] + 1).setValue(statuses[key]);
+       }
+     }
+   }
+   ```
+
+3. **마진 정보 표시** (CommonScripts.html)
+   ```javascript
+   // 테이블 헤더에 마진액/마진율 추가
+   html += '<th class="text-right">마진액</th>';
+   html += '<th class="text-right">마진율</th>';
+
+   // 데이터 행에 마진 정보 추가 (양수:녹색, 음수:빨간색)
+   html += '<td class="text-right margin-amount" style="color: ' +
+           (marginAmount >= 0 ? '#059669' : '#dc2626') + ';">₩' +
+           formatNumber(marginAmount) + '</td>';
+   ```
+
+**영향 파일**:
+- ApiService.js (updateOrderStatus 함수 수정)
+- CommonScripts.html (상세보기 모달 전체 개선)
+
+**관련 커밋**: `b4e0773`
+
+---
+
+### Issue #004: 매입/매출 마감 기능 개선 (2025-12-06) ⭐ NEW
+
+**증상**:
+1. 매입/매출 마감 페이지에서 업체명(매입처/발주처) 입력 필수 - 전체 조회 불가
+2. 이전에 저장한 마감 내역 조회 기능 없음
+
+**원인 분석**:
+
+1. **검색조건 문제**
+   ```javascript
+   // 수정 전 - 업체명 필수 입력
+   if (!supplier) {
+     alert('매입처를 입력해주세요.');
+     return;
+   }
+   ```
+   - API(`aggregatePurchaseOrders`)는 이미 업체명 없이 전체 조회 지원
+   - UI에서만 필수 조건 체크
+
+2. **마감 내역 조회 기능 누락**
+   - `getPurchaseSettlementsApi`, `getSalesSettlementsApi` 함수 정의됨
+   - UI에서 호출하는 코드 없음
+
+**해결**:
+
+1. **검색조건 개선** (CommonScripts.html)
+   ```javascript
+   // 수정 후 - 업체명 필수 조건 제거
+   // if (!supplier) { ... }  // 삭제
+
+   console.log('📋 매입 마감 조회:', {supplier: supplier || '전체', startDate, endDate});
+   ```
+
+2. **마감 내역 탭 UI 추가** (Page_PurchaseSettlement.html, Page_SalesSettlement.html)
+   ```html
+   <!-- 탭 네비게이션 -->
+   <div class="settlement-tabs">
+     <button class="settlement-tab active" data-tab="new">📝 신규 마감</button>
+     <button class="settlement-tab" data-tab="history">📋 마감 내역</button>
+   </div>
+
+   <!-- 마감 내역 탭 -->
+   <div class="settlement-tab-content" id="purchase-settlement-tab-history">
+     <!-- 마감 내역 테이블 -->
+   </div>
+   ```
+
+3. **마감 내역 조회 기능** (CommonScripts.html)
+   ```javascript
+   // 탭 전환 기능
+   tabs.forEach(function(tab) {
+     tab.addEventListener('click', function() {
+       // 탭 전환 로직
+     });
+   });
+
+   // 마감 내역 조회
+   google.script.run
+     .withSuccessHandler(renderHistoryTable)
+     .getPurchaseSettlementsApi({ type: 'PURCHASE' });
+   ```
+
+**영향 파일**:
+- CommonScripts.html (검색조건 변경, 탭 기능, 마감 내역 조회)
+- Page_PurchaseSettlement.html (탭 UI, CSS 추가)
+- Page_SalesSettlement.html (탭 UI, CSS 추가)
+
+**관련 커밋**: `be9dd10`
+
+---
+
 ## 6.2 알려진 이슈 (미해결)
 
 | ID | 이슈 | 우선순위 | 상태 |
 |----|------|----------|------|
-| #003 | Page_OrderFile.html에 `<script>` 태그 존재 | 낮음 | 보류 (SSR에서만 사용) |
-| #004 | getCustomers() 함수 중복 정의 | 중간 | 검토 필요 |
-| #005 | ping() 함수 Date 객체 반환 | 낮음 | 수정 필요 |
-| #006 | UIService 페이지명 불일치 | 낮음 | 수정 완료 |
+| #005 | Page_OrderFile.html에 `<script>` 태그 존재 | 낮음 | 보류 (SSR에서만 사용) |
+| #006 | getCustomers() 함수 중복 정의 | 중간 | 검토 필요 |
+| #007 | ping() 함수 Date 객체 반환 | 낮음 | 수정 필요 |
+| #008 | 청구서 재출력 기능 미구현 | 중간 | 구현 필요 |
+| #009 | getInvoicesApi, aggregateInvoiceDataApi UI 미연결 | 낮음 | 필요시 구현 |
+| #010 | getTransactionsApi, updateTransactionStateApi UI 미연결 | 낮음 | 필요시 구현 |
+| #011 | 마감 상세보기 기능 (OB.viewSettlementDetail) 미구현 | 중간 | 구현 필요 |
 
 ---
 
@@ -812,6 +984,7 @@ OB.initSomePagePage = function() {
 | 2.0.0 | 2025-11 | 초기 아키텍처 문서 작성 |
 | 2.1.0 | 2025-11-27 | 직렬화 표준, SPA 규칙, 디버깅 가이드 추가 |
 | 2.2.0 | 2025-12-05 | Phase 2 회계 기능 추가, Issue #002 해결 (발주 상세보기 모달 오류), API 함수 목록 업데이트 |
+| 2.2.1 | 2025-12-06 | Issue #003 해결 (확정수량 수정, 4개 상태 저장, 마진 정보), Issue #004 해결 (마감 검색조건, 마감 내역 조회), 발주내역 목록 진행상태 컬럼 추가 |
 
 ---
 
