@@ -1,9 +1,9 @@
-# OneBridge ERP v2.2 (SSR Hybrid) — Complete Architecture & Development Standards
+# OneBridge ERP v2.3 (SSR Hybrid) — Complete Architecture & Development Standards
 
 ## Document Information
-- **Version**: 2.2.1
+- **Version**: 2.3.0
 - **Last Updated**: 2025-12-06
-- **Status**: Active Development
+- **Status**: 🔄 Testing in Progress (Codex 통합 코드 검증 중)
 - **Purpose**: 시스템 아키텍처 명세 + 개발 표준 + 트러블슈팅 가이드
 
 > ⚠️ **IMPORTANT**: 이 문서는 OneBridge ERP 개발의 **정규 참조 문서**입니다.
@@ -85,12 +85,13 @@
 ├── DBService.gs              # 데이터베이스 접근 레이어
 ├── OrderParsingService.gs    # 발주 파싱/매칭/저장 로직
 ├── InvoiceOutputService.gs   # PDF 생성 엔진
+├── InvoiceService.gs         # 청구서/인보이스 서비스 ⭐ NEW
 └── SettlementService.gs      # 마감/청구서 관리 (Phase 2)
 ```
 
 ### Client Files (.html)
 ```
-├── Layout.html               # 메인 레이아웃 (SSR 템플릿)
+├── Layout.html               # 메인 레이아웃 (SSR 템플릿) + 마감상세 모달
 ├── CommonHead.html           # 전역 CSS
 ├── CommonScripts.html        # 전역 JS + 페이지 초기화 함수 ⭐
 ├── Component_Sidebar.html    # 네비게이션 사이드바
@@ -99,6 +100,8 @@
 ├── Page_OrderList.html       # 발주내역 페이지
 ├── Page_Dashboard.html       # 대시보드 페이지
 ├── Page_InvoiceOutput.html   # 출력/명세서 페이지
+├── Page_TransactionLedger.html   # 거래원장 페이지 ⭐ NEW
+├── Page_InvoiceManagement.html   # 인보이스 관리 페이지 ⭐ NEW
 ├── Page_PurchaseSettlement.html  # 매입 마감 페이지 (Phase 2)
 ├── Page_SalesSettlement.html     # 매출 마감 페이지 (Phase 2)
 ├── Page_MonthlyClosing.html      # 월별 마감 페이지 (Phase 2)
@@ -215,9 +218,18 @@ OB.api = {
 };
 
 // ===== 각 페이지별 초기화 함수 (⭐ 중요) =====
-OB.initOrderFilePage = function() { /* ... */ };
-OB.initInvoiceOutputPage = function() { /* ... */ };
-// ... 기타 페이지
+OB.initOrderFilePage = function() { /* ... */ };           // 발주입력 페이지
+OB.initOrderListPage = function() { /* ... */ };           // 발주내역 페이지
+OB.initInvoiceOutputPage = function() { /* ... */ };       // 출력/명세서 페이지
+OB.initTransactionLedgerPage = function() { /* ... */ };   // 거래원장 페이지 ⭐ NEW
+OB.initInvoiceManagementPage = function() { /* ... */ };   // 인보이스관리 페이지 ⭐ NEW
+OB.initPurchaseSettlementPage = function() { /* ... */ };  // 매입마감 페이지
+OB.initSalesSettlementPage = function() { /* ... */ };     // 매출마감 페이지
+OB.initMonthlyClosingPage = function() { /* ... */ };      // 월별마감 페이지
+OB.initBillingManagementPage = function() { /* ... */ };   // 청구서관리 페이지
+
+// ===== 공유 모달 함수 =====
+OB.viewSettlementDetail = function(settlementId) { /* ... */ };  // 마감상세 모달 ⭐ NEW
 ```
 
 ---
@@ -382,6 +394,9 @@ function someFeatureApi(params) {
 | `createInvoiceFromSettlementApi()` | 마감→청구서 생성 | ✅ 적용됨 | UI 미연결 |
 | `getInvoicesApi()` | 청구서 목록 (상세) | ✅ 적용됨 | UI 미연결 |
 | `updateInvoiceStatusApi()` | 청구서 상태 변경 | ✅ 적용됨 | UI 미연결 |
+| `getSettlementDetailApi()` | 마감 상세 조회 | ✅ 적용됨 | **완료** ⭐ NEW |
+| `reprintInvoiceApi()` | 청구서 재출력 (PDF) | ✅ 적용됨 | **완료** ⭐ NEW |
+| `getCustomers()` | 발주처 목록 조회 (통합) | ✅ 적용됨 | **완료** ⭐ 개선 |
 
 ---
 
@@ -854,26 +869,287 @@ YYYYMMDD-거래처코드-브랜드코드-SEQ
 
 | ID | 이슈 | 우선순위 | 상태 |
 |----|------|----------|------|
-| #005 | Page_OrderFile.html에 `<script>` 태그 존재 | 낮음 | 보류 (SSR에서만 사용) |
-| #006 | getCustomers() 함수 중복 정의 | 중간 | 검토 필요 |
 | #007 | ping() 함수 Date 객체 반환 | 낮음 | 수정 필요 |
-| #008 | 청구서 재출력 기능 미구현 | 중간 | 구현 필요 |
-| #009 | getInvoicesApi, aggregateInvoiceDataApi UI 미연결 | 낮음 | 필요시 구현 |
-| #010 | getTransactionsApi, updateTransactionStateApi UI 미연결 | 낮음 | 필요시 구현 |
-| #011 | 마감 상세보기 기능 (OB.viewSettlementDetail) 미구현 | 중간 | 구현 필요 |
+
+---
+
+## 6.3 Codex 통합으로 해결된 이슈 (2025-12-06) ⭐ NEW
+
+### Issue #005: Page_OrderFile.html 스크립트 분리 ✅ RESOLVED
+
+**증상**: Page_OrderFile.html에 `<script>` 태그가 존재하여 아키텍처 규칙 위반
+
+**해결**:
+- Page_OrderFile.html에서 `<script>` 블록 전체 제거 (373~835줄, 약 462줄)
+- CommonScripts.html에 `OB.initOrderFilePage()` 함수로 이동 (3152~3531줄, 약 380줄)
+- 기존 로직 100% 보존, 아키텍처 규칙 준수
+
+**변경 파일**:
+- Page_OrderFile.html: 834줄 → 371줄 (스크립트 제거)
+- CommonScripts.html: `OB.initOrderFilePage()` 함수 추가
+
+---
+
+### Issue #006: getCustomers() 함수 중복 정의 ✅ RESOLVED
+
+**증상**: `getCustomers()` 함수가 OrderParsingService.js와 ApiService.js에 중복 정의
+
+**해결**:
+- OrderParsingService.js에서 중복 함수 제거 (671~758줄)
+- ApiService.js의 `getCustomers()` 함수 개선
+  - '발주처' 타입 필터링 추가
+  - 반환값 구조화: `{ data: [...], customers: [...] }`
+
+**변경 파일**:
+- OrderParsingService.js: 중복 함수 제거 + 주석 추가 "getCustomers() 함수는 ApiService.js로 이동됨"
+- ApiService.js: getCustomers() 함수 개선
+
+```javascript
+// ApiService.js - 개선된 getCustomers()
+function getCustomers() {
+  var sheet = SpreadsheetApp.openById(ERP_CONFIG.BASE_DATA_SHEET_ID)
+    .getSheetByName('거래처DB');
+  var data = sheet.getDataRange().getValues();
+  var header = data[0];
+  var typeIdx = header.indexOf('유형');
+
+  // '발주처' 타입만 필터링
+  var customers = data.slice(1).filter(function(row) {
+    return row[typeIdx] === '발주처';
+  });
+
+  return safeReturn({
+    success: true,
+    data: data,
+    customers: customers
+  });
+}
+```
+
+---
+
+### Issue #008: 청구서 재출력 기능 ✅ RESOLVED
+
+**증상**: 청구서 재출력 기능 미구현
+
+**해결**:
+- InvoiceService.js에 `reprintInvoice()` 함수 추가
+- ApiService.js에 `reprintInvoiceApi()` 래퍼 함수 추가
+- BillingManagement 페이지의 재출력 버튼에 기능 연결
+
+**구현 코드**:
+```javascript
+// InvoiceService.js
+function reprintInvoice(params) {
+  var settlementId = params.settlementId;
+
+  // 마감 상세 데이터 조회
+  var detail = getSettlementDetail({ settlementId: settlementId });
+  if (!detail.success) {
+    return { success: false, error: detail.error };
+  }
+
+  // PDF 재생성
+  var invoiceResult = generateInvoiceZip({
+    orderNumbers: detail.orderNumbers,
+    // ... 기타 파라미터
+  });
+
+  return {
+    success: true,
+    fileId: invoiceResult.fileId,
+    fileName: invoiceResult.fileName
+  };
+}
+
+// ApiService.js
+function reprintInvoiceApi(params) {
+  var result = reprintInvoice(params);
+  return safeReturn(result);
+}
+```
+
+**변경 파일**:
+- InvoiceService.js: reprintInvoice() 함수 추가
+- ApiService.js: reprintInvoiceApi() 래퍼 추가
+- CommonScripts.html: BillingManagement 재출력 버튼 이벤트 연결
+
+---
+
+### Issue #009: Invoice APIs UI 연결 ✅ RESOLVED
+
+**증상**: getInvoicesApi, aggregateInvoiceDataApi 등 인보이스 관련 API가 UI와 미연결
+
+**해결**:
+- Page_InvoiceManagement.html 신규 생성 (202줄)
+- CommonScripts.html에 `OB.initInvoiceManagementPage()` 함수 추가 (약 315줄)
+- Component_Sidebar.html에 "인보이스 관리" 메뉴 추가
+- UiService.js, Layout.html에 라우팅 추가
+
+**Page_InvoiceManagement.html 구조**:
+```
+┌─────────────────────────────────────────────────────┐
+│  인보이스 관리 페이지                                │
+├─────────────────────────────────────────────────────┤
+│  [Panel 1] 데이터 집계                              │
+│  - 기간 선택, 거래처 선택, 집계 버튼                 │
+│  - 집계 결과 테이블                                 │
+├─────────────────────────────────────────────────────┤
+│  [Panel 2] 인보이스 생성                            │
+│  - 선택된 마감 건에서 인보이스 생성                  │
+├─────────────────────────────────────────────────────┤
+│  [Panel 3] 인보이스 목록                            │
+│  - 생성된 인보이스 목록, 상태 관리, PDF 다운로드     │
+└─────────────────────────────────────────────────────┘
+```
+
+**OB.initInvoiceManagementPage() 주요 기능**:
+```javascript
+OB.initInvoiceManagementPage = function() {
+  // 1. 데이터 집계 (aggregateInvoiceDataApi 호출)
+  // 2. 인보이스 생성 (createInvoiceFromSettlementApi 호출)
+  // 3. 인보이스 목록 조회 (getInvoicesApi 호출)
+  // 4. 상태 변경 (updateInvoiceStatusApi 호출)
+  // 5. PDF 다운로드 링크 생성
+};
+```
+
+---
+
+### Issue #010: Transaction APIs UI 연결 ✅ RESOLVED
+
+**증상**: getTransactionsApi, updateTransactionStateApi 등 거래원장 API가 UI와 미연결
+
+**해결**:
+- Page_TransactionLedger.html 신규 생성 (116줄)
+- CommonScripts.html에 `OB.initTransactionLedgerPage()` 함수 추가 (약 235줄)
+- Component_Sidebar.html에 "거래원장" 메뉴 추가
+- UiService.js, Layout.html에 라우팅 추가
+
+**Page_TransactionLedger.html 구조**:
+```
+┌─────────────────────────────────────────────────────┐
+│  거래원장 페이지                                     │
+├─────────────────────────────────────────────────────┤
+│  [필터 영역]                                        │
+│  - 기간 선택, 발주처/매입처 필터, 상태 필터          │
+├─────────────────────────────────────────────────────┤
+│  [요약 카드]                                        │
+│  - 총 거래건수, 매입액 합계, 공급액 합계, 마진 합계  │
+├─────────────────────────────────────────────────────┤
+│  [거래 목록 테이블]                                  │
+│  - 발주일, 발주번호, 품목, 수량, 금액, 상태 표시     │
+│  - 상태 변경 기능                                   │
+└─────────────────────────────────────────────────────┘
+```
+
+**OB.initTransactionLedgerPage() 주요 기능**:
+```javascript
+OB.initTransactionLedgerPage = function() {
+  // 1. 거래 목록 조회 (getTransactionsApi 호출)
+  // 2. 필터링/검색 기능
+  // 3. 상태 변경 (updateTransactionStateApi 호출)
+  // 4. 요약 카드 계산 및 표시
+};
+```
+
+---
+
+### Issue #011: 마감 상세보기 기능 ✅ RESOLVED
+
+**증상**: 마감 상세보기 기능(OB.viewSettlementDetail) 미구현
+
+**해결**:
+- SettlementService.js에 `getSettlementDetail()` 함수 추가 (약 105줄)
+- ApiService.js에 `getSettlementDetailApi()` 래퍼 함수 추가
+- Layout.html에 마감 상세 모달 HTML/CSS 추가 (약 90줄)
+- CommonScripts.html에 `OB.viewSettlementDetail()` 함수 추가 (약 110줄)
+
+**모달 구조**:
+```html
+<!-- Layout.html에 추가된 마감 상세 모달 -->
+<div id="settlement-detail-modal" class="settlement-modal">
+  <div class="settlement-modal-content">
+    <div class="settlement-modal-header">
+      <h3>마감 상세보기</h3>
+      <button class="settlement-modal-close">&times;</button>
+    </div>
+    <div class="settlement-modal-body">
+      <!-- 마감 정보 요약 -->
+      <div class="settlement-summary">...</div>
+      <!-- 상세 거래 목록 테이블 -->
+      <table class="settlement-detail-table">...</table>
+    </div>
+    <div class="settlement-modal-footer">
+      <button class="btn-reprint">재출력</button>
+      <button class="btn-close">닫기</button>
+    </div>
+  </div>
+</div>
+```
+
+**OB.viewSettlementDetail() 구현**:
+```javascript
+OB.viewSettlementDetail = function(settlementId) {
+  var modal = document.getElementById('settlement-detail-modal');
+
+  // 로딩 표시
+  OB.showLoading('마감 상세 조회 중...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      OB.hideLoading();
+      if (result.success) {
+        // 모달 내용 렌더링
+        renderSettlementDetail(result.data);
+        modal.style.display = 'flex';
+      } else {
+        alert('조회 실패: ' + result.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      OB.hideLoading();
+      alert('서버 오류: ' + error.message);
+    })
+    .getSettlementDetailApi({ settlementId: settlementId });
+};
+```
+
+**변경 파일**:
+- SettlementService.js: getSettlementDetail() 함수 추가
+- ApiService.js: getSettlementDetailApi() 래퍼 추가
+- Layout.html: 마감 상세 모달 HTML/CSS 추가
+- CommonScripts.html: OB.viewSettlementDetail() 함수 추가
 
 ---
 
 # PART 7: FUTURE ROADMAP
 
-## 7.1 단기 계획 (v2.3)
+## 7.1 v2.3 개발 완료 항목 ✅
+
+- [x] Page_OrderFile.html 스크립트 CommonScripts로 이동 (Issue #005)
+- [x] getCustomers() 함수 중복 제거 및 통합 (Issue #006)
+- [x] 청구서 재출력 기능 구현 (Issue #008)
+- [x] Invoice APIs UI 연결 - Page_InvoiceManagement.html (Issue #009)
+- [x] Transaction APIs UI 연결 - Page_TransactionLedger.html (Issue #010)
+- [x] 마감 상세보기 모달 구현 (Issue #011)
+
+## 7.2 테스트 진행 중 (v2.3) 🔄
+
+- [ ] 거래원장 페이지 기능 검증
+- [ ] 인보이스 관리 페이지 기능 검증
+- [ ] 마감 상세보기 모달 동작 확인
+- [ ] 청구서 재출력 기능 테스트
+- [ ] 발주입력 페이지 정상 동작 확인 (스크립트 이동 후)
+
+## 7.3 단기 계획 (v2.4)
 
 - [ ] 모든 API 함수에 safeReturn() 적용 확인
-- [ ] Page_OrderFile.html 스크립트 CommonScripts로 이동
-- [ ] 함수 명명 규칙 통일
+- [ ] ping() 함수 Date 객체 반환 수정 (Issue #007)
 - [ ] 에러 처리 표준화
+- [ ] 로딩 상태 UX 개선
 
-## 7.2 중기 계획 (v3.0)
+## 7.4 중기 계획 (v3.0)
 
 - [ ] Utils.gs 공통 유틸리티 분리
 - [ ] 단위 테스트 도입
@@ -881,7 +1157,7 @@ YYYYMMDD-거래처코드-브랜드코드-SEQ
 - [ ] Page_Settings 기능 구현
 - [ ] 마감/청구서 기능 고도화
 
-## 7.3 장기 계획
+## 7.5 장기 계획
 
 - [ ] Supabase/MySQL 데이터 이관
 - [ ] Full SPA 전환 (React/Vue)
@@ -985,6 +1261,7 @@ OB.initSomePagePage = function() {
 | 2.1.0 | 2025-11-27 | 직렬화 표준, SPA 규칙, 디버깅 가이드 추가 |
 | 2.2.0 | 2025-12-05 | Phase 2 회계 기능 추가, Issue #002 해결 (발주 상세보기 모달 오류), API 함수 목록 업데이트 |
 | 2.2.1 | 2025-12-06 | Issue #003 해결 (확정수량 수정, 4개 상태 저장, 마진 정보), Issue #004 해결 (마감 검색조건, 마감 내역 조회), 발주내역 목록 진행상태 컬럼 추가 |
+| 2.3.0 | 2025-12-06 | **Codex 통합 (테스트 진행 중)** - Issue #005~#011 해결, 거래원장 페이지 신규, 인보이스관리 페이지 신규, 마감상세 모달, 청구서 재출력, 코드 리팩토링 (+1,783줄/-566줄) |
 
 ---
 
