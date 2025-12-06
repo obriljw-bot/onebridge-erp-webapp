@@ -1505,7 +1505,10 @@
 
       // 품목 목록
       html += '<div class="orderlist-detail-section">';
-      html += '<div class="orderlist-detail-section-title">품목 목록 (' + items.length + '개)</div>';
+      html += '<div class="orderlist-detail-section-title">';
+      html += '품목 목록 (' + items.length + '개)';
+      html += '<button type="button" id="btn-save-confirmed-qty" class="orderlist-btn-save-qty" style="margin-left: 10px; padding: 4px 10px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">확정수량 저장</button>';
+      html += '</div>';
       html += '<table class="orderlist-detail-table">';
       html += '<thead><tr>';
       html += '<th>제품명</th>';
@@ -1516,30 +1519,42 @@
       html += '<th class="text-right">공급가</th>';
       html += '<th class="text-right">매입액</th>';
       html += '<th class="text-right">공급액</th>';
+      html += '<th class="text-right">마진액</th>';
+      html += '<th class="text-right">마진율</th>';
       html += '</tr></thead>';
       html += '<tbody>';
 
       var totalPurchaseAmount = 0;
       var totalSupplyAmount = 0;
+      var totalMarginAmount = 0;
 
-      items.forEach(function(item) {
+      items.forEach(function(item, idx) {
         var purchaseAmount = Number(item['매입액'] || 0);
         var supplyAmount = Number(item['공급액'] || 0);
+        var marginAmount = Number(item['마진액'] || (supplyAmount - purchaseAmount));
+        var marginRate = purchaseAmount > 0 ? ((marginAmount / purchaseAmount) * 100).toFixed(1) : 0;
+        var confirmedQty = Number(item['확정수량'] || item['발주수량'] || 0);
+        var rowIndex = item['_rowIndex'] || '';
 
         totalPurchaseAmount += purchaseAmount;
         totalSupplyAmount += supplyAmount;
+        totalMarginAmount += marginAmount;
 
-        html += '<tr>';
+        html += '<tr data-row-index="' + rowIndex + '">';
         html += '<td>' + (item['제품명'] || '') + '</td>';
         html += '<td>' + (item['품목코드'] || '') + '</td>';
         html += '<td class="text-right">' + formatNumber(item['발주수량']) + '</td>';
-        html += '<td class="text-right">' + formatNumber(item['확정수량']) + '</td>';
+        html += '<td class="text-right"><input type="number" class="confirmed-qty-input" value="' + confirmedQty + '" data-row="' + rowIndex + '" data-buy-price="' + (item['매입가'] || 0) + '" data-supply-price="' + (item['공급가'] || 0) + '" style="width: 60px; text-align: right; padding: 2px 4px; border: 1px solid #d1d5db; border-radius: 3px;" /></td>';
         html += '<td class="text-right">₩' + formatNumber(item['매입가']) + '</td>';
         html += '<td class="text-right">₩' + formatNumber(item['공급가']) + '</td>';
-        html += '<td class="text-right">₩' + formatNumber(purchaseAmount) + '</td>';
-        html += '<td class="text-right">₩' + formatNumber(supplyAmount) + '</td>';
+        html += '<td class="text-right purchase-amount">₩' + formatNumber(purchaseAmount) + '</td>';
+        html += '<td class="text-right supply-amount">₩' + formatNumber(supplyAmount) + '</td>';
+        html += '<td class="text-right margin-amount" style="color: ' + (marginAmount >= 0 ? '#059669' : '#dc2626') + ';">₩' + formatNumber(marginAmount) + '</td>';
+        html += '<td class="text-right margin-rate" style="color: ' + (marginAmount >= 0 ? '#059669' : '#dc2626') + ';">' + marginRate + '%</td>';
         html += '</tr>';
       });
+
+      var totalMarginRate = totalPurchaseAmount > 0 ? ((totalMarginAmount / totalPurchaseAmount) * 100).toFixed(1) : 0;
 
       html += '</tbody>';
       html += '<tfoot>';
@@ -1547,6 +1562,8 @@
       html += '<td colspan="6" class="text-right">합계</td>';
       html += '<td class="text-right">₩' + formatNumber(totalPurchaseAmount) + '</td>';
       html += '<td class="text-right">₩' + formatNumber(totalSupplyAmount) + '</td>';
+      html += '<td class="text-right" style="color: ' + (totalMarginAmount >= 0 ? '#059669' : '#dc2626') + ';">₩' + formatNumber(totalMarginAmount) + '</td>';
+      html += '<td class="text-right" style="color: ' + (totalMarginAmount >= 0 ? '#059669' : '#dc2626') + ';">' + totalMarginRate + '%</td>';
       html += '</tr>';
       html += '</tfoot>';
       html += '</table>';
@@ -1554,10 +1571,76 @@
 
       modalBody.innerHTML = html;
       modal.classList.add('show');
+
+      // 확정수량 입력 시 금액 실시간 계산
+      var qtyInputs = modalBody.querySelectorAll('.confirmed-qty-input');
+      qtyInputs.forEach(function(input) {
+        input.addEventListener('input', function() {
+          var tr = this.closest('tr');
+          var qty = Number(this.value) || 0;
+          var buyPrice = Number(this.dataset.buyPrice) || 0;
+          var supplyPrice = Number(this.dataset.supplyPrice) || 0;
+
+          var purchaseAmt = qty * buyPrice;
+          var supplyAmt = qty * supplyPrice;
+          var marginAmt = supplyAmt - purchaseAmt;
+          var marginRt = purchaseAmt > 0 ? ((marginAmt / purchaseAmt) * 100).toFixed(1) : 0;
+
+          tr.querySelector('.purchase-amount').textContent = '₩' + formatNumber(purchaseAmt);
+          tr.querySelector('.supply-amount').textContent = '₩' + formatNumber(supplyAmt);
+          tr.querySelector('.margin-amount').textContent = '₩' + formatNumber(marginAmt);
+          tr.querySelector('.margin-amount').style.color = marginAmt >= 0 ? '#059669' : '#dc2626';
+          tr.querySelector('.margin-rate').textContent = marginRt + '%';
+          tr.querySelector('.margin-rate').style.color = marginAmt >= 0 ? '#059669' : '#dc2626';
+        });
+      });
+
+      // 확정수량 저장 버튼
+      var btnSaveQty = document.getElementById('btn-save-confirmed-qty');
+      if (btnSaveQty) {
+        btnSaveQty.addEventListener('click', function() {
+          var updates = [];
+          qtyInputs.forEach(function(input) {
+            var rowIndex = Number(input.dataset.row);
+            var qty = Number(input.value) || 0;
+            if (rowIndex > 0) {
+              updates.push({ rowIndex: rowIndex, confirmedQty: qty });
+            }
+          });
+
+          if (updates.length === 0) {
+            alert('저장할 확정수량 데이터가 없습니다.');
+            return;
+          }
+
+          if (!confirm(updates.length + '개 품목의 확정수량을 저장하시겠습니까?')) {
+            return;
+          }
+
+          OB.showLoading('확정수량 저장 중...');
+
+          google.script.run
+            .withSuccessHandler(function(result) {
+              OB.hideLoading();
+              if (!result || !result.success) {
+                alert('저장 실패: ' + (result ? result.error : '알 수 없는 오류'));
+                return;
+              }
+              alert('✅ 확정수량이 저장되었습니다! (' + result.updatedCount + '건)');
+              // 모달 새로고침
+              loadOrderDetail(currentOrderCode);
+            })
+            .withFailureHandler(function(error) {
+              OB.hideLoading();
+              alert('저장 실패: ' + error.message);
+            })
+            .updateConfirmedQuantitiesApi({ updates: updates });
+        });
+      }
     }
 
     // ============================================================
-    // 상태 저장
+    // 상태 저장 (4개 상태 모두 저장)
     // ============================================================
     if (btnSaveStatus) {
       btnSaveStatus.addEventListener('click', function() {
@@ -1566,10 +1649,20 @@
           return;
         }
 
-        // 상태 값 수집 (하지만 현재 백엔드 API는 단일 상태만 지원)
-        var shipStatus = document.getElementById('orderlist-status-ship').value;
+        // 4개 상태 값 수집
+        var statuses = {
+          buyOrder: document.getElementById('orderlist-status-buy-order').value,
+          payBuy: document.getElementById('orderlist-status-pay-buy').value,
+          paySell: document.getElementById('orderlist-status-pay-sell').value,
+          ship: document.getElementById('orderlist-status-ship').value
+        };
 
-        if (!confirm('출고 상태를 "' + shipStatus + '"(으)로 변경하시겠습니까?')) {
+        var statusSummary = '매입발주: ' + statuses.buyOrder + '\n' +
+                           '매입결제: ' + statuses.payBuy + '\n' +
+                           '매출결제: ' + statuses.paySell + '\n' +
+                           '출고상태: ' + statuses.ship;
+
+        if (!confirm('다음과 같이 상태를 변경하시겠습니까?\n\n' + statusSummary)) {
           return;
         }
 
@@ -1595,7 +1688,7 @@
             console.error('❌ 상태 업데이트 실패:', error);
             alert('상태 업데이트 실패: ' + error.message);
           })
-          .updateOrderStatus(currentOrderCode, shipStatus);
+          .updateOrderStatus(currentOrderCode, statuses);
       });
     }
 

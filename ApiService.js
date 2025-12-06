@@ -347,46 +347,68 @@ function getOrderDetailApi(orderId) {
 
 /**
  * ============================================================
- * 발주 상태 업데이트
+ * 발주 상태 업데이트 (4개 상태 모두 지원)
  * ============================================================
+ * @param {string} orderId - 발주번호
+ * @param {Object|string} statuses - 상태 객체 또는 단일 출고상태
+ *   { buyOrder: '발주완료', payBuy: '결제완료', paySell: '미결제', ship: '미출고' }
  */
-function updateOrderStatus(orderId, status) {
+function updateOrderStatus(orderId, statuses) {
   try {
-    if (!orderId || !status) {
+    if (!orderId) {
       return {
         success: false,
-        error: '발주번호와 상태가 필요합니다.'
+        error: '발주번호가 필요합니다.'
       };
     }
-    
+
+    // 하위 호환: 문자열로 전달된 경우 출고 상태로 처리
+    if (typeof statuses === 'string') {
+      statuses = { ship: statuses };
+    }
+
+    if (!statuses || Object.keys(statuses).length === 0) {
+      return {
+        success: false,
+        error: '업데이트할 상태가 없습니다.'
+      };
+    }
+
     var sheet = getOrderMergedSheet();
     var data = sheet.getDataRange().getValues();
-    
+
     var header = data[0];
     var colOrderCode = header.indexOf('발주번호');
-    var colStatus = header.indexOf('출고'); // 또는 다른 상태 컬럼
-    
-    if (colStatus < 0) {
-      return {
-        success: false,
-        error: '상태 컬럼을 찾을 수 없습니다.'
-      };
-    }
-    
+
+    // 상태 컬럼 매핑
+    var colMap = {
+      buyOrder: header.indexOf('매입발주'),
+      payBuy: header.indexOf('매입결제'),
+      paySell: header.indexOf('매출결제'),
+      ship: header.indexOf('출고')
+    };
+
     var updated = 0;
-    
+
     for (var i = 1; i < data.length; i++) {
       if (data[i][colOrderCode] === orderId) {
-        sheet.getRange(i + 1, colStatus + 1).setValue(status);
+        // 각 상태 업데이트
+        for (var key in statuses) {
+          if (statuses.hasOwnProperty(key) && colMap[key] >= 0) {
+            sheet.getRange(i + 1, colMap[key] + 1).setValue(statuses[key]);
+          }
+        }
         updated++;
       }
     }
-    
+
+    Logger.log('[updateOrderStatus] 발주번호: ' + orderId + ', 업데이트: ' + updated + '건, 상태: ' + JSON.stringify(statuses));
+
     return {
       success: true,
       updated: updated
     };
-    
+
   } catch (err) {
     Logger.log('[updateOrderStatus Error] ' + err.message);
     return {
