@@ -1,0 +1,202 @@
+<style>
+  .invoice-wrap { padding: 20px; }
+  .invoice-header { margin-bottom: 16px; }
+  .invoice-header h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: #111827; }
+  .invoice-header p { margin: 0; color: #6b7280; font-size: 13px; }
+
+  .invoice-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 14px; margin-bottom: 14px; }
+  .invoice-panel h2 { margin: 0 0 10px; font-size: 16px; color: #0f172a; }
+  .invoice-flex { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .invoice-field { display: flex; flex-direction: column; gap: 4px; }
+  .invoice-field label { font-size: 12px; font-weight: 600; color: #475569; }
+  .invoice-field input, .invoice-field select { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-width: 160px; }
+  .invoice-btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .invoice-btn.primary { background: #2563eb; color: #fff; }
+  .invoice-btn.secondary { background: #e5e7eb; color: #1f2937; }
+  .invoice-btn.success { background: #10b981; color: #fff; }
+  .invoice-btn.primary:hover { background: #1d4ed8; }
+  .invoice-btn.secondary:hover { background: #d1d5db; }
+  .invoice-btn.success:hover { background: #059669; }
+
+  .invoice-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+  .invoice-summary-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; }
+  .invoice-summary-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .invoice-summary-value { font-size: 18px; font-weight: 700; color: #0f172a; }
+
+  .invoice-table-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: auto; max-height: 640px; }
+  .invoice-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .invoice-table th, .invoice-table td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+  .invoice-table th { background: #f8fafc; position: sticky; top: 0; z-index: 1; font-weight: 700; }
+  .invoice-table td.num { text-align: right; }
+  .invoice-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: #e5e7eb; color: #374151; }
+  .invoice-empty { text-align: center; padding: 40px 12px; color: #94a3b8; }
+</style>
+
+<div class="invoice-wrap">
+  <div class="invoice-header">
+    <h1>인보이스 관리</h1>
+    <p>청구 데이터 집계, 인보이스 생성 및 상태 관리를 수행합니다.</p>
+  </div>
+
+  <div class="invoice-panel">
+    <h2>1) 청구 데이터 집계</h2>
+    <div class="invoice-flex">
+      <div class="invoice-field">
+        <label for="invoice-agg-company">거래처</label>
+        <input type="text" id="invoice-agg-company" placeholder="거래처명을 입력" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-agg-start">시작일</label>
+        <input type="date" id="invoice-agg-start" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-agg-end">종료일</label>
+        <input type="date" id="invoice-agg-end" />
+      </div>
+      <button class="invoice-btn primary" id="invoice-agg-btn">집계 실행</button>
+    </div>
+
+    <div class="invoice-summary" id="invoice-agg-summary" style="display:none;">
+      <div class="invoice-summary-card">
+        <div class="invoice-summary-label">총 품목수</div>
+        <div class="invoice-summary-value" id="invoice-agg-items">0</div>
+      </div>
+      <div class="invoice-summary-card">
+        <div class="invoice-summary-label">발주수량 합계</div>
+        <div class="invoice-summary-value" id="invoice-agg-order-qty">0</div>
+      </div>
+      <div class="invoice-summary-card">
+        <div class="invoice-summary-label">확정수량 합계</div>
+        <div class="invoice-summary-value" id="invoice-agg-confirmed-qty">0</div>
+      </div>
+      <div class="invoice-summary-card">
+        <div class="invoice-summary-label">공급액 합계</div>
+        <div class="invoice-summary-value" id="invoice-agg-amount">₩0</div>
+      </div>
+    </div>
+
+    <div class="invoice-table-wrap" style="margin-top:10px; display:none;" id="invoice-agg-table-wrap">
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th>발주일</th>
+            <th>발주번호</th>
+            <th>매입처</th>
+            <th>브랜드</th>
+            <th>제품명</th>
+            <th class="num">확정수량</th>
+            <th class="num">공급가</th>
+            <th class="num">공급액</th>
+          </tr>
+        </thead>
+        <tbody id="invoice-agg-tbody">
+          <tr><td colspan="8" class="invoice-empty">집계 결과가 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="invoice-panel">
+    <h2>2) Settlement 기반 인보이스 생성</h2>
+    <div class="invoice-flex">
+      <div class="invoice-field">
+        <label for="invoice-create-settlement">마감 ID</label>
+        <input type="text" id="invoice-create-settlement" placeholder="예) SET-202501-001" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-create-type">유형</label>
+        <select id="invoice-create-type">
+          <option value="">선택하세요</option>
+          <option value="PURCHASE">매입</option>
+          <option value="SALES">매출</option>
+        </select>
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-create-company">거래처</label>
+        <input type="text" id="invoice-create-company" placeholder="집계된 거래처와 동일하게 입력" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-create-date">청구일</label>
+        <input type="date" id="invoice-create-date" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-create-amount">청구금액</label>
+        <input type="number" id="invoice-create-amount" min="0" />
+      </div>
+      <div class="invoice-field" style="flex:1; min-width:200px;">
+        <label for="invoice-create-notes">비고</label>
+        <input type="text" id="invoice-create-notes" placeholder="선택사항" />
+      </div>
+      <button class="invoice-btn success" id="invoice-create-btn">청구서 생성</button>
+    </div>
+  </div>
+
+  <div class="invoice-panel">
+    <h2>3) 인보이스 목록</h2>
+    <div class="invoice-flex">
+      <div class="invoice-field">
+        <label for="invoice-filter-type">유형</label>
+        <select id="invoice-filter-type">
+          <option value="">전체</option>
+          <option value="PURCHASE">매입</option>
+          <option value="SALES">매출</option>
+        </select>
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-filter-company">거래처</label>
+        <input type="text" id="invoice-filter-company" placeholder="거래처명" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-filter-status">상태</label>
+        <select id="invoice-filter-status">
+          <option value="">전체</option>
+          <option value="DRAFT">DRAFT</option>
+          <option value="ISSUED">ISSUED</option>
+          <option value="PAID">PAID</option>
+        </select>
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-filter-start">시작일</label>
+        <input type="date" id="invoice-filter-start" />
+      </div>
+      <div class="invoice-field">
+        <label for="invoice-filter-end">종료일</label>
+        <input type="date" id="invoice-filter-end" />
+      </div>
+      <button class="invoice-btn primary" id="invoice-search-btn">조회</button>
+      <button class="invoice-btn secondary" id="invoice-reset-btn">초기화</button>
+    </div>
+
+    <div class="invoice-summary" style="margin-top:10px;" id="invoice-list-summary">
+      <div class="invoice-summary-card">
+        <div class="invoice-summary-label">총 청구건수</div>
+        <div class="invoice-summary-value" id="invoice-list-count">0건</div>
+      </div>
+      <div class="invoice-summary-card">
+        <div class="invoice-summary-label">총 청구금액</div>
+        <div class="invoice-summary-value" id="invoice-list-amount">₩0</div>
+      </div>
+    </div>
+
+    <div class="invoice-table-wrap" style="margin-top:10px;">
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th>청구ID</th>
+            <th>유형</th>
+            <th>거래처</th>
+            <th>마감ID</th>
+            <th>청구일</th>
+            <th class="num">청구금액</th>
+            <th>상태</th>
+            <th>비고</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody id="invoice-list-tbody">
+          <tr><td colspan="9" class="invoice-empty">조회된 인보이스가 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
