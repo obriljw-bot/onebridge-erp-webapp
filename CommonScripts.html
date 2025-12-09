@@ -3453,6 +3453,53 @@
         return;
       }
 
+      // ✅ 디버그 정보 확인 및 경고 표시
+      if (result.debug) {
+        console.log('=== 파싱 디버그 정보 ===');
+        console.log('원본 헤더:', result.debug.originalHeader);
+        console.log('컬럼 매핑:', result.debug.columnMap);
+
+        var warnings = [];
+        if (!result.debug.barcodeDetected) {
+          warnings.push('바코드 컬럼을 찾을 수 없습니다');
+        }
+        if (!result.debug.brandDetected) {
+          warnings.push('브랜드 컬럼을 찾을 수 없습니다');
+        }
+        if (!result.debug.productNameDetected) {
+          warnings.push('제품명 컬럼을 찾을 수 없습니다');
+        }
+        if (!result.debug.supplyPriceDetected) {
+          warnings.push('공급가 컬럼을 찾을 수 없습니다');
+        }
+        if (!result.debug.orderQtyDetected) {
+          warnings.push('수량 컬럼을 찾을 수 없습니다');
+        }
+
+        if (warnings.length > 0) {
+          console.warn('⚠️ 컬럼 감지 경고:', warnings);
+
+          // 경고 메시지 표시
+          var warningHtml = '<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 16px;">' +
+            '<strong style="color: #92400e;">⚠️ 컬럼 감지 경고</strong><br>' +
+            '<span style="color: #78350f;">' + warnings.join(', ') + '</span><br>' +
+            '<small style="color: #92400e;">엑셀 헤더: ' + (result.debug.originalHeader ? result.debug.originalHeader.slice(0, 10).join(', ') : 'N/A') + '</small>' +
+            '</div>';
+
+          // 테이블 위에 경고 삽입
+          var tableWrap = document.querySelector('.ob-orderfile-table-wrap');
+          if (tableWrap) {
+            var existingWarning = tableWrap.querySelector('.column-warning');
+            if (existingWarning) existingWarning.remove();
+
+            var warningDiv = document.createElement('div');
+            warningDiv.className = 'column-warning';
+            warningDiv.innerHTML = warningHtml;
+            tableWrap.insertBefore(warningDiv, tableWrap.firstChild);
+          }
+        }
+      }
+
       // 요약 카드 표시
       summaryCards.style.display = 'grid';
 
