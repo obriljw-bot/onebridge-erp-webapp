@@ -3319,7 +3319,7 @@
           return;
         }
 
-        var unmatched = parsedItems.filter(function(item) { return !item.productCode; });
+        var unmatched = parsedItems.filter(function(item) { return item.matchStatus !== 'MATCHED'; });
 
         if (unmatched.length > 0) {
           var confirmMessage = '매칭되지 않은 품목이 ' + unmatched.length + '건 있습니다.\n' +
@@ -3344,12 +3344,14 @@
     function renderDuplicates(duplicates) {
       duplicateOrderList.innerHTML = '';
 
+      // checkTodayDuplicateOrder 반환 형식:
+      // { orderCode, brands, itemCount, totalAmount }
       duplicates.forEach(function(dup) {
         var li = document.createElement('div');
         li.className = 'ob-modal-list-item';
-        li.innerHTML = '<div><div class="title">' + dup.productName + '</div>' +
-                       '<div class="sub">발주수량: ' + dup.orderQty + ', 발주금액: ' + OB.formatNumber(dup.orderAmount) + '</div></div>' +
-                       '<div class="status">' + dup.status + '</div>';
+        li.innerHTML = '<div><div class="title">' + (dup.orderCode || '발주번호 없음') + '</div>' +
+                       '<div class="sub">브랜드: ' + (dup.brands || '-') + ', 품목수: ' + (dup.itemCount || 0) + '건</div></div>' +
+                       '<div class="status">₩' + OB.formatNumber(dup.totalAmount || 0) + '</div>';
         duplicateOrderList.appendChild(li);
       });
     }
@@ -3374,6 +3376,12 @@
       var dd = ('0' + today.getDate()).slice(-2);
       var todayStr = yyyy + '-' + mm + '-' + dd;
 
+      var customer = items[0] ? items[0].customer : '';
+      if (!customer) {
+        callback(true, []);
+        return;
+      }
+
       OB.showLoading('오늘 발주 내역 확인 중...');
 
       google.script.run
@@ -3381,18 +3389,14 @@
           OB.hideLoading();
           console.log('중복 체크 결과:', result);
 
-          if (!result || !result.orders) {
+          if (!result || !result.success || !result.hasDuplicate) {
             callback(true, []);
             return;
           }
 
-          var duplicates = result.orders.filter(function(order) {
-            return order.orderDate === todayStr &&
-                   order.customer === items[0].customer;
-          });
-
-          if (duplicates.length > 0) {
-            callback(false, duplicates);
+          // 중복 발주가 있으면 orders 배열 전달
+          if (result.orders && result.orders.length > 0) {
+            callback(false, result.orders);
           } else {
             callback(true, []);
           }
@@ -3403,7 +3407,7 @@
           alert('중복 확인 중 오류가 발생했습니다: ' + error.message);
           callback(true, []);
         })
-        .getOrdersByDate(todayStr);
+        .checkTodayDuplicateOrder(customer, todayStr);
     }
 
     function saveOrders(items) {
@@ -3415,10 +3419,24 @@
           console.log('발주 저장 결과:', result);
 
           if (result && result.success) {
-            alert('발주 저장이 완료되었습니다.');
+            alert('발주 저장이 완료되었습니다. (' + result.savedRows + '건)');
             btnSave.disabled = true;
+            // 테이블 초기화
+            parsedItems = [];
+            tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">파일을 선택하고 파싱 버튼을 클릭하세요</td></tr>';
+            summaryCards.style.display = 'none';
+            filterControls.style.display = 'none';
           } else {
-            alert('발주 저장 실패: ' + (result.error || '알 수 없는 오류'));
+            var errorMsg = '발주 저장 실패:\n';
+            if (result && result.errors && result.errors.length > 0) {
+              errorMsg += result.errors.slice(0, 5).join('\n');
+              if (result.errors.length > 5) {
+                errorMsg += '\n... 외 ' + (result.errors.length - 5) + '건';
+              }
+            } else {
+              errorMsg += (result ? result.error : '알 수 없는 오류');
+            }
+            alert(errorMsg);
           }
         })
         .withFailureHandler(function(error) {
@@ -3426,7 +3444,7 @@
           console.error('발주 저장 실패:', error);
           alert('발주 저장 중 오류 발생: ' + error.message);
         })
-        .saveOrders(items);
+        .saveParsedOrdersToDB(items);
     }
 
     function displayParseResult(result) {
@@ -3435,10 +3453,13 @@
         return;
       }
 
-      summaryTotal.textContent = result.items.length;
-      summaryMatched.textContent = result.matchedCount || 0;
-      summaryUnmatched.textContent = result.unmatchedCount || 0;
-      summaryAmount.textContent = OB.formatNumber(result.totalAmount || 0);
+      // 요약 카드 표시
+      summaryCards.style.display = 'grid';
+
+      summaryTotal.textContent = result.items.length + '개';
+      summaryMatched.textContent = (result.matchedCount || 0) + '개';
+      summaryUnmatched.textContent = '미매칭 ' + (result.unmatchedCount || 0) + '개';
+      summaryAmount.textContent = '₩' + OB.formatNumber(result.totalAmount || 0);
 
       if (result.items.length > 0) {
         var matchRate = ((result.matchedCount || 0) / result.items.length) * 100;
@@ -3462,26 +3483,28 @@
     function renderTable(items) {
       tableBody.innerHTML = '';
 
-      items.forEach(function(item) {
+      // HTML 테이블 헤더: #, 브랜드, 제품명, 바코드, 수량, 공급단가, 금액, 상태
+      items.forEach(function(item, index) {
         var tr = document.createElement('tr');
-        if (item.productCode) {
+        var isMatched = item.matchStatus === 'MATCHED';
+
+        if (isMatched) {
           tr.classList.add('matched');
         } else {
           tr.classList.add('unmatched');
         }
 
         tr.innerHTML =
-          '<td class="status-cell">' +
-            (item.productCode ? '<span class="status-text status-matched">매칭</span>' : '<span class="status-text status-unmatched">미매칭</span>') +
-          '</td>' +
-          '<td>' + (item.customer || '') + '</td>' +
-          '<td>' + (item.orderDate || '') + '</td>' +
+          '<td>' + (item.seq || index + 1) + '</td>' +
+          '<td>' + (item.brand || '') + '</td>' +
           '<td>' + (item.productName || '') + '</td>' +
-          '<td>' + (item.productCode || '-') + '</td>' +
-          '<td class="num">' + OB.formatNumber(item.orderQty) + '</td>' +
-          '<td class="num">' + OB.formatNumber(item.orderPrice) + '</td>' +
-          '<td class="num">' + OB.formatNumber(item.orderAmount) + '</td>' +
-          '<td>' + (item.inboundPlace || '') + '</td>';
+          '<td>' + (item.barcode || '-') + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.orderQty || 0) + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.supplyPrice || 0) + '</td>' +
+          '<td class="num">' + OB.formatNumber(item.orderAmount || 0) + '</td>' +
+          '<td class="status-cell">' +
+            (isMatched ? '<span class="status-text status-matched">매칭</span>' : '<span class="status-text status-unmatched">미매칭</span>') +
+          '</td>';
 
         tableBody.appendChild(tr);
       });
