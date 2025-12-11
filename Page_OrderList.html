@@ -424,6 +424,16 @@
   .orderlist-empty-text {
     font-size: 14px;
   }
+
+  /* 진행상태 이모지 */
+  .orderlist-progress-status {
+    display: inline-flex;
+    gap: 2px;
+    font-size: 14px;
+  }
+  .orderlist-progress-status span {
+    cursor: help;
+  }
 </style>
 
 <div class="orderlist-wrap">
@@ -497,11 +507,12 @@
             <th class="sortable text-center" data-sort="itemCount">품목수</th>
             <th class="sortable text-right" data-sort="totalPurchaseAmount">매입액</th>
             <th class="sortable text-right" data-sort="totalAmount">공급액</th>
+            <th class="text-center">진행상태</th>
           </tr>
         </thead>
         <tbody id="orderlist-tbody">
           <tr>
-            <td colspan="8" class="orderlist-empty">
+            <td colspan="9" class="orderlist-empty">
               <div class="orderlist-empty-icon">📋</div>
               <div class="orderlist-empty-text">조회 버튼을 클릭하여 발주 내역을 확인하세요</div>
             </td>

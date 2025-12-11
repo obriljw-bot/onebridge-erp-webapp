@@ -338,47 +338,77 @@ function getOrderDetail(orderId) {
 }
 
 /**
- * ============================================================
- * 발주 상태 업데이트
- * ============================================================
+ * 발주 상세 조회 (클라이언트용 래퍼)
  */
-function updateOrderStatus(orderId, status) {
+function getOrderDetailApi(orderId) {
+  var result = getOrderDetail(orderId);
+  return safeReturn(result);
+}
+
+/**
+ * ============================================================
+ * 발주 상태 업데이트 (4개 상태 모두 지원)
+ * ============================================================
+ * @param {string} orderId - 발주번호
+ * @param {Object|string} statuses - 상태 객체 또는 단일 출고상태
+ *   { buyOrder: '발주완료', payBuy: '결제완료', paySell: '미결제', ship: '미출고' }
+ */
+function updateOrderStatus(orderId, statuses) {
   try {
-    if (!orderId || !status) {
+    if (!orderId) {
       return {
         success: false,
-        error: '발주번호와 상태가 필요합니다.'
+        error: '발주번호가 필요합니다.'
       };
     }
-    
+
+    // 하위 호환: 문자열로 전달된 경우 출고 상태로 처리
+    if (typeof statuses === 'string') {
+      statuses = { ship: statuses };
+    }
+
+    if (!statuses || Object.keys(statuses).length === 0) {
+      return {
+        success: false,
+        error: '업데이트할 상태가 없습니다.'
+      };
+    }
+
     var sheet = getOrderMergedSheet();
     var data = sheet.getDataRange().getValues();
-    
+
     var header = data[0];
     var colOrderCode = header.indexOf('발주번호');
-    var colStatus = header.indexOf('출고'); // 또는 다른 상태 컬럼
-    
-    if (colStatus < 0) {
-      return {
-        success: false,
-        error: '상태 컬럼을 찾을 수 없습니다.'
-      };
-    }
-    
+
+    // 상태 컬럼 매핑
+    var colMap = {
+      buyOrder: header.indexOf('매입발주'),
+      payBuy: header.indexOf('매입결제'),
+      paySell: header.indexOf('매출결제'),
+      ship: header.indexOf('출고')
+    };
+
     var updated = 0;
-    
+
     for (var i = 1; i < data.length; i++) {
       if (data[i][colOrderCode] === orderId) {
-        sheet.getRange(i + 1, colStatus + 1).setValue(status);
+        // 각 상태 업데이트
+        for (var key in statuses) {
+          if (statuses.hasOwnProperty(key) && colMap[key] >= 0) {
+            sheet.getRange(i + 1, colMap[key] + 1).setValue(statuses[key]);
+          }
+        }
         updated++;
       }
     }
-    
+
+    Logger.log('[updateOrderStatus] 발주번호: ' + orderId + ', 업데이트: ' + updated + '건, 상태: ' + JSON.stringify(statuses));
+
     return {
       success: true,
       updated: updated
     };
-    
+
   } catch (err) {
     Logger.log('[updateOrderStatus Error] ' + err.message);
     return {
@@ -446,26 +476,53 @@ function deleteOrder(orderId) {
 
 /**
  * ============================================================
- * 거래처 목록 (발주처 + 매입처)
+ * 거래처 목록 (발주처 필터링)
  * ============================================================
+ * 거래처DB에서 '주거래처' 컬럼이 '발주처'인 거래처만 반환
+ * @returns {Object} {success, data: Array<string>, customers: Array<string>}
  */
 function getCustomers() {
   try {
     var data = getSuppliers();
-    
-    var customers = data.rows.map(function(row) {
-      var obj = {};
-      data.header.forEach(function(h, idx) {
-        obj[h] = row[idx];
-      });
-      return obj;
+
+    var header = data.header || [];
+    var rows = data.rows || [];
+
+    var nameIdx = header.indexOf('거래처명');
+    var mainTypeIdx = header.indexOf('주거래처');
+
+    if (nameIdx < 0) {
+      return {
+        success: false,
+        error: '거래처명 컬럼을 찾을 수 없습니다.',
+        data: []
+      };
+    }
+
+    var seen = {};
+    var customers = [];
+
+    rows.forEach(function(row) {
+      var name = String(row[nameIdx] || '').trim();
+      var mainType = mainTypeIdx >= 0 ? String(row[mainTypeIdx] || '').trim() : '';
+
+      // '발주처'가 포함된 거래처만 선택 (컬럼이 없으면 전체 허용)
+      var isOrderPartner = mainTypeIdx < 0 || mainType.indexOf('발주처') >= 0;
+
+      if (name && isOrderPartner && !seen[name]) {
+        customers.push(name);
+        seen[name] = true;
+      }
     });
-    
+
     return {
       success: true,
-      customers: customers
+      data: customers,
+      customers: customers,
+      header: header,
+      rows: rows
     };
-    
+
   } catch (err) {
     Logger.log('[getCustomers Error] ' + err.message);
     return {
@@ -547,6 +604,11 @@ function getPrintableOrders(params) {
     var cBuyer     = col('발주처');
     var cPurchaseAmount = col('매입액');
     var cSupplyAmount   = col('공급액');
+    // 상태 컬럼
+    var cBuyOrder = col('매입발주');
+    var cPayBuy   = col('매입결제');
+    var cPaySell  = col('매출결제');
+    var cShip     = col('출고');
 
     // ---- 필터링 ----
     var filtered = rows.filter(function (row) {
@@ -592,7 +654,12 @@ function getPrintableOrders(params) {
           buyer: row[cBuyer] || '',
           itemCount: 0,
           totalPurchaseAmount: 0,
-          totalAmount: 0
+          totalAmount: 0,
+          // 상태 정보
+          buyOrder: cBuyOrder >= 0 ? (row[cBuyOrder] || '') : '',
+          payBuy: cPayBuy >= 0 ? (row[cPayBuy] || '') : '',
+          paySell: cPaySell >= 0 ? (row[cPaySell] || '') : '',
+          ship: cShip >= 0 ? (row[cShip] || '') : ''
         };
       }
       
@@ -630,6 +697,36 @@ function getPrintableOrders(params) {
       error: err.message
     };
   }
+}
+
+/**
+ * ============================================================
+ * Transaction API (거래원장 관리)
+ * ============================================================
+ */
+
+/**
+ * 확정수량 업데이트 및 금액 자동 재계산
+ */
+function updateConfirmedQuantitiesApi(params) {
+  var result = updateConfirmedQuantities(params);
+  return safeReturn(result);
+}
+
+/**
+ * 발주 상태 업데이트
+ */
+function updateTransactionStateApi(params) {
+  var result = updateTransactionState(params);
+  return safeReturn(result);
+}
+
+/**
+ * 거래원장 조회
+ */
+function getTransactionsApi(params) {
+  var result = getTransactions(params);
+  return safeReturn(result);
 }
 
 /**
@@ -687,57 +784,91 @@ function getSalesSettlementsApi(params) {
 }
 
 /**
- * 매입 마감 데이터 집계
+ * 마감 상세 조회
  */
-function aggregatePurchaseOrdersApi(params) {
-  var result = aggregatePurchaseOrders(params);
+function getSettlementDetailApi(params) {
+  var result = getSettlementDetail(params);
   return safeReturn(result);
 }
 
 /**
- * 매출 마감 데이터 집계
+ * ============================================================
+ * 청구서 관리 API (InvoiceService)
+ * ============================================================
  */
-function aggregateSalesOrdersApi(params) {
-  var result = aggregateSalesOrders(params);
-  return safeReturn(result);
-}
 
 /**
  * 청구서용 데이터 집계
  */
-function aggregateBillingDataApi(params) {
-  var result = aggregateBillingData(params);
+function aggregateInvoiceDataApi(params) {
+  var result = aggregateInvoiceData(params);
   return safeReturn(result);
 }
 
 /**
- * ============================================================
- * 청구서 관리 API (Phase 2)
- * ============================================================
+ * Settlement 기반 청구서 생성
  */
-
-/**
- * 청구서 생성
- */
-function createBillingApi(params) {
-  var result = createBilling(params);
+function createInvoiceFromSettlementApi(params) {
+  var result = createInvoiceFromSettlement(params);
   return safeReturn(result);
 }
 
 /**
  * 청구서 목록 조회
  */
-function getBillingsApi(params) {
-  var result = getBillings(params);
+function getInvoicesApi(params) {
+  var result = getInvoices(params);
   return safeReturn(result);
 }
 
 /**
  * 청구서 상태 업데이트
  */
-function updateBillingStatusApi(params) {
-  var result = updateBillingStatus(params);
+function updateInvoiceStatusApi(params) {
+  var result = updateInvoiceStatus(params);
   return safeReturn(result);
+}
+
+/**
+ * 청구서 재출력 (PDF 재생성)
+ */
+function reprintInvoiceApi(params) {
+  var result = reprintInvoice(params);
+  return safeReturn(result);
+}
+
+/**
+ * ============================================================
+ * 하위 호환성을 위한 Deprecated API (곧 제거 예정)
+ * ============================================================
+ */
+
+/**
+ * @deprecated aggregateInvoiceDataApi 사용 권장
+ */
+function aggregateBillingDataApi(params) {
+  return aggregateInvoiceDataApi(params);
+}
+
+/**
+ * @deprecated createInvoiceFromSettlementApi 사용 권장
+ */
+function createBillingApi(params) {
+  return createInvoiceFromSettlementApi(params);
+}
+
+/**
+ * @deprecated getInvoicesApi 사용 권장
+ */
+function getBillingsApi(params) {
+  return getInvoicesApi(params);
+}
+
+/**
+ * @deprecated updateInvoiceStatusApi 사용 권장
+ */
+function updateBillingStatusApi(params) {
+  return updateInvoiceStatusApi(params);
 }
 
 /**
@@ -767,37 +898,5 @@ function unlockMonthlyClosingApi(params) {
  */
 function getMonthlyClosingsApi() {
   var result = getMonthlyClosings();
-  return safeReturn(result);
-}
-
-/**
- * 마감 상세 조회
- */
-function getSettlementDetailApi(params) {
-  var result = getSettlementDetail(params);
-  return safeReturn(result);
-}
-
-/**
- * 은행 CSV 업로드 및 자동 매칭
- */
-function uploadBankCSVApi(params) {
-  var result = uploadBankCSV(params);
-  return safeReturn(result);
-}
-
-/**
- * 미수금 알림 조회
- */
-function getOutstandingBalanceAlertsApi(params) {
-  var result = getOutstandingBalanceAlerts(params);
-  return safeReturn(result);
-}
-
-/**
- * 수동 입금 기록
- */
-function recordManualPaymentApi(params) {
-  var result = recordManualPayment(params);
   return safeReturn(result);
 }

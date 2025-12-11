@@ -1,0 +1,116 @@
+<style>
+  .ledger-wrap { padding: 20px; }
+  .ledger-header { margin-bottom: 16px; }
+  .ledger-header h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: #111827; }
+  .ledger-header p { margin: 0; color: #6b7280; font-size: 13px; }
+
+  .ledger-filter { display: flex; flex-wrap: wrap; gap: 12px; background: #fff; padding: 14px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 14px; align-items: flex-end; }
+  .ledger-filter-field { display: flex; flex-direction: column; gap: 4px; }
+  .ledger-filter-field label { font-size: 12px; color: #475569; font-weight: 600; }
+  .ledger-filter-field input, .ledger-filter-field select { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-width: 160px; }
+  .ledger-btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .ledger-btn.primary { background: #2563eb; color: #fff; }
+  .ledger-btn.secondary { background: #e5e7eb; color: #1f2937; }
+  .ledger-btn.danger { background: #ef4444; color: #fff; }
+  .ledger-btn.primary:hover { background: #1d4ed8; }
+  .ledger-btn.secondary:hover { background: #d1d5db; }
+  .ledger-btn.danger:hover { background: #dc2626; }
+
+  .ledger-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .ledger-summary-card { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  .ledger-summary-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .ledger-summary-value { font-size: 18px; font-weight: 700; color: #111827; }
+
+  .ledger-table-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: auto; max-height: 720px; }
+  .ledger-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ledger-table th, .ledger-table td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+  .ledger-table th { background: #f8fafc; position: sticky; top: 0; z-index: 1; font-weight: 700; }
+  .ledger-table td.num { text-align: right; }
+  .ledger-status-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e5e7eb; color: #374151; }
+  .ledger-empty { text-align: center; padding: 40px 12px; color: #94a3b8; }
+
+  .ledger-action-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .ledger-status-select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; min-width: 120px; }
+</style>
+
+<div class="ledger-wrap">
+  <div class="ledger-header">
+    <h1>거래원장</h1>
+    <p>거래 데이터를 조회하고 상태를 즉시 업데이트합니다.</p>
+  </div>
+
+  <div class="ledger-filter">
+    <div class="ledger-filter-field">
+      <label for="ledger-start-date">시작일</label>
+      <input type="date" id="ledger-start-date">
+    </div>
+    <div class="ledger-filter-field">
+      <label for="ledger-end-date">종료일</label>
+      <input type="date" id="ledger-end-date">
+    </div>
+    <div class="ledger-filter-field">
+      <label for="ledger-company">거래처 (발주처)</label>
+      <input type="text" id="ledger-company" placeholder="거래처명을 입력하세요" />
+    </div>
+    <div class="ledger-filter-field">
+      <label for="ledger-status">상태</label>
+      <select id="ledger-status">
+        <option value="">전체</option>
+        <option value="DRAFT">DRAFT</option>
+        <option value="CONFIRMED">CONFIRMED</option>
+        <option value="ISSUED">ISSUED</option>
+        <option value="PAID">PAID</option>
+        <option value="CANCELLED">CANCELLED</option>
+      </select>
+    </div>
+    <div class="ledger-filter-field">
+      <label for="ledger-order-code">발주번호</label>
+      <input type="text" id="ledger-order-code" placeholder="예) 20250101-..." />
+    </div>
+    <button class="ledger-btn primary" id="ledger-search-btn">조회</button>
+    <button class="ledger-btn secondary" id="ledger-reset-btn">초기화</button>
+  </div>
+
+  <div class="ledger-summary">
+    <div class="ledger-summary-card">
+      <div class="ledger-summary-label">총 거래건수</div>
+      <div class="ledger-summary-value" id="ledger-summary-count">0건</div>
+    </div>
+    <div class="ledger-summary-card">
+      <div class="ledger-summary-label">발주수량 합계</div>
+      <div class="ledger-summary-value" id="ledger-summary-order-qty">0</div>
+    </div>
+    <div class="ledger-summary-card">
+      <div class="ledger-summary-label">확정수량 합계</div>
+      <div class="ledger-summary-value" id="ledger-summary-confirmed-qty">0</div>
+    </div>
+    <div class="ledger-summary-card">
+      <div class="ledger-summary-label">공급액 합계</div>
+      <div class="ledger-summary-value" id="ledger-summary-amount">₩0</div>
+    </div>
+  </div>
+
+  <div class="ledger-table-wrap">
+    <table class="ledger-table">
+      <thead>
+        <tr>
+          <th>발주일</th>
+          <th>발주번호</th>
+          <th>발주처</th>
+          <th>브랜드</th>
+          <th>품목코드</th>
+          <th>제품명</th>
+          <th class="num">발주수량</th>
+          <th class="num">확정수량</th>
+          <th class="num">공급가</th>
+          <th class="num">공급액</th>
+          <th>상태</th>
+          <th>액션</th>
+        </tr>
+      </thead>
+      <tbody id="ledger-tbody">
+        <tr><td colspan="12" class="ledger-empty">조회 결과가 없습니다. 필터를 설정 후 조회하세요.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

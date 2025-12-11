@@ -151,10 +151,6 @@
   background:#dbeafe;
   color:#2563eb;
 }
-.billing-status-badge.PAID_PARTIAL{
-  background:#fef3c7;
-  color:#f59e0b;
-}
 .billing-status-badge.PAID{
   background:#d1fae5;
   color:#10b981;
@@ -269,7 +265,6 @@
         <option value="">전체</option>
         <option value="DRAFT">임시저장</option>
         <option value="ISSUED">발행완료</option>
-        <option value="PAID_PARTIAL">일부입금</option>
         <option value="PAID">입금완료</option>
       </select>
     </div>
@@ -291,13 +286,6 @@
     <button class="billing-btn secondary" id="billing-mgmt-reset-btn">
       초기화
     </button>
-
-    <div style="margin-left:auto;display:flex;gap:8px;">
-      <input type="file" id="billing-csv-upload" accept=".csv" style="display:none;">
-      <button class="billing-btn primary" id="billing-csv-upload-btn">
-        📥 CSV 업로드
-      </button>
-    </div>
   </div>
 
   <!-- 요약 카드 -->
@@ -386,14 +374,6 @@
           <div class="billing-detail-item">
             <div class="billing-detail-item-label">청구금액</div>
             <div class="billing-detail-item-value" id="detail-amount">-</div>
-          </div>
-          <div class="billing-detail-item">
-            <div class="billing-detail-item-label">입금액</div>
-            <div class="billing-detail-item-value" id="detail-paid-amount">-</div>
-          </div>
-          <div class="billing-detail-item">
-            <div class="billing-detail-item-label">잔액</div>
-            <div class="billing-detail-item-value" id="detail-remaining-amount">-</div>
           </div>
           <div class="billing-detail-item">
             <div class="billing-detail-item-label">상태</div>

@@ -42,7 +42,18 @@ function processParsedOrderRows(rows) {
   var header = rows[0];
   var dataRows = rows.slice(1);
 
+  Logger.log('=== processParsedOrderRows 시작 ===');
+  Logger.log('총 행 수: ' + rows.length + ' (헤더 포함)');
+  Logger.log('데이터 행 수: ' + dataRows.length);
+
   var colMap = detectOrderFileColumns_(header);
+
+  // ⚠️ 필수 컬럼 검증: 바코드가 없으면 매칭 불가
+  if (colMap.barcode < 0) {
+    Logger.log('❌ 바코드 컬럼 미검출 - 엑셀 헤더를 확인해주세요.');
+    Logger.log('현재 헤더: ' + JSON.stringify(header));
+    // 에러 반환 대신 경고만 남기고 진행 (빈 바코드로 처리)
+  }
 
   // 2) 품목DB 인덱스(바코드 기준)
   var productIndex = buildProductIndex_();
@@ -106,6 +117,11 @@ function processParsedOrderRows(rows) {
     });
   }
 
+  // ✅ 디버그 정보 포함하여 반환
+  Logger.log('=== 파싱 결과 ===');
+  Logger.log('총 품목: ' + items.length + ', 매칭: ' + matchedCount + ', 미매칭: ' + unmatchedCount);
+  Logger.log('총 금액: ' + totalAmount);
+
   return {
     totalRows: rows.length,
     dataRows: dataRows.length,
@@ -113,7 +129,17 @@ function processParsedOrderRows(rows) {
     matchedCount: matchedCount,
     unmatchedCount: unmatchedCount,
     totalAmount: totalAmount,
-    items: items
+    items: items,
+    // ✅ 디버그 정보 추가
+    debug: {
+      originalHeader: header,
+      columnMap: colMap,
+      barcodeDetected: colMap.barcode >= 0,
+      brandDetected: colMap.brand >= 0,
+      productNameDetected: colMap.productName >= 0,
+      supplyPriceDetected: colMap.supplyPrice >= 0,
+      orderQtyDetected: colMap.orderQty >= 0
+    }
   };
 }
 
@@ -616,6 +642,7 @@ function buildProductIndex_() {
 /* ============================================================
  * 발주파일 헤더 → 컬럼 인덱스 매핑
  * ✅ 줄바꿈 문자(\r\n, \n) 제거 처리
+ * ✅ 다양한 엑셀 헤더명 지원 (부분 매칭 포함)
  * ============================================================ */
 
 /**
@@ -623,33 +650,118 @@ function buildProductIndex_() {
  * - 브랜드, 제품명, 바코드, 수량, 공급단가, 금액, 입고지 등
  */
 function detectOrderFileColumns_(header) {
-  // ✅ 헤더 배열을 정규화 (줄바꿈, 공백 제거)
+  // ✅ 헤더 배열을 정규화 (줄바꿈, 공백, 특수문자 제거)
   var normalizedHeader = header.map(function(col) {
     if (typeof col === 'string') {
-      return col.replace(/[\r\n]/g, '').trim();
+      return col.replace(/[\r\n\s]/g, '').trim();
     }
-    return String(col);
+    return String(col).replace(/[\r\n\s]/g, '').trim();
   });
-  
-  function findIndex(candidates) {
+
+  // ✅ 디버그 로깅 추가
+  Logger.log('=== 발주파일 헤더 감지 시작 ===');
+  Logger.log('원본 헤더: ' + JSON.stringify(header));
+  Logger.log('정규화 헤더: ' + JSON.stringify(normalizedHeader));
+
+  /**
+   * 정확한 매칭 시도 후 부분 매칭(contains) 수행
+   */
+  function findIndex(candidates, fieldName) {
+    // 1) 정확한 매칭 먼저 시도
     for (var i = 0; i < candidates.length; i++) {
-      var idx = normalizedHeader.indexOf(candidates[i]);
-      if (idx >= 0) return idx;
+      var candidate = candidates[i].replace(/[\s]/g, '');
+      var idx = normalizedHeader.indexOf(candidate);
+      if (idx >= 0) {
+        Logger.log('✅ [' + fieldName + '] 정확 매칭: "' + candidate + '" → 인덱스 ' + idx);
+        return idx;
+      }
     }
+
+    // 2) 부분 매칭 (헤더에 후보 문자열이 포함된 경우)
+    for (var i = 0; i < candidates.length; i++) {
+      var candidate = candidates[i].replace(/[\s]/g, '');
+      for (var j = 0; j < normalizedHeader.length; j++) {
+        if (normalizedHeader[j].indexOf(candidate) >= 0) {
+          Logger.log('✅ [' + fieldName + '] 부분 매칭: "' + candidate + '" in "' + normalizedHeader[j] + '" → 인덱스 ' + j);
+          return j;
+        }
+      }
+    }
+
+    Logger.log('❌ [' + fieldName + '] 매칭 실패. 후보: ' + JSON.stringify(candidates));
     return -1;
   }
 
-  return {
-    brand:         findIndex(['브랜드', '브랜드명']),
-    productName:   findIndex(['제품명', '상품명', '품목명']),
-    barcode:       findIndex(['바코드', '품목코드', '상품코드']),
-    packQty:       findIndex(['입수량', '입수']),
-    consumerPrice: findIndex(['소비자가', '소비자가격']),
-    supplyPrice:   findIndex(['공급가(VAT포함)', '공급가 (VAT포함)', '공급가', '공급단가']),
-    orderQty:      findIndex(['발주수량', '수량', '주문수량']),
-    orderAmount:   findIndex(['발주금액', '합계', '공급가합계', '주문금액', '금액']),
-    inboundPlace:  findIndex(['입고지', '입고처', '납품처'])
+  var colMap = {
+    // 바코드: 다양한 변형 지원
+    barcode:       findIndex([
+      '바코드', '품목코드', '상품코드', '품번', 'SKU',
+      'BARCODE', 'barcode', 'CODE', 'code', '코드'
+    ], 'barcode'),
+
+    // 브랜드: 다양한 변형 지원
+    brand:         findIndex([
+      '브랜드', '브랜드명', 'BRAND', 'brand', '상표', '제조사'
+    ], 'brand'),
+
+    // 제품명: 다양한 변형 지원
+    productName:   findIndex([
+      '제품명', '상품명', '품목명', '품명', '명칭', 'NAME', 'name', '이름'
+    ], 'productName'),
+
+    // 입수량
+    packQty:       findIndex([
+      '입수량', '입수', 'PACK', 'pack', '박스입수', 'BOX'
+    ], 'packQty'),
+
+    // 소비자가
+    consumerPrice: findIndex([
+      '소비자가', '소비자가격', '판매가', '정가', '소가'
+    ], 'consumerPrice'),
+
+    // 공급가: 다양한 변형 지원 (VAT 포함 여부 등)
+    supplyPrice:   findIndex([
+      '공급가(VAT포함)', '공급가(VAT별도)', '공급가(부가세포함)',
+      '공급가', '공급단가', '단가', '납품가', '매입가', '원가',
+      'PRICE', 'price', '가격'
+    ], 'supplyPrice'),
+
+    // 발주수량: 다양한 변형 지원
+    orderQty:      findIndex([
+      '발주수량', '수량', '주문수량', '요청수량', 'QTY', 'qty',
+      '발주', '주문', 'ORDER', 'order', '갯수', '개수'
+    ], 'orderQty'),
+
+    // 발주금액: 다양한 변형 지원
+    orderAmount:   findIndex([
+      '발주금액', '합계', '공급가합계', '주문금액', '금액',
+      '공급금액', '총액', 'AMOUNT', 'amount', 'TOTAL', 'total'
+    ], 'orderAmount'),
+
+    // 입고지
+    inboundPlace:  findIndex([
+      '입고지', '입고처', '납품처', '배송지', '도착지', '납품장소'
+    ], 'inboundPlace')
   };
+
+  // ✅ 최종 결과 로깅
+  Logger.log('=== 컬럼 매핑 결과 ===');
+  Logger.log('barcode: ' + colMap.barcode);
+  Logger.log('brand: ' + colMap.brand);
+  Logger.log('productName: ' + colMap.productName);
+  Logger.log('supplyPrice: ' + colMap.supplyPrice);
+  Logger.log('orderQty: ' + colMap.orderQty);
+  Logger.log('orderAmount: ' + colMap.orderAmount);
+
+  // ⚠️ 필수 컬럼 체크
+  if (colMap.barcode < 0) {
+    Logger.log('⚠️⚠️⚠️ 바코드 컬럼을 찾을 수 없습니다! 매칭이 불가능합니다.');
+  }
+  if (colMap.orderQty < 0) {
+    Logger.log('⚠️⚠️⚠️ 수량 컬럼을 찾을 수 없습니다!');
+  }
+
+  return colMap;
 }
 
 /* ============================================================
@@ -669,96 +781,8 @@ function toNumber_(v) {
 }
 
 /**
- * 발주처(거래처) 목록 조회
- * 거래처DB에서 '주거래처' 컬럼이 '발주처'인 거래처만 반환
- * @returns {Object} {success: boolean, data: Array<string>, error: string}
- */
-function getCustomers() {
-  try {
-    var ss = SpreadsheetApp.openById(OB_MASTER_DB_SS_ID);
-    var sheet = ss.getSheetByName('거래처DB');
-    
-    if (!sheet) {
-      Logger.log('[getCustomers] ⚠️ 거래처DB 시트를 찾을 수 없습니다.');
-      return {
-        success: false,
-        error: '거래처DB 시트를 찾을 수 없습니다.',
-        data: []
-      };
-    }
-    
-    var data = sheet.getDataRange().getValues();
-    if (data.length <= 1) {
-      return {
-        success: true,
-        data: [],
-        error: ''
-      };
-    }
-    
-    var header = data[0];
-    
-    // 컬럼 인덱스 찾기
-    var nameIdx = header.indexOf('거래처명');      // B열
-    var mainTypeIdx = header.indexOf('주거래처');   // J열
-    
-    if (nameIdx < 0) {
-      Logger.log('[getCustomers] ⚠️ 거래처명 컬럼을 찾을 수 없습니다.');
-      return {
-        success: false,
-        error: '거래처명 컬럼을 찾을 수 없습니다.',
-        data: []
-      };
-    }
-    
-    var customers = [];
-    var seen = {}; // 중복 제거용
-    
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      var name = safeCell_(row[nameIdx]);
-      
-      // 주거래처 컬럼이 있는 경우
-      if (mainTypeIdx >= 0) {
-        var mainType = safeCell_(row[mainTypeIdx]);
-        
-        // '발주처'가 포함된 거래처만 선택
-        if (mainType && mainType.indexOf('발주처') >= 0) {
-          if (name && !seen[name]) {
-            customers.push(name);
-            seen[name] = true;
-          }
-        }
-      } else {
-        // 주거래처 컬럼이 없으면 모든 거래처 반환
-        if (name && !seen[name]) {
-          customers.push(name);
-          seen[name] = true;
-        }
-      }
-    }
-    
-    Logger.log('[getCustomers] 발주처 목록: ' + JSON.stringify(customers));
-    Logger.log('[getCustomers] 총 ' + customers.length + '개');
-    
-    return {
-      success: true,
-      data: customers.sort(), // 가나다순 정렬
-      error: ''
-    };
-    
-  } catch (e) {
-    Logger.log('[getCustomers Error] ' + e.toString());
-    return {
-      success: false,
-      error: e.toString(),
-      data: []
-    };
-  }
-}
-
-/**
  * ✅ 품목DB에서 바코드로 매입가 조회
+ * NOTE: getCustomers() 함수는 ApiService.js로 이동됨 (중복 제거)
  */
 function getBuyPriceFromProductDB_(barcode) {
   var ss = SpreadsheetApp.openById(OB_MASTER_DB_SS_ID);
