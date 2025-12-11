@@ -172,7 +172,42 @@
     setupNavLinks();
     OB.highlightActiveNav(OB.state.currentPage);
     OB.initCurrentPage(OB.state.currentPage);
+
+    // 모바일 메뉴 토글 초기화
+    initMobileMenu();
   });
+
+  // 모바일 메뉴 토글 함수
+  function initMobileMenu() {
+    var menuBtn = document.getElementById('mobile-menu-toggle');
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+
+    if (!menuBtn || !sidebar || !overlay) return;
+
+    // 햄버거 버튼 클릭
+    menuBtn.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('active');
+    });
+
+    // 오버레이 클릭 시 사이드바 닫기
+    overlay.addEventListener('click', function() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+    });
+
+    // 사이드바 링크 클릭 시 사이드바 닫기 (모바일에서)
+    var sidebarLinks = sidebar.querySelectorAll('a');
+    sidebarLinks.forEach(function(link) {
+      link.addEventListener('click', function() {
+        if (window.innerWidth <= 768) {
+          sidebar.classList.remove('open');
+          overlay.classList.remove('active');
+        }
+      });
+    });
+  }
 
   // ===== 유틸리티 함수 =====
   OB.formatNumber = function(num) {
@@ -2654,6 +2689,8 @@
     var endDateInput = document.getElementById('billing-mgmt-end-date');
     var searchBtn = document.getElementById('billing-mgmt-search-btn');
     var resetBtn = document.getElementById('billing-mgmt-reset-btn');
+    var csvUploadInput = document.getElementById('billing-csv-upload');
+    var csvUploadBtn = document.getElementById('billing-csv-upload-btn');
 
     var summaryDiv = document.getElementById('billing-mgmt-summary');
     var totalCountSpan = document.getElementById('billing-mgmt-total-count');
@@ -2738,6 +2775,78 @@
         '<div class="billing-empty-text">조회 버튼을 눌러 청구서 목록을 확인하세요</div>' +
         '</td></tr>';
     });
+
+    // CSV 업로드 버튼 클릭
+    if (csvUploadBtn) {
+      csvUploadBtn.addEventListener('click', function() {
+        csvUploadInput.click();
+      });
+    }
+
+    // CSV 파일 선택 시 처리
+    if (csvUploadInput) {
+      csvUploadInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        if (!confirm('CSV 파일을 업로드하고 자동 매칭을 실행하시겠습니까?')) {
+          csvUploadInput.value = '';
+          return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+          var csvData = event.target.result;
+
+          OB.showLoading('CSV 파일 처리 중...');
+
+          google.script.run
+            .withSuccessHandler(function(result) {
+              OB.hideLoading();
+              csvUploadInput.value = '';
+
+              if (!result || !result.success) {
+                alert('CSV 업로드 실패: ' + (result ? result.error : '알 수 없는 오류'));
+                return;
+              }
+
+              var msg = 'CSV 업로드 완료!\n\n';
+              msg += '총 입금: ' + result.totalDeposits + '건\n';
+              msg += '매칭 성공: ' + result.matchedCount + '건\n';
+              msg += '업데이트: ' + result.updatedCount + '건';
+
+              if (result.unmatchedDeposits && result.unmatchedDeposits.length > 0) {
+                msg += '\n\n미매칭 입금: ' + result.unmatchedDeposits.length + '건';
+              }
+
+              alert(msg);
+
+              // 목록 새로고침
+              searchBtn.click();
+            })
+            .withFailureHandler(function(error) {
+              OB.hideLoading();
+              csvUploadInput.value = '';
+              console.error('❌ CSV 업로드 실패:', error);
+              alert('CSV 업로드 실패: ' + error.message);
+            })
+            .uploadBankCSVApi({
+              csvData: csvData,
+              matchCriteria: {
+                amountTolerance: 0,
+                dateTolerance: 3
+              }
+            });
+        };
+
+        reader.onerror = function() {
+          alert('파일 읽기 실패');
+          csvUploadInput.value = '';
+        };
+
+        reader.readAsText(file);
+      });
+    }
 
     // 요약 카드 렌더링
     function renderSummary(billings) {
@@ -2827,6 +2936,7 @@
       switch (status) {
         case 'DRAFT': return '임시저장';
         case 'ISSUED': return '발행완료';
+        case 'PAID_PARTIAL': return '일부입금';
         case 'PAID': return '입금완료';
         default: return status;
       }
@@ -2842,6 +2952,8 @@
       document.getElementById('detail-settlement-id').textContent = billing.settlementId || '-';
       document.getElementById('detail-billing-date').textContent = billing.billingDate || '-';
       document.getElementById('detail-amount').textContent = '₩' + OB.formatNumber(billing.amount);
+      document.getElementById('detail-paid-amount').textContent = '₩' + OB.formatNumber(billing.paidAmount || 0);
+      document.getElementById('detail-remaining-amount').textContent = '₩' + OB.formatNumber(billing.remainingAmount || billing.amount);
       document.getElementById('detail-status').textContent = getStatusText(billing.status);
       document.getElementById('detail-notes').textContent = billing.notes || '-';
 

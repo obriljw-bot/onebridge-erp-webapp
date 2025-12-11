@@ -817,8 +817,9 @@ function createBilling(params) {
     if (!sheet) {
       sheet = ss.insertSheet(OB_BILLING_SHEET);
       sheet.appendRow([
-        '청구ID', '청구유형', '업체명', '마감ID', '청구일', '청구금액',
-        '청구상태', '비고', '생성일시', '생성자', '발행일시', '발행자', '결제일시'
+        '청구ID', '청구유형', '업체명', '마감ID', '청구일', '청구상태',
+        '청구금액', '입금액', '잔액', '비고', '생성일시', '생성자',
+        '발행일시', '발행자', '결제일시'
       ]);
     }
 
@@ -843,8 +844,10 @@ function createBilling(params) {
       company,
       settlementId,
       billingDate,
-      amount,
       'DRAFT',
+      amount,
+      0,
+      amount,
       notes,
       now,
       user,
@@ -914,7 +917,7 @@ function getBillings(params) {
       if (company && data[i][2].indexOf(company) === -1) continue;
 
       // 상태 필터
-      if (status && data[i][6] !== status) continue;
+      if (status && data[i][5] !== status) continue;
 
       // 날짜 필터
       if (start || end) {
@@ -929,14 +932,16 @@ function getBillings(params) {
         company: data[i][2],
         settlementId: data[i][3],
         billingDate: formatDateString(data[i][4]),
-        amount: data[i][5],
-        status: data[i][6],
-        notes: data[i][7],
-        createdAt: formatDateString(data[i][8]),
-        createdBy: data[i][9],
-        issuedAt: formatDateString(data[i][10]),
-        issuedBy: data[i][11],
-        paidAt: formatDateString(data[i][12])
+        status: data[i][5],
+        amount: data[i][6],
+        paidAmount: data[i][7],
+        remainingAmount: data[i][8],
+        notes: data[i][9],
+        createdAt: formatDateString(data[i][10]),
+        createdBy: data[i][11],
+        issuedAt: formatDateString(data[i][12]),
+        issuedBy: data[i][13],
+        paidAt: formatDateString(data[i][14])
       });
     }
 
@@ -1002,17 +1007,24 @@ function updateBillingStatus(params) {
     var user = Session.getActiveUser().getEmail();
 
     // 상태 업데이트
-    sheet.getRange(rowIndex, 7).setValue(status);
+    sheet.getRange(rowIndex, 6).setValue(status);
 
     // ISSUED로 변경 시 발행 정보 기록
     if (status === 'ISSUED') {
-      sheet.getRange(rowIndex, 11).setValue(now);
-      sheet.getRange(rowIndex, 12).setValue(user);
+      sheet.getRange(rowIndex, 13).setValue(now);
+      sheet.getRange(rowIndex, 14).setValue(user);
     }
 
-    // PAID로 변경 시 결제 일시 기록
-    if (status === 'PAID') {
-      sheet.getRange(rowIndex, 13).setValue(now);
+    // PAID로 변경 시 결제 일시 기록 및 잔액 처리
+    if (status === 'PAID' || status === 'PAID_PARTIAL') {
+      sheet.getRange(rowIndex, 15).setValue(now);
+
+      // PAID 상태일 때는 입금액을 청구금액과 동일하게, 잔액을 0으로 설정
+      if (status === 'PAID') {
+        var totalAmount = Number(data[rowIndex - 1][6]) || 0;
+        sheet.getRange(rowIndex, 8).setValue(totalAmount);
+        sheet.getRange(rowIndex, 9).setValue(0);
+      }
     }
 
     Logger.log('[updateBillingStatus] 청구서 상태 업데이트: ' + billingId + ' -> ' + status);

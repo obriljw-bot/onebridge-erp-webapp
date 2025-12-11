@@ -428,12 +428,219 @@
   }
 
   @media (max-width: 768px) {
+    /* 레이아웃 조정 */
     .ob-app-shell {
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
+      position: relative;
     }
+
+    /* 모바일 사이드바 - 기본 숨김, 토글로 표시 */
     .ob-sidebar {
-      display: none; /* 모바일에서는 우선 숨김 (추후 토글 메뉴로 확장 가능) */
+      position: fixed;
+      left: -250px;
+      top: 0;
+      bottom: 0;
+      width: 250px;
+      z-index: 1000;
+      transition: left 0.3s ease;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .ob-sidebar.open {
+      left: 0;
+    }
+
+    /* 햄버거 메뉴 버튼 */
+    .ob-mobile-menu-btn {
+      display: block !important;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 999;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      font-size: 20px;
+    }
+
+    /* 오버레이 */
+    .ob-sidebar-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+
+    .ob-sidebar-overlay.active {
+      display: block;
+    }
+
+    /* 메인 컨텐츠 상단 여백 추가 (햄버거 메뉴 공간) */
+    .ob-main-content {
+      padding-top: 60px;
+    }
+
+    /* KPI 그리드 1열로 */
+    .ob-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+
+    /* 테이블을 카드 레이아웃으로 전환 */
+    .settlement-table-wrap table,
+    .monthly-table-wrap table,
+    .billing-table-wrap table {
+      display: block;
+      overflow-x: auto;
+    }
+
+    .settlement-table thead,
+    .monthly-table thead,
+    .billing-table thead {
+      display: none;
+    }
+
+    .settlement-table tbody,
+    .monthly-table tbody,
+    .billing-table tbody {
+      display: block;
+    }
+
+    .settlement-table tr,
+    .monthly-table tr,
+    .billing-table tr {
+      display: block;
+      margin-bottom: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      background: white;
+    }
+
+    .settlement-table td,
+    .monthly-table td,
+    .billing-table td {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border: none;
+      text-align: left !important;
+    }
+
+    .settlement-table td:before,
+    .monthly-table td:before,
+    .billing-table td:before {
+      content: attr(data-label);
+      font-weight: 600;
+      color: #64748b;
+      min-width: 100px;
+    }
+
+    /* 버튼 터치 친화적 크기 */
+    .settlement-btn,
+    .monthly-btn,
+    .billing-btn {
+      min-height: 44px;
+      padding: 12px 20px;
+      font-size: 15px;
+    }
+
+    .settlement-btn.small,
+    .billing-btn.small {
+      min-height: 38px;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+
+    /* 폼 입력 요소 크기 조정 */
+    input[type="text"],
+    input[type="date"],
+    input[type="month"],
+    input[type="number"],
+    select {
+      min-height: 44px;
+      font-size: 16px;
+    }
+
+    /* 검색바 및 필터바 세로 배치 */
+    .settlement-filters,
+    .monthly-closing-select,
+    .billing-search {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .settlement-filters-field,
+    .monthly-closing-select-field,
+    .billing-search-field {
+      width: 100%;
+    }
+
+    .settlement-filters-field input,
+    .settlement-filters-field select,
+    .monthly-closing-select-field input,
+    .monthly-closing-select-field select,
+    .billing-search-field input,
+    .billing-search-field select {
+      width: 100%;
+      min-width: 100%;
+    }
+
+    /* 요약 카드 1열로 */
+    .settlement-summary,
+    .monthly-status-grid,
+    .billing-summary {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* 모달 전체 화면 */
+    .billing-modal-content {
+      width: 95%;
+      max-height: 95vh;
+    }
+
+    .billing-detail-grid {
+      grid-template-columns: 1fr;
+    }
+
+    /* 액션 버튼 그룹 세로 배치 */
+    .settlement-actions,
+    .monthly-status-actions,
+    .billing-modal-footer {
+      flex-direction: column;
+    }
+
+    .settlement-actions button,
+    .monthly-status-actions button,
+    .billing-modal-footer button {
+      width: 100%;
+    }
+
+    /* 테이블 가로 스크롤 활성화 (카드로 전환하지 않는 경우) */
+    .settlement-table-wrap,
+    .monthly-table-wrap,
+    .billing-table-wrap {
+      max-height: none;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* 데스크톱에서 햄버거 메뉴 숨김 */
+  @media (min-width: 769px) {
+    .ob-mobile-menu-btn {
+      display: none !important;
+    }
+
+    .ob-sidebar-overlay {
+      display: none !important;
     }
   }
 </style>

@@ -777,3 +777,27 @@ function getSettlementDetailApi(params) {
   var result = getSettlementDetail(params);
   return safeReturn(result);
 }
+
+/**
+ * 은행 CSV 업로드 및 자동 매칭
+ */
+function uploadBankCSVApi(params) {
+  var result = uploadBankCSV(params);
+  return safeReturn(result);
+}
+
+/**
+ * 미수금 알림 조회
+ */
+function getOutstandingBalanceAlertsApi(params) {
+  var result = getOutstandingBalanceAlerts(params);
+  return safeReturn(result);
+}
+
+/**
+ * 수동 입금 기록
+ */
+function recordManualPaymentApi(params) {
+  var result = recordManualPayment(params);
+  return safeReturn(result);
+}

@@ -5,8 +5,14 @@
   </head>
   <body class="ob-body">
     <div class="ob-app-shell">
+      <!-- 모바일 햄버거 메뉴 -->
+      <button class="ob-mobile-menu-btn" id="mobile-menu-toggle">☰</button>
+
+      <!-- 사이드바 오버레이 -->
+      <div class="ob-sidebar-overlay" id="sidebar-overlay"></div>
+
       <!-- 좌측 사이드바 -->
-      <aside class="ob-sidebar">
+      <aside class="ob-sidebar" id="sidebar">
         <?!= include('Component_Sidebar'); ?>
       </aside>
 
