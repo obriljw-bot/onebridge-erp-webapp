@@ -806,10 +806,27 @@ function aggregateInvoiceDataApi(params) {
 }
 
 /**
- * Settlement 기반 청구서 생성
+ * Settlement 기반 청구서 생성 (Track B)
  */
 function createInvoiceFromSettlementApi(params) {
   var result = createInvoiceFromSettlement(params);
+  return safeReturn(result);
+}
+
+/**
+ * 발주번호 기반 직접 청구서 생성 (Track A - Fast Path)
+ * @param {Object} params - { orderNumbers, type, company, invoiceDate, notes }
+ */
+function createDirectBillingApi(params) {
+  var result = createInvoiceFromSettlement(params);
+  return safeReturn(result);
+}
+
+/**
+ * 발주번호에 대한 청구서 존재 여부 확인
+ */
+function checkInvoiceExistsApi(params) {
+  var result = checkInvoiceExists(params);
   return safeReturn(result);
 }
 

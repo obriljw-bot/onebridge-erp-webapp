@@ -151,17 +151,51 @@ function aggregateInvoiceData(params) {
 function createInvoiceFromSettlement(params) {
   try {
     var settlementId = params.settlementId || '';
+    var orderNumbers = params.orderNumbers || [];
     var type = params.type || '';
     var company = params.company || '';
     var invoiceDate = params.invoiceDate || new Date();
     var amount = params.amount || 0;
     var notes = params.notes || '';
 
-    if (!settlementId || !type || !company) {
+    // 2-Track 구조: settlementId 또는 orderNumbers 중 하나는 필수
+    if (!settlementId && (!orderNumbers || orderNumbers.length === 0)) {
+      return {
+        success: false,
+        error: '마감ID 또는 발주번호가 필요합니다.'
+      };
+    }
+
+    if (!type || !company) {
       return {
         success: false,
         error: '필수 정보를 입력해주세요.'
       };
+    }
+
+    // billingType 결정: SETTLEMENT (마감 기반) 또는 DIRECT (직접 생성)
+    var billingType = settlementId ? 'SETTLEMENT' : 'DIRECT';
+
+    // DIRECT 타입이고 amount가 제공되지 않은 경우, orderNumbers로부터 금액 계산
+    if (billingType === 'DIRECT' && amount === 0 && orderNumbers.length > 0) {
+      var orderSs = SpreadsheetApp.openById(OB_INVOICE_SS_ID);
+      var orderSheet = orderSs.getSheetByName(OB_INVOICE_LEDGER_SHEET);
+
+      if (orderSheet) {
+        var orderData = orderSheet.getDataRange().getValues();
+        var header = orderData[0];
+        var orderNumIdx = header.indexOf('발주번호');
+        var supplyAmtIdx = header.indexOf('공급액');
+
+        for (var i = 1; i < orderData.length; i++) {
+          var orderNum = orderData[i][orderNumIdx];
+          if (orderNumbers.indexOf(orderNum) !== -1) {
+            amount += Number(orderData[i][supplyAmtIdx]) || 0;
+          }
+        }
+
+        Logger.log('[createInvoiceFromSettlement] DIRECT 타입 금액 계산: ₩' + amount);
+      }
     }
 
     var ss = SpreadsheetApp.openById(OB_INVOICE_SS_ID);
@@ -171,7 +205,7 @@ function createInvoiceFromSettlement(params) {
       sheet = ss.insertSheet(OB_INVOICE_SHEET);
       sheet.appendRow([
         '청구ID', '청구유형', '업체명', '마감ID', '청구일', '청구금액',
-        '청구상태', '비고', '생성일시', '생성자', '발행일시', '발행자', '결제일시'
+        '청구상태', '청구타입', '발주번호', '비고', '생성일시', '생성자', '발행일시', '발행자', '결제일시'
       ]);
     }
 
@@ -190,6 +224,9 @@ function createInvoiceFromSettlement(params) {
     var now = new Date();
     var user = Session.getActiveUser().getEmail();
 
+    // orderNumbers 배열을 문자열로 변환 (JSON 형식)
+    var orderNumbersStr = orderNumbers.length > 0 ? JSON.stringify(orderNumbers) : '';
+
     var rowData = [
       invoiceId,
       type,
@@ -198,6 +235,8 @@ function createInvoiceFromSettlement(params) {
       invoiceDate,
       amount,
       'DRAFT',
+      billingType,
+      orderNumbersStr,
       notes,
       now,
       user,
@@ -207,7 +246,7 @@ function createInvoiceFromSettlement(params) {
     ];
 
     sheet.appendRow(rowData);
-    Logger.log('[createInvoiceFromSettlement] 청구서 생성: ' + invoiceId);
+    Logger.log('[createInvoiceFromSettlement] 청구서 생성: ' + invoiceId + ' (타입: ' + billingType + ')');
 
     return {
       success: true,
@@ -229,6 +268,94 @@ function createInvoiceFromSettlement(params) {
  * 3. 청구서 조회
  * ============================================================
  */
+
+/**
+ * 발주번호에 대한 청구서 존재 여부 확인
+ * @param {Object} params - { orderNumber }
+ * @returns {Object} { exists: boolean, invoices: [...] }
+ */
+function checkInvoiceExists(params) {
+  try {
+    var orderNumber = params.orderNumber || '';
+
+    if (!orderNumber) {
+      return {
+        success: false,
+        error: '발주번호가 필요합니다.'
+      };
+    }
+
+    var ss = SpreadsheetApp.openById(OB_INVOICE_SS_ID);
+    var sheet = ss.getSheetByName(OB_INVOICE_SHEET);
+
+    if (!sheet) {
+      return {
+        success: true,
+        exists: false,
+        invoices: []
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return {
+        success: true,
+        exists: false,
+        invoices: []
+      };
+    }
+
+    var header = data[0];
+    var orderNumbersIdx = header.indexOf('발주번호');
+    var invoiceIdIdx = header.indexOf('청구ID');
+    var companyIdx = header.indexOf('업체명');
+    var typeIdx = header.indexOf('청구유형');
+    var amountIdx = header.indexOf('청구금액');
+    var statusIdx = header.indexOf('청구상태');
+    var billingTypeIdx = header.indexOf('청구타입');
+
+    var matchingInvoices = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var orderNumbersStr = String(data[i][orderNumbersIdx] || '');
+
+      // JSON 배열 파싱
+      var orderNumbers = [];
+      try {
+        if (orderNumbersStr) {
+          orderNumbers = JSON.parse(orderNumbersStr);
+        }
+      } catch (e) {
+        // 파싱 실패시 빈 배열
+      }
+
+      // 발주번호가 포함되어 있는지 확인
+      if (orderNumbers.indexOf(orderNumber) !== -1) {
+        matchingInvoices.push({
+          invoiceId: data[i][invoiceIdIdx],
+          company: data[i][companyIdx],
+          type: data[i][typeIdx],
+          amount: data[i][amountIdx],
+          status: data[i][statusIdx],
+          billingType: data[i][billingTypeIdx]
+        });
+      }
+    }
+
+    return {
+      success: true,
+      exists: matchingInvoices.length > 0,
+      invoices: matchingInvoices
+    };
+
+  } catch (err) {
+    Logger.log('[checkInvoiceExists Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
 
 /**
  * 청구서 목록 조회
