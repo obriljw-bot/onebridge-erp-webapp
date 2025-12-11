@@ -372,6 +372,23 @@ function savePurchaseSettlement(params) {
       Logger.log('[savePurchaseSettlement] 새 마감 생성: ' + settlementId);
     }
 
+    // 마감상세DB에 품목별 상세 저장
+    var detailSaved = saveSettlementDetails_(settlementId, items, 'PURCHASE');
+    if (!detailSaved) {
+      Logger.log('[savePurchaseSettlement] 경고: 마감상세 저장 실패');
+    }
+
+    // 확정 상태일 경우 거래원장 상태를 SETTLED로 업데이트
+    if (status === 'CONFIRMED') {
+      var orderNumbers = items.map(function(item) {
+        return item.orderCode;
+      });
+      var ledgerUpdated = updateLedgerStatus_(orderNumbers, 'SETTLED');
+      if (!ledgerUpdated) {
+        Logger.log('[savePurchaseSettlement] 경고: 거래원장 상태 업데이트 실패');
+      }
+    }
+
     return {
       success: true,
       settlementId: settlementId,
@@ -473,6 +490,23 @@ function saveSalesSettlement(params) {
     } else {
       sheet.appendRow(rowData);
       Logger.log('[saveSalesSettlement] 새 마감 생성: ' + settlementId);
+    }
+
+    // 마감상세DB에 품목별 상세 저장
+    var detailSaved = saveSettlementDetails_(settlementId, items, 'SALES');
+    if (!detailSaved) {
+      Logger.log('[saveSalesSettlement] 경고: 마감상세 저장 실패');
+    }
+
+    // 확정 상태일 경우 거래원장 상태를 SETTLED로 업데이트
+    if (status === 'CONFIRMED') {
+      var orderNumbers = items.map(function(item) {
+        return item.orderCode;
+      });
+      var ledgerUpdated = updateLedgerStatus_(orderNumbers, 'SETTLED');
+      if (!ledgerUpdated) {
+        Logger.log('[saveSalesSettlement] 경고: 거래원장 상태 업데이트 실패');
+      }
     }
 
     return {
@@ -1251,5 +1285,239 @@ function getMonthlyClosings() {
       success: false,
       error: err.message
     };
+  }
+}
+
+/**
+ * 마감 상세 조회
+ * @param {Object} params - { settlementId }
+ * @returns {Object} 조회 결과
+ */
+function getSettlementDetail(params) {
+  try {
+    var settlementId = params.settlementId || '';
+
+    if (!settlementId) {
+      return {
+        success: false,
+        error: '마감ID를 입력해주세요.'
+      };
+    }
+
+    Logger.log('[getSettlementDetail] 마감 상세 조회: ' + settlementId);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_SETTLEMENT_DETAIL_SHEET);
+
+    if (!sheet) {
+      return {
+        success: true,
+        items: []
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var items = [];
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === settlementId) {
+        items.push({
+          settlementId: data[i][0],
+          orderCode: data[i][1],
+          orderDate: formatDateString(data[i][2]),
+          productCode: data[i][3],
+          productName: data[i][4],
+          brand: data[i][5],
+          supplier: data[i][6],
+          buyer: data[i][7],
+          orderQty: data[i][8],
+          confirmedQty: data[i][9],
+          diffQty: data[i][10],
+          buyPrice: data[i][11],
+          supplyPrice: data[i][12],
+          purchaseAmount: data[i][13],
+          supplyAmount: data[i][14],
+          marginAmount: data[i][15],
+          marginRate: data[i][16],
+          savedAt: formatDateString(data[i][17])
+        });
+      }
+    }
+
+    return {
+      success: true,
+      items: items
+    };
+
+  } catch (err) {
+    Logger.log('[getSettlementDetail Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
+ * ============================================================
+ * 6. 내부 헬퍼 함수
+ * ============================================================
+ */
+
+/**
+ * 마감 상세 정보를 마감상세DB에 저장 (내부 함수)
+ * @param {string} settlementId - 마감ID
+ * @param {Array} items - 품목 배열
+ * @param {string} type - 마감 유형 ('PURCHASE' 또는 'SALES')
+ * @returns {boolean} 성공 여부
+ */
+function saveSettlementDetails_(settlementId, items, type) {
+  try {
+    Logger.log('[saveSettlementDetails_] 시작: ' + settlementId + ', 품목수: ' + items.length);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_SETTLEMENT_DETAIL_SHEET);
+
+    if (!sheet) {
+      // 시트가 없으면 생성
+      sheet = ss.insertSheet(OB_SETTLEMENT_DETAIL_SHEET);
+      sheet.appendRow([
+        '마감ID', '발주번호', '발주일', '품목코드', '제품명', '브랜드',
+        '매입처', '발주처', '발주수량', '확정수량', '차이수량',
+        '매입가', '공급가', '매입액', '공급액', '마진액', '마진율', '저장일시'
+      ]);
+    }
+
+    // 기존 해당 마감ID의 상세 데이터 삭제
+    var data = sheet.getDataRange().getValues();
+    var rowsToDelete = [];
+
+    for (var i = data.length - 1; i >= 1; i--) {
+      if (data[i][0] === settlementId) {
+        rowsToDelete.push(i + 1); // 시트 행 번호 (1-based)
+      }
+    }
+
+    // 역순으로 삭제 (인덱스 변경 방지)
+    for (var j = 0; j < rowsToDelete.length; j++) {
+      sheet.deleteRow(rowsToDelete[j]);
+    }
+
+    Logger.log('[saveSettlementDetails_] 기존 데이터 ' + rowsToDelete.length + '건 삭제');
+
+    // 새 데이터 추가
+    var now = new Date();
+    var rowsToAdd = [];
+
+    for (var k = 0; k < items.length; k++) {
+      var item = items[k];
+
+      // 매입/매출에 따라 필드명 다름
+      var buyPrice = Number(item.buyPrice) || 0;
+      var supplyPrice = Number(item.supplyPrice) || 0;
+      var confirmedQty = Number(item.confirmedQty) || 0;
+
+      var purchaseAmount = confirmedQty * buyPrice;
+      var supplyAmount = confirmedQty * supplyPrice;
+      var marginAmount = supplyAmount - purchaseAmount;
+      var marginRate = purchaseAmount > 0 ? (marginAmount / purchaseAmount) * 100 : 0;
+
+      rowsToAdd.push([
+        settlementId,
+        item.orderCode || '',
+        item.orderDate || '',
+        item.productCode || '',
+        item.productName || '',
+        item.brand || '',
+        item.supplier || '',
+        item.buyer || '',
+        Number(item.orderQty) || 0,
+        confirmedQty,
+        Number(item.diffQty) || 0,
+        buyPrice,
+        supplyPrice,
+        purchaseAmount,
+        supplyAmount,
+        marginAmount,
+        marginRate,
+        now
+      ]);
+    }
+
+    if (rowsToAdd.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAdd.length, 18).setValues(rowsToAdd);
+      Logger.log('[saveSettlementDetails_] 새 데이터 ' + rowsToAdd.length + '건 저장 완료');
+    }
+
+    return true;
+
+  } catch (err) {
+    Logger.log('[saveSettlementDetails_ Error] ' + err.message);
+    return false;
+  }
+}
+
+/**
+ * 거래원장의 발주 상태를 업데이트 (내부 함수)
+ * @param {Array} orderNumbers - 발주번호 배열
+ * @param {string} newStatus - 새 상태 ('SETTLED', 'INVOICED', 'PAID' 등)
+ * @returns {boolean} 성공 여부
+ */
+function updateLedgerStatus_(orderNumbers, newStatus) {
+  try {
+    if (!orderNumbers || orderNumbers.length === 0) {
+      Logger.log('[updateLedgerStatus_] 발주번호가 없습니다.');
+      return true; // 빈 배열은 성공으로 처리
+    }
+
+    Logger.log('[updateLedgerStatus_] 시작: ' + orderNumbers.length + '건, 상태: ' + newStatus);
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_ORDER_LEDGER_SHEET);
+
+    if (!sheet) {
+      Logger.log('[updateLedgerStatus_] 거래원장 시트를 찾을 수 없습니다.');
+      return false;
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    // 발주번호 컬럼과 상태 컬럼 찾기
+    var orderCodeCol = -1;
+    var statusCol = -1;
+
+    for (var i = 0; i < header.length; i++) {
+      if (header[i] === '발주번호') orderCodeCol = i;
+      if (header[i] === '상태') statusCol = i;
+    }
+
+    if (orderCodeCol === -1 || statusCol === -1) {
+      Logger.log('[updateLedgerStatus_] 필수 컬럼을 찾을 수 없습니다.');
+      return false;
+    }
+
+    // 발주번호를 객체로 변환 (빠른 검색용)
+    var orderMap = {};
+    for (var j = 0; j < orderNumbers.length; j++) {
+      orderMap[orderNumbers[j]] = true;
+    }
+
+    // 상태 업데이트
+    var updateCount = 0;
+    for (var k = 1; k < data.length; k++) {
+      var orderCode = data[k][orderCodeCol];
+      if (orderMap[orderCode]) {
+        sheet.getRange(k + 1, statusCol + 1).setValue(newStatus);
+        updateCount++;
+      }
+    }
+
+    Logger.log('[updateLedgerStatus_] 완료: ' + updateCount + '건 업데이트');
+    return true;
+
+  } catch (err) {
+    Logger.log('[updateLedgerStatus_ Error] ' + err.message);
+    return false;
   }
 }

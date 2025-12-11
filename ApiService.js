@@ -769,3 +769,11 @@ function getMonthlyClosingsApi() {
   var result = getMonthlyClosings();
   return safeReturn(result);
 }
+
+/**
+ * 마감 상세 조회
+ */
+function getSettlementDetailApi(params) {
+  var result = getSettlementDetail(params);
+  return safeReturn(result);
+}
