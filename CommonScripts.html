@@ -1685,6 +1685,7 @@
 
     var saveDraftBtn = document.getElementById('purchase-settlement-save-draft-btn');
     var confirmBtn = document.getElementById('purchase-settlement-confirm-btn');
+    var createBillingBtn = document.getElementById('purchase-settlement-create-billing-btn');
     var exportBtn = document.getElementById('purchase-settlement-export-btn');
 
     // 기본 날짜 설정 (이번 달)
@@ -1794,6 +1795,56 @@
       });
     }
 
+    // 청구서 생성 버튼
+    if (createBillingBtn) {
+      createBillingBtn.addEventListener('click', function() {
+        if (!state.settlementId) {
+          alert('마감을 먼저 확정해주세요.');
+          return;
+        }
+
+        if (!confirm('이 마감 건으로 청구서를 생성하시겠습니까?')) {
+          return;
+        }
+
+        OB.showLoading('청구서 생성 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+
+            if (!result || !result.success) {
+              alert('청구서 생성 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              return;
+            }
+
+            alert('청구서가 생성되었습니다!\n청구서 ID: ' + result.billingId);
+            console.log('✅ 청구서 생성 완료:', result.billingId);
+
+            // 청구서 생성 버튼 숨기기
+            createBillingBtn.style.display = 'none';
+
+            // 청구서 관리 페이지로 이동할지 물어보기
+            if (confirm('청구서 관리 페이지로 이동하시겠습니까?')) {
+              window.location.href = '?page=billingManagement';
+            }
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 청구서 생성 실패:', error);
+            alert('청구서 생성 실패: ' + error.message);
+          })
+          .createBillingApi({
+            settlementId: state.settlementId,
+            type: 'PURCHASE',
+            company: state.supplier,
+            billingDate: new Date().toISOString().split('T')[0],
+            amount: state.currentData.totalPurchaseAmount || 0,
+            notes: '매입 마감 기준 청구서 (기간: ' + state.startDate + ' ~ ' + state.endDate + ')'
+          });
+      });
+    }
+
     // 요약 렌더링
     function renderSummary(data) {
       document.getElementById('purchase-settlement-total-items').textContent =
@@ -1891,6 +1942,14 @@
 
           alert(result.message || '저장 완료');
           console.log('✅ 마감 저장 완료:', result.settlementId);
+
+          // 확정 상태일 경우 청구서 생성 버튼 표시
+          if (status === 'CONFIRMED') {
+            state.settlementId = result.settlementId;
+            if (createBillingBtn) {
+              createBillingBtn.style.display = 'inline-block';
+            }
+          }
         })
         .withFailureHandler(function(error) {
           OB.hideLoading();
@@ -1984,6 +2043,7 @@
 
     var saveDraftBtn = document.getElementById('sales-settlement-save-draft-btn');
     var confirmBtn = document.getElementById('sales-settlement-confirm-btn');
+    var createBillingBtn = document.getElementById('sales-settlement-create-billing-btn');
     var exportBtn = document.getElementById('sales-settlement-export-btn');
 
     // 기본 날짜 설정 (이번 달)
@@ -2093,6 +2153,56 @@
       });
     }
 
+    // 청구서 생성 버튼
+    if (createBillingBtn) {
+      createBillingBtn.addEventListener('click', function() {
+        if (!state.settlementId) {
+          alert('마감을 먼저 확정해주세요.');
+          return;
+        }
+
+        if (!confirm('이 마감 건으로 청구서를 생성하시겠습니까?')) {
+          return;
+        }
+
+        OB.showLoading('청구서 생성 중...');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            OB.hideLoading();
+
+            if (!result || !result.success) {
+              alert('청구서 생성 실패: ' + (result ? result.error : '알 수 없는 오류'));
+              return;
+            }
+
+            alert('청구서가 생성되었습니다!\n청구서 ID: ' + result.billingId);
+            console.log('✅ 청구서 생성 완료:', result.billingId);
+
+            // 청구서 생성 버튼 숨기기
+            createBillingBtn.style.display = 'none';
+
+            // 청구서 관리 페이지로 이동할지 물어보기
+            if (confirm('청구서 관리 페이지로 이동하시겠습니까?')) {
+              window.location.href = '?page=billingManagement';
+            }
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            console.error('❌ 청구서 생성 실패:', error);
+            alert('청구서 생성 실패: ' + error.message);
+          })
+          .createBillingApi({
+            settlementId: state.settlementId,
+            type: 'SALES',
+            company: state.buyer,
+            billingDate: new Date().toISOString().split('T')[0],
+            amount: state.currentData.totalSupplyAmount || 0,
+            notes: '매출 마감 기준 청구서 (기간: ' + state.startDate + ' ~ ' + state.endDate + ')'
+          });
+      });
+    }
+
     // 요약 렌더링
     function renderSummary(data) {
       document.getElementById('sales-settlement-total-items').textContent =
@@ -2190,6 +2300,14 @@
 
           alert(result.message || '저장 완료');
           console.log('✅ 마감 저장 완료:', result.settlementId);
+
+          // 확정 상태일 경우 청구서 생성 버튼 표시
+          if (status === 'CONFIRMED') {
+            state.settlementId = result.settlementId;
+            if (createBillingBtn) {
+              createBillingBtn.style.display = 'inline-block';
+            }
+          }
         })
         .withFailureHandler(function(error) {
           OB.hideLoading();
