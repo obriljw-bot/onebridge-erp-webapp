@@ -201,7 +201,7 @@
     return year + '-' + month + '-' + day;
   };
 
-  // ===== 청구서 네비게이션 함수 (컨텍스트 기반) =====
+  // ===== 청구서 네비게이션 함수 (컨텍스트 기반 - Phase 2) =====
   OB.navigateToInvoice = function(orderNumber, company) {
     if (!orderNumber) {
       alert('발주번호가 필요합니다.');
@@ -243,7 +243,7 @@
       .checkInvoiceExistsApi({ orderNumber: orderNumber });
   };
 
-  // ===== 청구서 직접 생성 함수 (Track A - Fast Path) =====
+  // ===== 청구서 직접 생성 함수 (Track A - Fast Path, Phase 1) =====
   OB.createDirectInvoiceForOrder = function(orderNumber, company) {
     if (!orderNumber || !company) {
       alert('발주번호와 거래처 정보가 필요합니다.');
@@ -280,6 +280,52 @@
         alert('서버 오류: ' + error.message);
       })
       .createDirectBillingApi(params);
+  };
+
+  // ===== 포맷 함수 (Phase 4.1) =====
+  OB.formatCurrency = function(amount) {
+    if (amount === null || amount === undefined || amount === '') return '₩0';
+    return '₩' + Number(amount).toLocaleString('ko-KR');
+  };
+
+  OB.getStatusBadge = function(status, type) {
+    if (!status) return '<span class="badge badge-gray">-</span>';
+
+    var config = {
+      // 거래 상태
+      transaction: {
+        '매입발주': { label: '매입발주', color: '#3B82F6', bg: '#DBEAFE' },
+        '매입결제': { label: '매입결제', color: '#8B5CF6', bg: '#EDE9FE' },
+        '매출결제': { label: '매출결제', color: '#10B981', bg: '#D1FAE5' },
+        '출고': { label: '출고', color: '#059669', bg: '#A7F3D0' }
+      },
+      // 발주 진행 상태
+      order: {
+        '대기': { label: '대기', color: '#6B7280', bg: '#F3F4F6' },
+        '확정': { label: '확정', color: '#059669', bg: '#D1FAE5' },
+        '완료': { label: '완료', color: '#1D4ED8', bg: '#DBEAFE' },
+        '취소': { label: '취소', color: '#DC2626', bg: '#FEE2E2' }
+      },
+      // 청구서 상태
+      billing: {
+        'DRAFT': { label: '임시', color: '#6B7280', bg: '#F3F4F6' },
+        'PENDING': { label: '대기', color: '#D97706', bg: '#FEF3C7' },
+        'PAID': { label: '완료', color: '#059669', bg: '#D1FAE5' },
+        'CANCELLED': { label: '취소', color: '#DC2626', bg: '#FEE2E2' }
+      },
+      // 마감 상태
+      settlement: {
+        'OPEN': { label: '진행중', color: '#3B82F6', bg: '#DBEAFE' },
+        'CLOSED': { label: '완료', color: '#059669', bg: '#D1FAE5' },
+        'CANCELLED': { label: '취소', color: '#DC2626', bg: '#FEE2E2' }
+      }
+    };
+
+    var typeConfig = config[type] || config.order;
+    var statusConfig = typeConfig[status] || { label: status, color: '#6B7280', bg: '#F3F4F6' };
+
+    return '<span class="badge" style="color:' + statusConfig.color + ';background:' + statusConfig.bg + ';padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;">' +
+           statusConfig.label + '</span>';
   };
 
   // ===========================================================
