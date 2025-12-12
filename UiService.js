@@ -24,6 +24,8 @@ function getPageTemplateName_(page) {
       return 'Page_InvoiceOutput';
     case 'transactionLedger':
       return 'Page_TransactionLedger';
+    case 'settlement':
+      return 'Page_Settlement';
     case 'purchaseSettlement':
       return 'Page_PurchaseSettlement';
     case 'salesSettlement':

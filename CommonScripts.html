@@ -4301,6 +4301,149 @@
     console.log('✅ InvoiceManagement 페이지 초기화 완료');
   };
 
+  // ===========================================================
+  // ✅ Settlement 통합 페이지 초기화 (매입/매출 탭)
+  // ===========================================================
+  OB.initSettlementPage = function() {
+    console.log('🔧 Settlement 통합 페이지 초기화 시작');
+
+    var tabs = document.querySelectorAll('.settlement-tab');
+    var tabContents = document.querySelectorAll('.settlement-tab-content');
+
+    // 탭 전환 기능
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var targetTab = tab.getAttribute('data-tab');
+
+        // 모든 탭 비활성화
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        tabContents.forEach(function(tc) { tc.classList.remove('active'); });
+
+        // 선택된 탭 활성화
+        tab.classList.add('active');
+        document.getElementById(targetTab + '-tab').classList.add('active');
+
+        console.log('탭 전환:', targetTab);
+      });
+    });
+
+    // ========== 매입 마감 ==========
+    var purchaseSearchBtn = document.getElementById('purchase-search-btn');
+    var purchaseCreateBtn = document.getElementById('purchase-create-btn');
+    var purchaseTbody = document.getElementById('purchase-tbody');
+
+    function loadPurchaseSettlements() {
+      var startDate = document.getElementById('purchase-start-date').value;
+      var endDate = document.getElementById('purchase-end-date').value;
+      var company = document.getElementById('purchase-company').value;
+
+      OB.showLoading('매입 마감 조회 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            alert('조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          renderPurchaseTable(result.settlements || []);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          alert('서버 오류: ' + error.message);
+        })
+        .getPurchaseSettlementsApi({ startDate: startDate, endDate: endDate, company: company });
+    }
+
+    function renderPurchaseTable(settlements) {
+      if (!settlements.length) {
+        purchaseTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">조회 결과가 없습니다.</td></tr>';
+        return;
+      }
+
+      purchaseTbody.innerHTML = '';
+      settlements.forEach(function(s) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + (s.settlementId || '-') + '</td>' +
+          '<td>' + (s.company || '-') + '</td>' +
+          '<td>' + (s.startDate || '') + ' ~ ' + (s.endDate || '') + '</td>' +
+          '<td class="text-right">' + OB.formatCurrency(s.amount || 0) + '</td>' +
+          '<td>' + OB.getStatusBadge(s.status || 'OPEN', 'settlement') + '</td>' +
+          '<td>' + OB.formatDate(s.createdAt) + '</td>' +
+          '<td><button class="action-btn primary" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\')">상세</button></td>';
+        purchaseTbody.appendChild(tr);
+      });
+    }
+
+    purchaseSearchBtn.addEventListener('click', loadPurchaseSettlements);
+    purchaseCreateBtn.addEventListener('click', function() {
+      alert('[개발 예정] 매입 마감 생성 기능');
+      // TODO: 매입 마감 생성 모달 or 페이지 이동
+    });
+
+    // ========== 매출 마감 ==========
+    var salesSearchBtn = document.getElementById('sales-search-btn');
+    var salesCreateBtn = document.getElementById('sales-create-btn');
+    var salesTbody = document.getElementById('sales-tbody');
+
+    function loadSalesSettlements() {
+      var startDate = document.getElementById('sales-start-date').value;
+      var endDate = document.getElementById('sales-end-date').value;
+      var company = document.getElementById('sales-company').value;
+
+      OB.showLoading('매출 마감 조회 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            alert('조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          renderSalesTable(result.settlements || []);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          alert('서버 오류: ' + error.message);
+        })
+        .getSalesSettlementsApi({ startDate: startDate, endDate: endDate, company: company });
+    }
+
+    function renderSalesTable(settlements) {
+      if (!settlements.length) {
+        salesTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">조회 결과가 없습니다.</td></tr>';
+        return;
+      }
+
+      salesTbody.innerHTML = '';
+      settlements.forEach(function(s) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + (s.settlementId || '-') + '</td>' +
+          '<td>' + (s.company || '-') + '</td>' +
+          '<td>' + (s.startDate || '') + ' ~ ' + (s.endDate || '') + '</td>' +
+          '<td class="text-right">' + OB.formatCurrency(s.amount || 0) + '</td>' +
+          '<td>' + OB.getStatusBadge(s.status || 'OPEN', 'settlement') + '</td>' +
+          '<td>' + OB.formatDate(s.createdAt) + '</td>' +
+          '<td><button class="action-btn primary" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\')">상세</button></td>';
+        salesTbody.appendChild(tr);
+      });
+    }
+
+    salesSearchBtn.addEventListener('click', loadSalesSettlements);
+    salesCreateBtn.addEventListener('click', function() {
+      alert('[개발 예정] 매출 마감 생성 기능');
+      // TODO: 매출 마감 생성 모달 or 페이지 이동
+    });
+
+    console.log('✅ Settlement 통합 페이지 초기화 완료');
+  };
+
   // ========================================
   // 마감 상세 공용 모달
   // ========================================

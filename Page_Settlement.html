@@ -1,0 +1,197 @@
+<style>
+.settlement-wrap{padding:20px;}
+
+/* 탭 네비게이션 */
+.settlement-tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:20px;
+  border-bottom:2px solid #e5e7eb;
+}
+.settlement-tab{
+  padding:12px 24px;
+  background:none;
+  border:none;
+  border-bottom:3px solid transparent;
+  cursor:pointer;
+  font-size:15px;
+  font-weight:600;
+  color:#64748b;
+  transition:all 0.2s;
+}
+.settlement-tab.active{
+  color:#2563eb;
+  border-bottom-color:#2563eb;
+}
+.settlement-tab:hover{
+  color:#1e40af;
+}
+
+/* 탭 컨텐츠 */
+.settlement-tab-content{
+  display:none;
+}
+.settlement-tab-content.active{
+  display:block;
+}
+
+/* 공통 필터 스타일 */
+.settlement-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #fff;
+  padding: 14px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom: 14px;
+  align-items: flex-end;
+}
+.settlement-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settlement-filter-field label {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+}
+.settlement-filter-field input,
+.settlement-filter-field select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  min-width: 160px;
+}
+.settlement-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.settlement-btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+.settlement-btn.primary:hover {
+  background: #1d4ed8;
+}
+.settlement-btn.secondary {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+.settlement-btn.secondary:hover {
+  background: #d1d5db;
+}
+
+/* 마감 목록 테이블 */
+.settlement-table-wrap {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  overflow: auto;
+  max-height: 600px;
+  margin-bottom: 20px;
+}
+</style>
+
+<div class="settlement-wrap">
+  <h1 style="margin:0 0 20px;font-size:22px;font-weight:700;color:#111827;">마감 관리</h1>
+
+  <!-- 탭 네비게이션 -->
+  <div class="settlement-tabs">
+    <button class="settlement-tab active" data-tab="purchase">매입 마감</button>
+    <button class="settlement-tab" data-tab="sales">매출 마감</button>
+  </div>
+
+  <!-- 매입 마감 탭 -->
+  <div class="settlement-tab-content active" id="purchase-tab">
+    <div class="settlement-filter">
+      <div class="settlement-filter-field">
+        <label for="purchase-start-date">시작일</label>
+        <input type="date" id="purchase-start-date">
+      </div>
+      <div class="settlement-filter-field">
+        <label for="purchase-end-date">종료일</label>
+        <input type="date" id="purchase-end-date">
+      </div>
+      <div class="settlement-filter-field">
+        <label for="purchase-company">매입처</label>
+        <input type="text" id="purchase-company" placeholder="매입처명 입력">
+      </div>
+      <button class="settlement-btn primary" id="purchase-search-btn">조회</button>
+      <button class="settlement-btn secondary" id="purchase-create-btn">신규 마감</button>
+    </div>
+
+    <div class="settlement-table-wrap">
+      <table class="ob-table">
+        <thead>
+          <tr>
+            <th>마감ID</th>
+            <th>매입처</th>
+            <th>마감기간</th>
+            <th class="text-right">매입금액</th>
+            <th>상태</th>
+            <th>생성일</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody id="purchase-tbody">
+          <tr>
+            <td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">
+              조회 결과가 없습니다. 필터를 설정 후 조회하세요.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 매출 마감 탭 -->
+  <div class="settlement-tab-content" id="sales-tab">
+    <div class="settlement-filter">
+      <div class="settlement-filter-field">
+        <label for="sales-start-date">시작일</label>
+        <input type="date" id="sales-start-date">
+      </div>
+      <div class="settlement-filter-field">
+        <label for="sales-end-date">종료일</label>
+        <input type="date" id="sales-end-date">
+      </div>
+      <div class="settlement-filter-field">
+        <label for="sales-company">발주처</label>
+        <input type="text" id="sales-company" placeholder="발주처명 입력">
+      </div>
+      <button class="settlement-btn primary" id="sales-search-btn">조회</button>
+      <button class="settlement-btn secondary" id="sales-create-btn">신규 마감</button>
+    </div>
+
+    <div class="settlement-table-wrap">
+      <table class="ob-table">
+        <thead>
+          <tr>
+            <th>마감ID</th>
+            <th>발주처</th>
+            <th>마감기간</th>
+            <th class="text-right">매출금액</th>
+            <th>상태</th>
+            <th>생성일</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody id="sales-tbody">
+          <tr>
+            <td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">
+              조회 결과가 없습니다. 필터를 설정 후 조회하세요.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
