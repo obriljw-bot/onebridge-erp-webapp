@@ -7,13 +7,13 @@
  */
 
 // ====== 스프레드시트 ID / 시트명 상수 ======
-const OB_SETTLEMENT_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs'; // 발주_통합DB (기존)
-const OB_ORDER_LEDGER_SHEET = '거래원장';
-const OB_PURCHASE_SETTLEMENT_SHEET = '매입마감DB';
-const OB_SALES_SETTLEMENT_SHEET = '매출마감DB';
-const OB_SETTLEMENT_DETAIL_SHEET = '마감상세DB';
-const OB_BILLING_SHEET = '청구DB';
-const OB_MONTHLY_CLOSING_SHEET = '월마감DB';
+var OB_SETTLEMENT_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs'; // 발주_통합DB (기존)
+var OB_ORDER_LEDGER_SHEET = '거래원장';
+var OB_PURCHASE_SETTLEMENT_SHEET = '매입마감DB';
+var OB_SALES_SETTLEMENT_SHEET = '매출마감DB';
+var OB_SETTLEMENT_DETAIL_SHEET = '마감상세DB';
+var OB_BILLING_SHEET = '청구DB';
+var OB_MONTHLY_CLOSING_SHEET = '월마감DB';
 
 /**
  * ============================================================

@@ -8,12 +8,12 @@
  */
 
 // ====== 스프레드시트 ID / 시트명 상수 ======
-const OB_ORDER_INPUT_SS_ID   = '11sjwW1NM4fskAQBYnWghbE6d2E0y_EpX-LocgUAevWY'; // (현재 사용 X, 필요 시 확장)
-const OB_MASTER_DB_SS_ID     = '1vjAjykSQGK2DnFXvmQcH2zuI8WbOvAq_smqvW8u_bao';   // 마스터DB
-const OB_ORDER_ALL_SS_ID     = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs';   // 발주_통합DB
+var OB_ORDER_INPUT_SS_ID   = '11sjwW1NM4fskAQBYnWghbE6d2E0y_EpX-LocgUAevWY'; // (현재 사용 X, 필요 시 확장)
+var OB_MASTER_DB_SS_ID     = '1vjAjykSQGK2DnFXvmQcH2zuI8WbOvAq_smqvW8u_bao';   // 마스터DB
+var OB_ORDER_ALL_SS_ID     = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs';   // 발주_통합DB
 
-const OB_MASTER_PRODUCT_SHEET = '품목DB';   // 마스터DB 내 품목 시트명 (실제 시트명과 다르면 수정)
-const OB_ORDER_MAIN_SHEET     = '거래원장'; // 발주_통합DB 내 메인 시트명
+var OB_MASTER_PRODUCT_SHEET = '품목DB';   // 마스터DB 내 품목 시트명 (실제 시트명과 다르면 수정)
+var OB_ORDER_MAIN_SHEET     = '거래원장'; // 발주_통합DB 내 메인 시트명
 
 /* ============================================================
  * 메인: 발주파일 rows 파싱 + 마스터 매칭
