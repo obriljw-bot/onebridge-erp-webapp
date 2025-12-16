@@ -904,6 +904,8 @@ function getSettlementDetail(params) {
     var settlementId = params && params.settlementId ? String(params.settlementId) : '';
     var type = params && params.type ? String(params.type) : '';
 
+    Logger.log('[getSettlementDetail] 요청 - ID: ' + settlementId + ', Type: ' + type);
+
     if (!settlementId) {
       return {
         success: false,
@@ -912,22 +914,31 @@ function getSettlementDetail(params) {
     }
 
     var sheetName = type === 'SALES' ? OB_SALES_SETTLEMENT_SHEET : OB_PURCHASE_SETTLEMENT_SHEET;
+    Logger.log('[getSettlementDetail] 시트: ' + sheetName);
+
     var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
     var sheet = ss.getSheetByName(sheetName);
 
     if (!sheet) {
       return {
         success: false,
-        error: '마감 시트를 찾을 수 없습니다.'
+        error: '마감 시트를 찾을 수 없습니다. (시트명: ' + sheetName + ')'
       };
     }
 
     var data = sheet.getDataRange().getValues();
+    Logger.log('[getSettlementDetail] 시트 행 수: ' + data.length);
+
     var settlementRow = null;
 
     for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === settlementId) {
+      var rowId = String(data[i][0]);
+      if (i <= 3) {
+        Logger.log('[getSettlementDetail] 행 ' + i + ' ID: ' + rowId);
+      }
+      if (rowId === settlementId) {
         settlementRow = data[i];
+        Logger.log('[getSettlementDetail] 마감 찾음: ' + settlementId);
         break;
       }
     }
@@ -935,7 +946,7 @@ function getSettlementDetail(params) {
     if (!settlementRow) {
       return {
         success: false,
-        error: '해당 마감을 찾을 수 없습니다.'
+        error: '해당 마감을 찾을 수 없습니다. (찾는 ID: ' + settlementId + ', 시트: ' + sheetName + ')'
       };
     }
 
