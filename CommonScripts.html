@@ -4508,7 +4508,7 @@
           '<td class="text-right">' + OB.formatCurrency(s.amount || 0) + '</td>' +
           '<td>' + OB.getStatusBadge(s.status || 'OPEN', 'settlement') + '</td>' +
           '<td>' + OB.formatDate(s.createdAt) + '</td>' +
-          '<td><button class="action-btn primary" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\')">상세</button></td>';
+          '<td><button class="action-btn primary" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\', \'PURCHASE\')">상세</button></td>';
         purchaseTbody.appendChild(tr);
       });
     }
@@ -4565,7 +4565,7 @@
           '<td class="text-right">' + OB.formatCurrency(s.amount || 0) + '</td>' +
           '<td>' + OB.getStatusBadge(s.status || 'OPEN', 'settlement') + '</td>' +
           '<td>' + OB.formatDate(s.createdAt) + '</td>' +
-          '<td><button class="action-btn primary" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\')">상세</button></td>';
+          '<td><button class="action-btn primary" onclick="OB.viewSettlementDetail(\'' + s.settlementId + '\', \'SALES\')">상세</button></td>';
         salesTbody.appendChild(tr);
       });
     }
