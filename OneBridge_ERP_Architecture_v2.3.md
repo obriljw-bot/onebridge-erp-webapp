@@ -1,9 +1,9 @@
 # OneBridge ERP v2.3 (SSR Hybrid) — Complete Architecture & Development Standards
 
 ## Document Information
-- **Version**: 2.3.0
-- **Last Updated**: 2025-12-06
-- **Status**: 🔄 Testing in Progress (Codex 통합 코드 검증 중)
+- **Version**: 2.4.0
+- **Last Updated**: 2025-12-16
+- **Status**: 📋 Implementation Planning (구현 계획 수립 완료)
 - **Purpose**: 시스템 아키텍처 명세 + 개발 표준 + 트러블슈팅 가이드
 
 > ⚠️ **IMPORTANT**: 이 문서는 OneBridge ERP 개발의 **정규 참조 문서**입니다.
@@ -122,27 +122,56 @@ const ERP_CONFIG = {
 };
 ```
 
-### 거래원장 컬럼 구조
-| 컬럼명 | 타입 | 설명 |
-|--------|------|------|
-| 발주일 | Date | 발주 일자 |
-| 발주번호 | String | `YYYYMMDD-거래처코드-브랜드코드-SEQ` |
-| 품목코드 | String | 바코드 |
-| 브랜드 | String | 브랜드명 |
-| 매입처 | String | 공급사명 |
-| 발주처 | String | 고객사명 |
-| 부가세구분 | String | 부별/영세/면세 |
-| 제품명 | String | 상품명 |
-| 발주수량 | Number | 발주 수량 |
-| 확정수량 | Number | 확정된 수량 |
-| 매입가 | Number | 매입 단가 |
-| 공급가 | Number | 공급 단가 |
-| 매입액 | Formula | =매입가*발주수량 |
-| 공급액 | Formula | =공급가*발주수량 |
-| 마진액 | Formula | =공급액-매입액 |
-| 마진율 | Formula | =마진액/공급액 |
-| 생성일시 | String | ISO 형식 타임스탬프 |
-| 수정일시 | String | ISO 형식 타임스탬프 |
+### 거래원장 컬럼 구조 ⭐ 업데이트
+| 컬럼명 | 타입 | 설명 | API 필드명 |
+|--------|------|------|-----------|
+| 발주일 | Date | 발주 일자 | - |
+| 발주번호 | String | `YYYYMMDD-거래처코드-브랜드코드-SEQ` | orderId |
+| 품목코드 | String | 바코드 | - |
+| 브랜드 | String | 브랜드명 | - |
+| 매입처 | String | 공급사명 | supplier |
+| 발주처 | String | 고객사명 | buyer |
+| 부가세구분 | String | 부별/영세/면세 | - |
+| 제품명 | String | 상품명 | - |
+| 발주수량 | Number | 발주 수량 | - |
+| 확정수량 | Number | 확정된 수량 | - |
+| 매입가 | Number | 매입 단가 | - |
+| 공급가 | Number | 공급 단가 | - |
+| 매입액 | Formula | =매입가*발주수량 | - |
+| 공급액 | Formula | =공급가*발주수량 | - |
+| 마진액 | Formula | =공급액-매입액 | - |
+| 마진율 | Formula | =마진액/공급액 | - |
+| **매입발주** ⭐ | String | 발주 상태 (예: '발주완료', '발주대기') | **buyOrder** |
+| **매입결제** ⭐ | String | 매입 결제 상태 (예: '결제완료', '미결제') | **payBuy** |
+| **매출결제** ⭐ | String | 매출 결제 상태 (예: '결제완료', '미결제') | **paySell** |
+| **출고** ⭐ | String | 출고 상태 (예: '출고완료', '미출고') | **ship** |
+| 생성일시 | String | ISO 형식 타임스탬프 | - |
+| 수정일시 | String | ISO 형식 타임스탬프 | - |
+
+### 🔴 중요: 4개 상태 컬럼 관리
+
+거래원장 시트는 **4개의 독립적인 상태 컬럼**을 가지며, 각각 다른 업무 단계를 추적합니다:
+
+1. **매입발주**: 매입처에 대한 발주 진행 상태
+2. **매입결제**: 매입처에 대한 결제 진행 상태
+3. **매출결제**: 발주처로부터의 결제 진행 상태
+4. **출고**: 물류/출고 진행 상태
+
+**API 함수**: `updateOrderStatus(orderId, statuses)`
+```javascript
+// 4개 상태 동시 업데이트
+updateOrderStatus('20251216-001', {
+  buyOrder: '발주완료',
+  payBuy: '결제대기',
+  paySell: '미결제',
+  ship: '출고완료'
+});
+
+// 개별 상태만 업데이트 (나머지 유지)
+updateOrderStatus('20251216-001', {
+  ship: '출고완료'
+});
+```
 
 ---
 
@@ -1123,6 +1152,399 @@ OB.viewSettlementDetail = function(settlementId) {
 
 ---
 
+# PART 6B: 2-TRACK 청구서 시스템 (Phase 1-2) ⭐ NEW
+
+## 개요
+
+2-Track 청구서 시스템은 기존의 **마감 기반 청구서 생성 (Track B - Batch)**에 더해, **거래원장에서 직접 청구서 생성 (Track A - Fast Path)**을 지원합니다.
+
+### Track 비교
+
+| 항목 | Track A (Fast Path) | Track B (Batch) |
+|------|---------------------|-----------------|
+| **시작점** | 거래원장 | 마감 관리 |
+| **필수 단계** | 없음 (즉시 생성) | 마감 필수 |
+| **사용 시나리오** | 긴급 청구서, 소량 거래 | 정기 마감, 대량 청구 |
+| **청구타입** | `DIRECT` | `SETTLEMENT` |
+| **발주번호 참조** | JSON 배열 저장 | settlementId 참조 |
+
+---
+
+## Phase 1: 2-Track 청구서 생성
+
+### 1.1 InvoiceService.js 수정
+
+**`createInvoiceFromSettlement()` 함수**가 두 가지 경로를 모두 처리:
+
+```javascript
+function createInvoiceFromSettlement(params) {
+  var settlementId = params.settlementId;      // Track B
+  var orderNumbers = params.orderNumbers;      // Track A
+
+  // 파라미터 검증: 둘 중 하나는 필수
+  if (!settlementId && (!orderNumbers || orderNumbers.length === 0)) {
+    return { success: false, error: '마감ID 또는 발주번호가 필요합니다.' };
+  }
+
+  // billingType 자동 결정
+  var billingType = settlementId ? 'SETTLEMENT' : 'DIRECT';
+
+  // Track A: 거래원장에서 금액 자동 계산
+  if (billingType === 'DIRECT' && (!params.amount || params.amount === 0)) {
+    var sheet = getOrderMergedSheet();
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+    var totalAmount = 0;
+
+    // orderNumbers의 공급액 합계
+    for (var i = 1; i < data.length; i++) {
+      var orderNo = data[i][header.indexOf('발주번호')];
+      if (orderNumbers.indexOf(orderNo) !== -1) {
+        totalAmount += Number(data[i][header.indexOf('공급액')] || 0);
+      }
+    }
+    params.amount = totalAmount;
+  }
+
+  // 청구DB에 저장
+  var invoiceData = {
+    invoiceId: generateInvoiceId(),
+    company: params.company,
+    type: params.type,
+    amount: params.amount,
+    invoiceDate: params.invoiceDate || new Date(),
+    billingType: billingType,              // ⭐ NEW
+    settlementId: settlementId || '',      // Track B
+    orderNumbers: JSON.stringify(orderNumbers || []),  // ⭐ Track A
+    status: 'DRAFT',
+    createdAt: new Date().toISOString()
+  };
+
+  // ... 저장 로직
+}
+```
+
+### 1.2 API 함수
+
+```javascript
+// ApiService.js
+
+/**
+ * Track A 전용 API (발주번호 기반 직접 청구서 생성)
+ */
+function createDirectBillingApi(params) {
+  var result = createInvoiceFromSettlement(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 존재 여부 확인
+ */
+function checkInvoiceExistsApi(params) {
+  var result = checkInvoiceExists(params);
+  return safeReturn(result);
+}
+```
+
+---
+
+## Phase 2: 컨텍스트 기반 네비게이션
+
+### 2.1 Smart Navigation 흐름
+
+```
+[거래원장] 발주번호 행 → "청구서" 버튼 클릭
+    ↓
+checkInvoiceExists(orderNumber) 호출
+    ↓
+┌─────────────────┬─────────────────┐
+│ 청구서 존재     │ 청구서 없음     │
+├─────────────────┼─────────────────┤
+│ Alert: 기존 청구서│ Confirm: 생성?  │
+│ "확인" 클릭     │ "예" → 생성     │
+│     ↓           │     ↓           │
+│ billingManagement│ createDirect   │
+│ 페이지로 이동   │ Billing        │
+│ + 자동 필터링   │ + 페이지 이동  │
+└─────────────────┴─────────────────┘
+```
+
+### 2.2 구현 코드
+
+```javascript
+// CommonScripts.html
+
+OB.navigateToInvoice = function(orderNumber, company) {
+  OB.showLoading('청구서 확인 중...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      OB.hideLoading();
+
+      if (!result.success) {
+        alert('오류: ' + result.error);
+        return;
+      }
+
+      if (result.exists) {
+        // 청구서 존재 → 이동
+        var invoiceList = result.invoices.map(function(inv) {
+          return inv.invoiceId + ' (' + inv.status + ')';
+        }).join(', ');
+
+        alert('기존 청구서가 있습니다:\n' + invoiceList);
+
+        // 페이지 이동 + 필터 설정
+        OB.state.pendingInvoiceFilter = {
+          orderNumber: orderNumber,
+          company: company
+        };
+        OB.api.loadPage('billingManagement');
+
+      } else {
+        // 청구서 없음 → 생성 제안
+        if (confirm('청구서가 없습니다. 즉시 생성하시겠습니까?')) {
+          OB.createDirectInvoiceForOrder(orderNumber, company);
+        }
+      }
+    })
+    .withFailureHandler(function(error) {
+      OB.hideLoading();
+      alert('오류: ' + error.message);
+    })
+    .checkInvoiceExistsApi({ orderNumber: orderNumber });
+};
+
+OB.createDirectInvoiceForOrder = function(orderNumber, company) {
+  OB.showLoading('청구서 생성 중...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      OB.hideLoading();
+
+      if (result.success) {
+        alert('청구서가 생성되었습니다!\n청구서 ID: ' + result.invoiceId);
+        OB.api.loadPage('billingManagement');
+      } else {
+        alert('생성 실패: ' + result.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      OB.hideLoading();
+      alert('오류: ' + error.message);
+    })
+    .createDirectBillingApi({
+      orderNumbers: [orderNumber],
+      company: company,
+      type: 'SALES'
+    });
+};
+```
+
+---
+
+## 데이터 구조 변경
+
+### 청구DB 컬럼 추가
+
+| 컬럼명 | 타입 | 설명 |
+|--------|------|------|
+| invoiceId | String | 청구서 ID |
+| **billingType** ⭐ | String | `SETTLEMENT` or `DIRECT` |
+| **orderNumbers** ⭐ | String | JSON 배열 (Track A 전용) |
+| settlementId | String | 마감 ID (Track B 전용) |
+| company | String | 거래처명 |
+| type | String | `PURCHASE` or `SALES` |
+| amount | Number | 청구 금액 |
+| invoiceDate | String | 청구일 (ISO) |
+| status | String | `DRAFT`, `ISSUED`, `PAID` |
+| createdAt | String | 생성일시 (ISO) |
+
+---
+
+# PART 6C: 거래원장 페이지 표준 구조 ⭐ NEW
+
+## 개요
+
+거래원장 페이지는 **4개 상태 컬럼**을 모두 표시하고 관리해야 합니다.
+
+## Page_TransactionLedger.html 올바른 구조
+
+### HTML 테이블 헤더
+
+```html
+<thead>
+  <tr>
+    <th>발주일</th>
+    <th>발주번호</th>
+    <th>발주처</th>
+    <th>브랜드</th>
+    <th>품목코드</th>
+    <th>제품명</th>
+    <th class="num">발주수량</th>
+    <th class="num">확정수량</th>
+    <th class="num">공급가</th>
+    <th class="num">공급액</th>
+    <!-- ⭐ 4개 상태 컬럼 -->
+    <th>매입발주</th>
+    <th>매입결제</th>
+    <th>매출결제</th>
+    <th>출고</th>
+    <th>액션</th>
+  </tr>
+</thead>
+```
+
+### JavaScript 렌더링 (품목별 표시)
+
+```javascript
+// CommonScripts.html - OB.initTransactionLedgerPage()
+
+function renderTable() {
+  state.filtered.forEach(function(tx) {
+    var tr = document.createElement('tr');
+
+    // ... 기본 컬럼 렌더링
+
+    // ⭐ 4개 상태 컬럼 - 드롭다운으로 표시
+    var statuses = ['매입발주', '매입결제', '매출결제', '출고'];
+    var statusKeys = ['buyOrder', 'payBuy', 'paySell', 'ship'];
+
+    statuses.forEach(function(statusName, idx) {
+      var td = document.createElement('td');
+      var select = document.createElement('select');
+      select.className = 'status-select';
+      select.dataset.statusKey = statusKeys[idx];
+      select.dataset.orderCode = tx['발주번호'];
+
+      var options = ['미처리', '진행중', '완료', '취소'];
+      options.forEach(function(opt) {
+        var option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (tx[statusName] === opt) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      });
+
+      td.appendChild(select);
+      tr.appendChild(td);
+    });
+
+    // 액션 버튼
+    var actionTd = document.createElement('td');
+    var saveBtn = document.createElement('button');
+    saveBtn.textContent = '상태 저장';
+    saveBtn.className = 'ledger-btn primary';
+    saveBtn.addEventListener('click', function() {
+      saveRowStatuses(tr);
+    });
+    actionTd.appendChild(saveBtn);
+
+    var invoiceBtn = document.createElement('button');
+    invoiceBtn.textContent = '청구서';
+    invoiceBtn.className = 'ledger-btn secondary';
+    invoiceBtn.addEventListener('click', function() {
+      OB.navigateToInvoice(tx['발주번호'], tx['발주처']);
+    });
+    actionTd.appendChild(invoiceBtn);
+
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
+  });
+}
+
+function saveRowStatuses(tr) {
+  var selects = tr.querySelectorAll('.status-select');
+  var orderCode = selects[0].dataset.orderCode;
+  var statuses = {};
+
+  selects.forEach(function(select) {
+    statuses[select.dataset.statusKey] = select.value;
+  });
+
+  OB.showLoading('상태 저장 중...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      OB.hideLoading();
+      if (result.success) {
+        alert('상태가 저장되었습니다.');
+      } else {
+        alert('저장 실패: ' + result.error);
+      }
+    })
+    .withFailureHandler(function(error) {
+      OB.hideLoading();
+      alert('오류: ' + error.message);
+    })
+    .updateOrderStatus(orderCode, statuses);
+}
+```
+
+### 거래번호 단위 집계 표시 (Phase 4 목표)
+
+```javascript
+// 발주번호별로 그룹핑
+function aggregateByOrderNumber() {
+  var groups = {};
+
+  state.filtered.forEach(function(tx) {
+    var orderNo = tx['발주번호'];
+    if (!groups[orderNo]) {
+      groups[orderNo] = {
+        orderNo: orderNo,
+        orderDate: tx['발주일'],
+        buyer: tx['발주처'],
+        supplier: tx['매입처'],
+        brand: tx['브랜드'],
+        itemCount: 0,
+        totalAmount: 0,
+        buyOrder: tx['매입발주'],
+        payBuy: tx['매입결제'],
+        paySell: tx['매출결제'],
+        ship: tx['출고'],
+        items: []
+      };
+    }
+
+    groups[orderNo].itemCount++;
+    groups[orderNo].totalAmount += Number(tx['공급액'] || 0);
+    groups[orderNo].items.push(tx);
+  });
+
+  return Object.values(groups);
+}
+
+// 집계 테이블 렌더링
+function renderAggregatedTable() {
+  var groups = aggregateByOrderNumber();
+
+  groups.forEach(function(group) {
+    var tr = document.createElement('tr');
+    tr.className = 'aggregated-row';
+    tr.dataset.orderNo = group.orderNo;
+
+    // 클릭 → 상세 모달
+    tr.addEventListener('click', function() {
+      showOrderDetailModal(group);
+    });
+
+    // 발주번호, 발주처, 품목수, 금액, 4개 상태
+    // ...
+  });
+}
+
+function showOrderDetailModal(group) {
+  // 모달에 group.items 표시
+  // 각 품목별 상세 정보
+  // 4개 상태 일괄 변경 기능
+}
+```
+
+---
+
 # PART 7: FUTURE ROADMAP
 
 ## 7.1 v2.3 개발 완료 항목 ✅
@@ -1262,6 +1684,7 @@ OB.initSomePagePage = function() {
 | 2.2.0 | 2025-12-05 | Phase 2 회계 기능 추가, Issue #002 해결 (발주 상세보기 모달 오류), API 함수 목록 업데이트 |
 | 2.2.1 | 2025-12-06 | Issue #003 해결 (확정수량 수정, 4개 상태 저장, 마진 정보), Issue #004 해결 (마감 검색조건, 마감 내역 조회), 발주내역 목록 진행상태 컬럼 추가 |
 | 2.3.0 | 2025-12-06 | **Codex 통합 (테스트 진행 중)** - Issue #005~#011 해결, 거래원장 페이지 신규, 인보이스관리 페이지 신규, 마감상세 모달, 청구서 재출력, 코드 리팩토링 (+1,783줄/-566줄) |
+| **2.4.0** | **2025-12-16** | **🔴 설계 개선 및 구현 계획** - 거래원장 4개 상태 컬럼 명시 (매입발주/매입결제/매출결제/출고), Phase 1-2 (2-Track 청구서) 설계 추가, 거래원장 페이지 표준 구조 정의, 3단계 구현 로드맵 수립 |
 
 ---
 
