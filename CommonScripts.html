@@ -255,11 +255,16 @@
 
     OB.showLoading('청구서 생성 중...');
 
+    var today = new Date();
+    var invoiceDateStr = today.getFullYear() + '-' +
+                         String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                         String(today.getDate()).padStart(2, '0');
+
     var params = {
       orderNumbers: [orderNumber],
       type: 'SALES',  // 매출 청구서
       company: company,
-      invoiceDate: new Date(),
+      invoiceDate: invoiceDateStr,
       notes: '거래원장에서 직접 생성'
     };
 
@@ -3851,13 +3856,42 @@
       if (!tbody) return;
 
       if (!state.filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="15" class="ledger-empty">조회 결과가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="ledger-empty">조회 결과가 없습니다.</td></tr>';
         return;
       }
 
+      // 거래번호 단위로 집계
+      var aggregated = {};
+      state.filtered.forEach(function(tx) {
+        var orderNum = tx['발주번호'];
+        if (!orderNum) return;
+
+        if (!aggregated[orderNum]) {
+          aggregated[orderNum] = {
+            orderDate: tx['발주일'],
+            orderNumber: orderNum,
+            company: tx['발주처'],
+            items: [],
+            totalOrderQty: 0,
+            totalConfirmedQty: 0,
+            totalAmount: 0,
+            buyOrder: tx['매입발주'] || '-',
+            payBuy: tx['매입결제'] || '-',
+            paySell: tx['매출결제'] || '-',
+            ship: tx['출고'] || '-'
+          };
+        }
+
+        aggregated[orderNum].items.push(tx);
+        aggregated[orderNum].totalOrderQty += Number(tx['발주수량']) || 0;
+        aggregated[orderNum].totalConfirmedQty += Number(tx['확정수량']) || 0;
+        aggregated[orderNum].totalAmount += Number(tx['공급액']) || 0;
+      });
+
       tbody.innerHTML = '';
 
-      state.filtered.forEach(function(tx) {
+      Object.keys(aggregated).forEach(function(orderNum) {
+        var agg = aggregated[orderNum];
         var tr = document.createElement('tr');
 
         function td(text, cls) {
@@ -3867,22 +3901,34 @@
           tr.appendChild(cell);
         }
 
-        td(OB.formatDate(tx['발주일']));
-        td(tx['발주번호'] || '-');
-        td(tx['발주처'] || '-');
-        td(tx['브랜드'] || '-');
-        td(tx['품목코드'] || '-');
-        td(tx['제품명'] || '-');
-        td(OB.formatNumber(tx['발주수량'] || 0), 'num');
-        td(OB.formatNumber(tx['확정수량'] || 0), 'num');
-        td(OB.formatNumber(tx['공급가'] || 0), 'num');
-        td(OB.formatNumber(tx['공급액'] || 0), 'num');
+        td(OB.formatDate(agg.orderDate));
+
+        // 발주번호 - 클릭 가능 (상세 보기)
+        var orderTd = document.createElement('td');
+        var orderLink = document.createElement('a');
+        orderLink.textContent = agg.orderNumber;
+        orderLink.href = '#';
+        orderLink.style.color = '#2563eb';
+        orderLink.style.textDecoration = 'underline';
+        orderLink.style.cursor = 'pointer';
+        orderLink.addEventListener('click', function(e) {
+          e.preventDefault();
+          showOrderDetailModal(agg);
+        });
+        orderTd.appendChild(orderLink);
+        tr.appendChild(orderTd);
+
+        td(agg.company || '-');
+        td(agg.items.length + '개', 'num');
+        td(OB.formatNumber(agg.totalOrderQty), 'num');
+        td(OB.formatNumber(agg.totalConfirmedQty), 'num');
+        td(OB.formatNumber(agg.totalAmount), 'num');
 
         // 4개 상태 컬럼 표시
-        td(tx['매입발주'] || '-');
-        td(tx['매입결제'] || '-');
-        td(tx['매출결제'] || '-');
-        td(tx['출고'] || '-');
+        td(agg.buyOrder);
+        td(agg.payBuy);
+        td(agg.paySell);
+        td(agg.ship);
 
         var actionTd = document.createElement('td');
         actionTd.className = 'ledger-action-group';
@@ -3892,7 +3938,13 @@
         updateBtn.className = 'ledger-btn primary';
         updateBtn.textContent = '상태 수정';
         updateBtn.addEventListener('click', function() {
-          openStatusEditModal(tx);
+          openStatusEditModal({
+            '발주번호': agg.orderNumber,
+            '매입발주': agg.buyOrder,
+            '매입결제': agg.payBuy,
+            '매출결제': agg.paySell,
+            '출고': agg.ship
+          });
         });
         actionTd.appendChild(updateBtn);
 
@@ -3901,7 +3953,7 @@
         invoiceBtn.className = 'ledger-btn secondary';
         invoiceBtn.textContent = '청구서';
         invoiceBtn.addEventListener('click', function() {
-          OB.navigateToInvoice(tx['발주번호'], tx['발주처']);
+          OB.navigateToInvoice(agg.orderNumber, agg.company);
         });
         actionTd.appendChild(invoiceBtn);
 
@@ -3909,6 +3961,60 @@
 
         tbody.appendChild(tr);
       });
+    }
+
+    function showOrderDetailModal(agg) {
+      var html = '<div style="max-height:400px; overflow:auto;">';
+      html += '<h3 style="margin:0 0 12px;">발주번호: ' + agg.orderNumber + '</h3>';
+      html += '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+      html += '<thead><tr style="background:#f8fafc;">';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb;">브랜드</th>';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb;">품목코드</th>';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb;">제품명</th>';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">발주수량</th>';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">확정수량</th>';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">공급가</th>';
+      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">공급액</th>';
+      html += '</tr></thead><tbody>';
+
+      agg.items.forEach(function(item) {
+        html += '<tr>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb;">' + (item['브랜드'] || '-') + '</td>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb;">' + (item['품목코드'] || '-') + '</td>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb;">' + (item['제품명'] || '-') + '</td>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['발주수량'] || 0) + '</td>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['확정수량'] || 0) + '</td>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['공급가'] || 0) + '</td>';
+        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['공급액'] || 0) + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+
+      var modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center;';
+
+      var content = document.createElement('div');
+      content.style.cssText = 'background:white; padding:24px; border-radius:12px; max-width:900px; width:90%;';
+      content.innerHTML = html;
+
+      var closeBtn = document.createElement('button');
+      closeBtn.textContent = '닫기';
+      closeBtn.className = 'ledger-btn secondary';
+      closeBtn.style.marginTop = '16px';
+      closeBtn.addEventListener('click', function() {
+        document.body.removeChild(modal);
+      });
+      content.appendChild(closeBtn);
+
+      modal.appendChild(content);
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+
+      document.body.appendChild(modal);
     }
 
     function openStatusEditModal(tx) {
