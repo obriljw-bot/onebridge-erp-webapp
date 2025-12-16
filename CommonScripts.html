@@ -4674,6 +4674,8 @@
         .withSuccessHandler(function(result) {
           OB.hideLoading();
 
+          console.log('[DEBUG] Settlement detail result:', result);
+
           if (!result || !result.success) {
             alert('마감 상세 조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
             return;
@@ -4683,6 +4685,7 @@
         })
         .withFailureHandler(function(error) {
           OB.hideLoading();
+          console.error('[ERROR] Settlement detail failed:', error);
           alert('마감 상세 조회 실패: ' + error.message);
         })
         .getSettlementDetailApi({ settlementId: settlementId, type: type });
