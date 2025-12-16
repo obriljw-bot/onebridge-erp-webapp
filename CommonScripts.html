@@ -281,7 +281,7 @@
 
         // 청구서 관리 페이지로 이동
         OB.state.pendingInvoiceFilter = orderNumber;
-        OB.api.loadPage('billingManagement');
+        OB.api.loadPage('invoiceManagement');
       })
       .withFailureHandler(function(error) {
         OB.hideLoading();
