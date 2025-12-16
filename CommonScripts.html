@@ -41,6 +41,9 @@
       case 'transactionLedger':
         initFuncName = 'initTransactionLedgerPage';
         break;
+      case 'settlement':
+        initFuncName = 'initSettlementPage';
+        break;
       case 'purchaseSettlement':
         initFuncName = 'initPurchaseSettlementPage';
         break;
@@ -3782,7 +3785,14 @@
         }
 
         if (status) {
-          keep = keep && String(tx['상태'] || '').toUpperCase() === status.toUpperCase();
+          // 4개 상태 컬럼 중 하나라도 매칭되면 포함
+          var matchFound = false;
+          var statusUpper = status.toUpperCase();
+          if (String(tx['매입발주'] || '').toUpperCase().indexOf(statusUpper) !== -1) matchFound = true;
+          if (String(tx['매입결제'] || '').toUpperCase().indexOf(statusUpper) !== -1) matchFound = true;
+          if (String(tx['매출결제'] || '').toUpperCase().indexOf(statusUpper) !== -1) matchFound = true;
+          if (String(tx['출고'] || '').toUpperCase().indexOf(statusUpper) !== -1) matchFound = true;
+          keep = keep && matchFound;
         }
 
         if (start || end) {
@@ -3841,7 +3851,7 @@
       if (!tbody) return;
 
       if (!state.filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="12" class="ledger-empty">조회 결과가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="ledger-empty">조회 결과가 없습니다.</td></tr>';
         return;
       }
 
@@ -3868,51 +3878,23 @@
         td(OB.formatNumber(tx['공급가'] || 0), 'num');
         td(OB.formatNumber(tx['공급액'] || 0), 'num');
 
-        var statusTd = document.createElement('td');
-        var badge = document.createElement('span');
-        badge.className = 'ledger-status-badge';
-        badge.textContent = tx['상태'] || 'N/A';
-        statusTd.appendChild(badge);
-        tr.appendChild(statusTd);
+        // 4개 상태 컬럼 표시
+        td(tx['매입발주'] || '-');
+        td(tx['매입결제'] || '-');
+        td(tx['매출결제'] || '-');
+        td(tx['출고'] || '-');
 
         var actionTd = document.createElement('td');
         actionTd.className = 'ledger-action-group';
 
-        var select = buildStatusSelect(tx['상태']);
-        var btn = document.createElement('button');
-        btn.className = 'ledger-btn primary';
-        btn.textContent = '상태 변경';
-
-        btn.addEventListener('click', function() {
-          var next = select.value;
-          if (!next) {
-            alert('변경할 상태를 선택해주세요.');
-            return;
-          }
-
-          OB.showLoading('상태 변경 중...');
-
-          google.script.run
-            .withSuccessHandler(function(res) {
-              OB.hideLoading();
-
-              if (!res || !res.success) {
-                alert('상태 변경 실패: ' + (res ? res.error : '알 수 없는 오류'));
-                return;
-              }
-
-              alert('상태가 업데이트되었습니다.');
-              fetchTransactions();
-            })
-            .withFailureHandler(function(err) {
-              OB.hideLoading();
-              alert('상태 변경 실패: ' + err.message);
-            })
-            .updateTransactionStateApi({ rowIndex: tx._rowIndex, state: next });
+        // 상태 일괄 업데이트 버튼
+        var updateBtn = document.createElement('button');
+        updateBtn.className = 'ledger-btn primary';
+        updateBtn.textContent = '상태 수정';
+        updateBtn.addEventListener('click', function() {
+          openStatusEditModal(tx);
         });
-
-        actionTd.appendChild(select);
-        actionTd.appendChild(btn);
+        actionTd.appendChild(updateBtn);
 
         // 청구서 생성/보기 버튼 추가
         var invoiceBtn = document.createElement('button');
@@ -3927,6 +3909,53 @@
 
         tbody.appendChild(tr);
       });
+    }
+
+    function openStatusEditModal(tx) {
+      var orderId = tx['발주번호'];
+      if (!orderId) {
+        alert('발주번호가 없습니다.');
+        return;
+      }
+
+      var buyOrder = prompt('매입발주 상태를 입력하세요 (현재: ' + (tx['매입발주'] || '-') + ')', tx['매입발주'] || '');
+      if (buyOrder === null) return;
+
+      var payBuy = prompt('매입결제 상태를 입력하세요 (현재: ' + (tx['매입결제'] || '-') + ')', tx['매입결제'] || '');
+      if (payBuy === null) return;
+
+      var paySell = prompt('매출결제 상태를 입력하세요 (현재: ' + (tx['매출결제'] || '-') + ')', tx['매출결제'] || '');
+      if (paySell === null) return;
+
+      var ship = prompt('출고 상태를 입력하세요 (현재: ' + (tx['출고'] || '-') + ')', tx['출고'] || '');
+      if (ship === null) return;
+
+      var statuses = {
+        buyOrder: buyOrder,
+        payBuy: payBuy,
+        paySell: paySell,
+        ship: ship
+      };
+
+      OB.showLoading('상태 변경 중...');
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          OB.hideLoading();
+
+          if (!res || !res.success) {
+            alert('상태 변경 실패: ' + (res ? res.error : '알 수 없는 오류'));
+            return;
+          }
+
+          alert('상태가 업데이트되었습니다.');
+          fetchTransactions();
+        })
+        .withFailureHandler(function(err) {
+          OB.hideLoading();
+          alert('상태 변경 실패: ' + err.message);
+        })
+        .updateOrderStatusApi(orderId, statuses);
     }
 
     function fetchTransactions() {

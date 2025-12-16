@@ -917,3 +917,11 @@ function getMonthlyClosingsApi() {
   var result = getMonthlyClosings();
   return safeReturn(result);
 }
+
+/**
+ * 발주 상태 업데이트 (4개 상태 컬럼)
+ */
+function updateOrderStatusApi(orderId, statuses) {
+  var result = updateOrderStatus(orderId, statuses);
+  return safeReturn(result);
+}

@@ -154,7 +154,7 @@ function createInvoiceFromSettlement(params) {
     var orderNumbers = params.orderNumbers || [];
     var type = params.type || '';
     var company = params.company || '';
-    var invoiceDate = params.invoiceDate || new Date();
+    var invoiceDate = params.invoiceDate ? formatDateString(new Date(params.invoiceDate)) : formatDateString(new Date());
     var amount = params.amount || 0;
     var notes = params.notes || '';
 
