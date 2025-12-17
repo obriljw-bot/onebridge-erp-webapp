@@ -3964,30 +3964,76 @@
     }
 
     function showOrderDetailModal(agg) {
-      var html = '<div style="max-height:400px; overflow:auto;">';
-      html += '<h3 style="margin:0 0 12px;">발주번호: ' + agg.orderNumber + '</h3>';
-      html += '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+      var html = '<div style="max-height:500px; overflow:auto;">';
+      html += '<h3 style="margin:0 0 16px;">발주번호: ' + agg.orderNumber + '</h3>';
+      html += '<table id="order-detail-table" style="width:100%; border-collapse:collapse; font-size:12px;">';
       html += '<thead><tr style="background:#f8fafc;">';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb;">브랜드</th>';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb;">품목코드</th>';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb;">제품명</th>';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">발주수량</th>';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">확정수량</th>';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">공급가</th>';
-      html += '<th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">공급액</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb;">브랜드</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb;">품목코드</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb;">제품명</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">발주수량</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">확정수량</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">매입가</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">구매액</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">공급가</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">공급액</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">마진액</th>';
+      html += '<th style="padding:6px; border:1px solid #e5e7eb; text-align:right;">마진율</th>';
       html += '</tr></thead><tbody>';
 
-      agg.items.forEach(function(item) {
-        html += '<tr>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb;">' + (item['브랜드'] || '-') + '</td>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb;">' + (item['품목코드'] || '-') + '</td>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb;">' + (item['제품명'] || '-') + '</td>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['발주수량'] || 0) + '</td>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['확정수량'] || 0) + '</td>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['공급가'] || 0) + '</td>';
-        html += '<td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(item['공급액'] || 0) + '</td>';
+      var totalOrderQty = 0, totalConfirmedQty = 0, totalPurchaseAmt = 0, totalSupplyAmt = 0, totalMarginAmt = 0;
+
+      agg.items.forEach(function(item, idx) {
+        var orderQty = Number(item['발주수량']) || 0;
+        var confirmedQty = Number(item['확정수량']) || 0;
+        var buyPrice = Number(item['매입가']) || 0;
+        var supplyPrice = Number(item['공급가']) || 0;
+        var purchaseAmt = confirmedQty * buyPrice;
+        var supplyAmt = confirmedQty * supplyPrice;
+        var marginAmt = supplyAmt - purchaseAmt;
+        var marginRate = supplyAmt > 0 ? ((marginAmt / supplyAmt) * 100).toFixed(1) : 0;
+
+        totalOrderQty += orderQty;
+        totalConfirmedQty += confirmedQty;
+        totalPurchaseAmt += purchaseAmt;
+        totalSupplyAmt += supplyAmt;
+        totalMarginAmt += marginAmt;
+
+        var marginColor = marginAmt >= 0 ? '#059669' : '#dc2626';
+
+        html += '<tr data-row-idx="' + idx + '">';
+        html += '<td style="padding:6px; border:1px solid #e5e7eb;">' + (item['브랜드'] || '-') + '</td>';
+        html += '<td style="padding:6px; border:1px solid #e5e7eb;">' + (item['품목코드'] || '-') + '</td>';
+        html += '<td style="padding:6px; border:1px solid #e5e7eb;">' + (item['제품명'] || '-') + '</td>';
+        html += '<td style="padding:6px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(orderQty) + '</td>';
+        html += '<td style="padding:6px; border:1px solid #e5e7eb; text-align:right;">';
+        html += '<input type="number" class="confirmed-qty-input" data-idx="' + idx + '" value="' + confirmedQty + '" ';
+        html += 'style="width:70px; padding:4px; text-align:right; border:1px solid #cbd5e1; border-radius:4px;" ';
+        html += 'data-buy-price="' + buyPrice + '" data-supply-price="' + supplyPrice + '" />';
+        html += '</td>';
+        html += '<td class="buy-price" style="padding:6px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(buyPrice) + '</td>';
+        html += '<td class="purchase-amt" style="padding:6px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(purchaseAmt) + '</td>';
+        html += '<td class="supply-price" style="padding:6px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(supplyPrice) + '</td>';
+        html += '<td class="supply-amt" style="padding:6px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(supplyAmt) + '</td>';
+        html += '<td class="margin-amt" style="padding:6px; border:1px solid #e5e7eb; text-align:right; color:' + marginColor + '; font-weight:600;">' + OB.formatNumber(marginAmt) + '</td>';
+        html += '<td class="margin-rate" style="padding:6px; border:1px solid #e5e7eb; text-align:right; color:' + marginColor + ';">' + marginRate + '%</td>';
         html += '</tr>';
       });
+
+      // 합계 행
+      var totalMarginRate = totalSupplyAmt > 0 ? ((totalMarginAmt / totalSupplyAmt) * 100).toFixed(1) : 0;
+      var totalMarginColor = totalMarginAmt >= 0 ? '#059669' : '#dc2626';
+      html += '<tr style="background:#f1f5f9; font-weight:600;">';
+      html += '<td colspan="3" style="padding:8px; border:1px solid #e5e7eb; text-align:center;">합계</td>';
+      html += '<td id="total-order-qty" style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(totalOrderQty) + '</td>';
+      html += '<td id="total-confirmed-qty" style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(totalConfirmedQty) + '</td>';
+      html += '<td style="padding:8px; border:1px solid #e5e7eb;"></td>';
+      html += '<td id="total-purchase-amt" style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(totalPurchaseAmt) + '</td>';
+      html += '<td style="padding:8px; border:1px solid #e5e7eb;"></td>';
+      html += '<td id="total-supply-amt" style="padding:8px; border:1px solid #e5e7eb; text-align:right;">' + OB.formatNumber(totalSupplyAmt) + '</td>';
+      html += '<td id="total-margin-amt" style="padding:8px; border:1px solid #e5e7eb; text-align:right; color:' + totalMarginColor + ';">' + OB.formatNumber(totalMarginAmt) + '</td>';
+      html += '<td id="total-margin-rate" style="padding:8px; border:1px solid #e5e7eb; text-align:right; color:' + totalMarginColor + ';">' + totalMarginRate + '%</td>';
+      html += '</tr>';
 
       html += '</tbody></table></div>';
 
@@ -3995,17 +4041,110 @@
       modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center;';
 
       var content = document.createElement('div');
-      content.style.cssText = 'background:white; padding:24px; border-radius:12px; max-width:900px; width:90%;';
+      content.style.cssText = 'background:white; padding:24px; border-radius:12px; max-width:1200px; width:95%;';
       content.innerHTML = html;
+
+      // 실시간 재계산 이벤트 리스너
+      setTimeout(function() {
+        var inputs = content.querySelectorAll('.confirmed-qty-input');
+        inputs.forEach(function(input) {
+          input.addEventListener('input', function() {
+            var idx = parseInt(input.getAttribute('data-idx'));
+            var newQty = Number(input.value) || 0;
+            var buyPrice = Number(input.getAttribute('data-buy-price')) || 0;
+            var supplyPrice = Number(input.getAttribute('data-supply-price')) || 0;
+
+            var row = content.querySelector('[data-row-idx="' + idx + '"]');
+            var purchaseAmt = newQty * buyPrice;
+            var supplyAmt = newQty * supplyPrice;
+            var marginAmt = supplyAmt - purchaseAmt;
+            var marginRate = supplyAmt > 0 ? ((marginAmt / supplyAmt) * 100).toFixed(1) : 0;
+            var marginColor = marginAmt >= 0 ? '#059669' : '#dc2626';
+
+            row.querySelector('.purchase-amt').textContent = OB.formatNumber(purchaseAmt);
+            row.querySelector('.supply-amt').textContent = OB.formatNumber(supplyAmt);
+            row.querySelector('.margin-amt').textContent = OB.formatNumber(marginAmt);
+            row.querySelector('.margin-amt').style.color = marginColor;
+            row.querySelector('.margin-rate').textContent = marginRate + '%';
+            row.querySelector('.margin-rate').style.color = marginColor;
+
+            // 합계 재계산
+            recalculateTotals();
+          });
+        });
+
+        function recalculateTotals() {
+          var totalConfirmed = 0, totalPurchase = 0, totalSupply = 0, totalMargin = 0;
+          inputs.forEach(function(inp) {
+            var qty = Number(inp.value) || 0;
+            var buyPrice = Number(inp.getAttribute('data-buy-price')) || 0;
+            var supplyPrice = Number(inp.getAttribute('data-supply-price')) || 0;
+            totalConfirmed += qty;
+            totalPurchase += qty * buyPrice;
+            totalSupply += qty * supplyPrice;
+          });
+          totalMargin = totalSupply - totalPurchase;
+          var totalRate = totalSupply > 0 ? ((totalMargin / totalSupply) * 100).toFixed(1) : 0;
+          var totalColor = totalMargin >= 0 ? '#059669' : '#dc2626';
+
+          content.querySelector('#total-confirmed-qty').textContent = OB.formatNumber(totalConfirmed);
+          content.querySelector('#total-purchase-amt').textContent = OB.formatNumber(totalPurchase);
+          content.querySelector('#total-supply-amt').textContent = OB.formatNumber(totalSupply);
+          content.querySelector('#total-margin-amt').textContent = OB.formatNumber(totalMargin);
+          content.querySelector('#total-margin-amt').style.color = totalColor;
+          content.querySelector('#total-margin-rate').textContent = totalRate + '%';
+          content.querySelector('#total-margin-rate').style.color = totalColor;
+        }
+      }, 100);
+
+      // 버튼 영역
+      var btnContainer = document.createElement('div');
+      btnContainer.style.cssText = 'margin-top:16px; display:flex; gap:8px; justify-content:flex-end;';
+
+      var saveBtn = document.createElement('button');
+      saveBtn.textContent = '저장';
+      saveBtn.className = 'ledger-btn primary';
+      saveBtn.addEventListener('click', function() {
+        var updates = [];
+        var inputs = content.querySelectorAll('.confirmed-qty-input');
+        inputs.forEach(function(input, i) {
+          var newQty = Number(input.value) || 0;
+          updates.push({
+            orderNumber: agg.orderNumber,
+            itemCode: agg.items[i]['품목코드'],
+            confirmedQty: newQty
+          });
+        });
+
+        OB.showLoading('확정수량 저장 중...');
+        google.script.run
+          .withSuccessHandler(function(res) {
+            OB.hideLoading();
+            if (!res || !res.success) {
+              alert('저장 실패: ' + (res ? res.error : '알 수 없는 오류'));
+              return;
+            }
+            alert('확정수량이 저장되었습니다.');
+            document.body.removeChild(modal);
+            fetchTransactions();
+          })
+          .withFailureHandler(function(error) {
+            OB.hideLoading();
+            alert('서버 오류: ' + error.message);
+          })
+          .updateConfirmedQuantitiesApi({ updates: updates });
+      });
 
       var closeBtn = document.createElement('button');
       closeBtn.textContent = '닫기';
       closeBtn.className = 'ledger-btn secondary';
-      closeBtn.style.marginTop = '16px';
       closeBtn.addEventListener('click', function() {
         document.body.removeChild(modal);
       });
-      content.appendChild(closeBtn);
+
+      btnContainer.appendChild(saveBtn);
+      btnContainer.appendChild(closeBtn);
+      content.appendChild(btnContainer);
 
       modal.appendChild(content);
       modal.addEventListener('click', function(e) {
@@ -4024,44 +4163,95 @@
         return;
       }
 
-      var buyOrder = prompt('매입발주 상태를 입력하세요 (현재: ' + (tx['매입발주'] || '-') + ')', tx['매입발주'] || '');
-      if (buyOrder === null) return;
+      var modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center;';
 
-      var payBuy = prompt('매입결제 상태를 입력하세요 (현재: ' + (tx['매입결제'] || '-') + ')', tx['매입결제'] || '');
-      if (payBuy === null) return;
+      var content = document.createElement('div');
+      content.style.cssText = 'background:white; padding:24px; border-radius:12px; max-width:500px; width:90%;';
 
-      var paySell = prompt('매출결제 상태를 입력하세요 (현재: ' + (tx['매출결제'] || '-') + ')', tx['매출결제'] || '');
-      if (paySell === null) return;
+      var html = '<h3 style="margin:0 0 20px;">상태 변경</h3>';
+      html += '<div style="margin-bottom:16px;">';
+      html += '<label style="display:block; margin-bottom:4px; font-weight:600; font-size:14px;">발주번호</label>';
+      html += '<div style="padding:8px; background:#f8fafc; border-radius:6px; color:#64748b;">' + orderId + '</div>';
+      html += '</div>';
 
-      var ship = prompt('출고 상태를 입력하세요 (현재: ' + (tx['출고'] || '-') + ')', tx['출고'] || '');
-      if (ship === null) return;
+      var statusConfigs = [
+        { label: '매입발주', key: 'buyOrder', current: tx['매입발주'] || '', options: ['', '발주대기', '발주완료', '발주취소'] },
+        { label: '매입결제', key: 'payBuy', current: tx['매입결제'] || '', options: ['', '미결제', '부분결제', '결제완료'] },
+        { label: '매출결제', key: 'paySell', current: tx['매출결제'] || '', options: ['', '미결제', '부분결제', '결제완료'] },
+        { label: '출고', key: 'ship', current: tx['출고'] || '', options: ['', '미출고', '출고준비', '출고완료', '배송중', '배송완료'] }
+      ];
 
-      var statuses = {
-        buyOrder: buyOrder,
-        payBuy: payBuy,
-        paySell: paySell,
-        ship: ship
-      };
+      statusConfigs.forEach(function(config) {
+        html += '<div style="margin-bottom:16px;">';
+        html += '<label style="display:block; margin-bottom:4px; font-weight:600; font-size:14px;">' + config.label + '</label>';
+        html += '<select id="status-' + config.key + '" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;">';
+        config.options.forEach(function(opt) {
+          var selected = opt === config.current ? ' selected' : '';
+          var displayText = opt === '' ? '- 선택 -' : opt;
+          html += '<option value="' + opt + '"' + selected + '>' + displayText + '</option>';
+        });
+        html += '</select>';
+        html += '</div>';
+      });
 
-      OB.showLoading('상태 변경 중...');
+      content.innerHTML = html;
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          OB.hideLoading();
+      var btnContainer = document.createElement('div');
+      btnContainer.style.cssText = 'margin-top:24px; display:flex; gap:8px; justify-content:flex-end;';
 
-          if (!res || !res.success) {
-            alert('상태 변경 실패: ' + (res ? res.error : '알 수 없는 오류'));
-            return;
-          }
+      var saveBtn = document.createElement('button');
+      saveBtn.textContent = '저장';
+      saveBtn.className = 'ledger-btn primary';
+      saveBtn.addEventListener('click', function() {
+        var statuses = {
+          buyOrder: content.querySelector('#status-buyOrder').value,
+          payBuy: content.querySelector('#status-payBuy').value,
+          paySell: content.querySelector('#status-paySell').value,
+          ship: content.querySelector('#status-ship').value
+        };
 
-          alert('상태가 업데이트되었습니다.');
-          fetchTransactions();
-        })
-        .withFailureHandler(function(err) {
-          OB.hideLoading();
-          alert('상태 변경 실패: ' + err.message);
-        })
-        .updateOrderStatusApi(orderId, statuses);
+        document.body.removeChild(modal);
+        OB.showLoading('상태 변경 중...');
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            OB.hideLoading();
+
+            if (!res || !res.success) {
+              alert('상태 변경 실패: ' + (res ? res.error : '알 수 없는 오류'));
+              return;
+            }
+
+            alert('상태가 업데이트되었습니다.');
+            fetchTransactions();
+          })
+          .withFailureHandler(function(err) {
+            OB.hideLoading();
+            alert('상태 변경 실패: ' + err.message);
+          })
+          .updateOrderStatusApi(orderId, statuses);
+      });
+
+      var cancelBtn = document.createElement('button');
+      cancelBtn.textContent = '취소';
+      cancelBtn.className = 'ledger-btn secondary';
+      cancelBtn.addEventListener('click', function() {
+        document.body.removeChild(modal);
+      });
+
+      btnContainer.appendChild(saveBtn);
+      btnContainer.appendChild(cancelBtn);
+      content.appendChild(btnContainer);
+
+      modal.appendChild(content);
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+
+      document.body.appendChild(modal);
     }
 
     function fetchTransactions() {
