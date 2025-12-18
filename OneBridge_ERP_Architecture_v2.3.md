@@ -1,10 +1,10 @@
 # OneBridge ERP v2.3 (SSR Hybrid) — Complete Architecture & Development Standards
 
 ## Document Information
-- **Version**: 2.4.0
-- **Last Updated**: 2025-12-16
-- **Status**: 📋 Implementation Planning (구현 계획 수립 완료)
-- **Purpose**: 시스템 아키텍처 명세 + 개발 표준 + 트러블슈팅 가이드
+- **Version**: 2.5.0
+- **Last Updated**: 2025-12-18
+- **Status**: 📐 UI/UX Pattern Templates Added (패턴 템플릿 확립)
+- **Purpose**: 시스템 아키텍처 명세 + 개발 표준 + UI/UX 패턴 템플릿 + 트러블슈팅 가이드
 
 > ⚠️ **IMPORTANT**: 이 문서는 OneBridge ERP 개발의 **정규 참조 문서**입니다.
 > 모든 신규 개발 및 수정 작업은 이 문서의 표준을 준수해야 합니다.
@@ -1675,6 +1675,404 @@ OB.initSomePagePage = function() {
 
 ---
 
+# PART 7: UI/UX PATTERN TEMPLATES
+
+> 💡 **목적**: 거래원장을 기준으로 확립된 UI/UX 패턴을 다른 메뉴(청구서 관리, 매출/매입 마감 등)에서 **재사용 가능한 템플릿**으로 정의
+
+## 7.1 거래원장 패턴 (표준 템플릿)
+
+### 7.1.1 레이아웃 구조 (4단 구성)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [1] 검색 필터 영역                                           │
+│ ┌─────────┬─────────┬─────────┬──────────────┬────┬─────┐  │
+│ │발주처   │상태     │발주번호 │기간 범위      │조회│초기화│ │
+│ └─────────┴─────────┴─────────┴──────────────┴────┴─────┘  │
+├─────────────────────────────────────────────────────────────┤
+│ [2] 요약 정보 (Summary Cards)                                │
+│ ┌───────────┬───────────┬───────────┬──────────────┐        │
+│ │조회건수   │발주수량   │확정수량   │공급액        │        │
+│ │ 15건      │ 1,500     │ 1,450     │ ₩15,000,000  │        │
+│ └───────────┴───────────┴───────────┴──────────────┘        │
+├─────────────────────────────────────────────────────────────┤
+│ [3] 일괄 작업 버튼 (체크박스 선택 시 활성화)                 │
+│ [0건 선택 - 청구서 생성] [선택 항목 상태 변경]              │
+├─────────────────────────────────────────────────────────────┤
+│ [4] 데이터 테이블 (체크박스 + 집계 데이터)                   │
+│ ┌─┬────┬──────┬────┬───┬──┬──┬───┬───┬───┬───┬────┐      │
+│ │☑│일자│번호  │처  │브 │량│확│입 │공 │마 │마 │상태│      │
+│ ├─┼────┼──────┼────┼───┼──┼──┼───┼───┼───┼───┼────┤      │
+│ │☐│0115│ABC-1│ABC │A  │100│95│950│1.2│250│20%│✓✗✓✗│      │
+│ │☐│0115│ABC-2│ABC │B  │200│200│2.0│2.5│500│20%│✓✓✓✗│      │
+│ └─┴────┴──────┴────┴───┴──┴──┴───┴───┴───┴───┴────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**핵심 요소:**
+- **검색 필터**: 발주처, 상태, 발주번호, 기간 범위 (입력 → 조회 → 필터링)
+- **요약 카드**: 조회 결과의 집계 정보 (건수, 수량, 금액)
+- **일괄 버튼**: 체크박스 선택 개수에 따라 `disabled` 속성 제어
+- **테이블**: 발주번호 단위 집계 데이터 (품목별 행 → 발주번호 단위 합산)
+
+---
+
+### 7.1.2 테이블 + 체크박스 패턴
+
+**구조:**
+```html
+<!-- HTML 구조 -->
+<table>
+  <thead>
+    <tr>
+      <th><input type="checkbox" id="select-all"></th>
+      <th>컬럼1</th>
+      <th>컬럼2</th>
+    </tr>
+  </thead>
+  <tbody id="data-tbody">
+    <!-- JavaScript로 동적 생성 -->
+  </tbody>
+</table>
+
+<!-- 일괄 버튼 (초기 disabled) -->
+<button id="bulk-btn-1" disabled>선택 항목 처리</button>
+```
+
+**JavaScript 패턴:**
+```javascript
+// 1. 전체 선택 체크박스
+selectAllCheckbox.addEventListener('change', function() {
+  var checkboxes = document.querySelectorAll('.row-checkbox');
+  checkboxes.forEach(function(cb) {
+    cb.checked = selectAllCheckbox.checked;
+  });
+  updateBulkButtons();
+});
+
+// 2. 개별 체크박스 변경
+tbody.addEventListener('change', function(e) {
+  if (e.target.classList.contains('row-checkbox')) {
+    updateBulkButtons();
+  }
+});
+
+// 3. 일괄 버튼 활성화/비활성화
+function updateBulkButtons() {
+  var checked = document.querySelectorAll('.row-checkbox:checked');
+  bulkBtn.disabled = checked.length === 0;
+
+  // 전체 선택 상태 업데이트
+  var total = document.querySelectorAll('.row-checkbox').length;
+  selectAllCheckbox.checked = checked.length === total;
+  selectAllCheckbox.indeterminate = checked.length > 0 && checked.length < total;
+}
+```
+
+**핵심 포인트:**
+- 체크박스에 `data-*` 속성으로 ID 저장 (예: `data-order-number`)
+- 일괄 버튼은 항상 표시, `disabled`로 제어
+- `indeterminate` 상태로 부분 선택 표시
+
+---
+
+### 7.1.3 상태 표시 패턴 (✓✗ + 색상 코딩)
+
+**컴팩트 형식:**
+```
+4개 상태를 1개 셀에 표시:
+✓✗✓✗ = [매입발주 완료][매입결제 미완료][매출결제 완료][출고 미완료]
+```
+
+**구현:**
+```javascript
+// 상태 표시 셀 생성
+var td = document.createElement('td');
+td.style.textAlign = 'center';
+td.style.fontFamily = 'monospace';
+td.style.fontWeight = 'bold';
+
+// 상태별 심볼 + 색상 반환
+function getStatusSymbol(status) {
+  if (!status) return { symbol: '✗', color: '#dc2626' }; // 빨간색
+  var completed = ['완료', '결제완료', '발주완료', '출고완료'];
+  var isCompleted = completed.indexOf(status) !== -1;
+  return {
+    symbol: isCompleted ? '✓' : '✗',
+    color: isCompleted ? '#059669' : '#dc2626' // 초록색 : 빨간색
+  };
+}
+
+// 4개 상태를 span으로 감싸서 개별 색상 적용
+var statuses = [data.buyOrder, data.payBuy, data.paySell, data.ship];
+statuses.forEach(function(status) {
+  var result = getStatusSymbol(status);
+  var span = document.createElement('span');
+  span.textContent = result.symbol;
+  span.style.color = result.color;
+  td.appendChild(span);
+});
+```
+
+**핵심 포인트:**
+- ❌ 툴팁(title) 사용 안 함 (브라우저별 차이)
+- ✅ 시각적 색상으로 상태 구분 (초록=완료, 빨강=미완료)
+- ✅ 굵게(bold) + monospace 폰트로 가독성 확보
+
+---
+
+### 7.1.4 모달 구조 패턴 (섹션 분리 + 독립 저장)
+
+**구조:**
+```
+┌──────────────────────────────────────┐
+│ 발주번호: 20240115-ABC-A-001         │
+├──────────────────────────────────────┤
+│ [섹션 1] 상태 변경                   │
+│ ┌──────────────────────────────────┐ │
+│ │ 매입발주: [▼]  매입결제: [▼]    │ │
+│ │ 매출결제: [▼]  출고: [▼]        │ │
+│ │          [상태 저장 버튼]        │ │
+│ └──────────────────────────────────┘ │
+├──────────────────────────────────────┤
+│ [섹션 2] 품목 상세 (확정수량 편집)   │
+│ ┌──────────────────────────────────┐ │
+│ │ 품목  | 발주량 | 확정량 | 금액   │ │
+│ │ 품목A |   100  | [95]   | ...    │ │
+│ │ 품목B |   200  | [200]  | ...    │ │
+│ │                                  │ │
+│ │      [확정수량 저장] [닫기]      │ │
+│ └──────────────────────────────────┘ │
+└──────────────────────────────────────┘
+```
+
+**핵심 포인트:**
+- 2개 섹션 분리: 상태 변경 / 데이터 편집
+- **독립적 저장 버튼**: 각 섹션마다 별도 저장
+  - 이유: 상태만 변경하는 경우가 빈번함 (수량 변경 없이)
+- 배경색으로 섹션 구분 (`background:#f8fafc`)
+
+---
+
+### 7.1.5 일괄 작업 패턴 (검증 → API 호출)
+
+**표준 플로우:**
+```javascript
+bulkActionBtn.addEventListener('click', function() {
+  // 1. 선택 검증
+  var checkboxes = document.querySelectorAll('.row-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('항목을 선택해주세요.');
+    return;
+  }
+
+  // 2. 데이터 수집 + 비즈니스 검증
+  var orderNumbers = [];
+  var companies = {};
+  checkboxes.forEach(function(cb) {
+    orderNumbers.push(cb.dataset.orderNumber);
+    companies[cb.dataset.company] = true;
+  });
+
+  // 예: 동일 거래처만 청구서 생성 가능
+  if (Object.keys(companies).length > 1) {
+    alert('동일한 거래처의 발주만 선택해야 합니다.');
+    return;
+  }
+
+  // 3. 확인 창
+  if (!confirm(orderNumbers.length + '건을 처리하시겠습니까?')) {
+    return;
+  }
+
+  // 4. API 호출
+  OB.showLoading('처리 중...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      OB.hideLoading();
+      if (!res || !res.success) {
+        alert('실패: ' + (res ? res.error : '알 수 없는 오류'));
+        return;
+      }
+      alert('완료되었습니다.');
+      // 5. 체크박스 해제 + 버튼 비활성화
+      checkboxes.forEach(function(cb) { cb.checked = false; });
+      updateBulkButtons();
+      // 6. 데이터 새로고침
+      fetchData();
+    })
+    .withFailureHandler(function(err) {
+      OB.hideLoading();
+      alert('실패: ' + err.message);
+    })
+    .bulkActionApi({ orderNumbers: orderNumbers, ... });
+});
+```
+
+**핵심 포인트:**
+- **5단계 검증**: 선택 여부 → 비즈니스 규칙 → 확인 → API → 후처리
+- **에러 핸들링**: success/failure 모두 처리
+- **UX**: 로딩 표시 → 완료 메시지 → 체크박스 해제 → 화면 갱신
+
+---
+
+### 7.1.6 백엔드 데이터 처리 패턴 (안전한 행 찾기)
+
+**문제점: rowIndex 기반 업데이트의 위험성**
+```javascript
+// ❌ 위험한 방식
+function updateData(params) {
+  var rowIndex = params.rowIndex; // 클라이언트가 행 번호 전달
+  sheet.getRange(rowIndex, col).setValue(value); // 동기화 문제 가능
+}
+```
+
+**해결책: 식별자 기반 안전한 행 찾기**
+```javascript
+// ✅ 안전한 방식 (거래원장 예시)
+function updateConfirmedQuantities(params) {
+  var updates = params.updates; // [{ orderNumber, itemCode, confirmedQty }]
+
+  var data = sheet.getDataRange().getValues();
+  var header = data[0];
+  var colOrderNum = header.indexOf('발주번호');
+  var colItemCode = header.indexOf('품목코드');
+
+  updates.forEach(function(update) {
+    // 1. 발주번호 + 품목코드로 정확한 행 찾기
+    var rowIndex = null;
+    var matchCount = 0;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colOrderNum] === update.orderNumber &&
+          data[i][colItemCode] === update.itemCode) {
+        rowIndex = i + 1; // 1-based
+        matchCount++;
+      }
+    }
+
+    // 2. 안전성 검증
+    if (matchCount === 0) {
+      errors.push('데이터를 찾을 수 없습니다: ' + update.orderNumber);
+      return;
+    }
+    if (matchCount > 1) {
+      errors.push('중복 데이터 ' + matchCount + '건: ' + update.orderNumber);
+      return;
+    }
+
+    // 3. 정확히 1개만 매칭된 경우에만 업데이트
+    sheet.getRange(rowIndex, colConfirmedQty + 1).setValue(update.confirmedQty);
+  });
+}
+```
+
+**핵심 포인트:**
+- **복합 키 사용**: 단일 필드가 아니라 여러 필드 조합 (orderNumber + itemCode)
+- **중복 검증**: 정확히 1개만 매칭되어야 업데이트 (0개 또는 2개 이상이면 에러)
+- **로그 기록**: 성공/실패 모두 Logger.log()로 기록
+- **오류 수집**: 개별 업데이트 실패 시 전체 롤백 대신 오류 배열에 수집
+
+---
+
+### 7.1.7 데이터 집계 패턴 (품목 행 → 발주번호 단위)
+
+**시나리오**: 거래원장 시트는 품목별 행이지만, 화면에는 발주번호 단위로 집계해서 표시
+
+**구현:**
+```javascript
+function renderTable() {
+  // 1. 발주번호 단위로 집계
+  var aggregated = {};
+
+  rawData.forEach(function(item) {
+    var orderNum = item['발주번호'];
+
+    if (!aggregated[orderNum]) {
+      aggregated[orderNum] = {
+        orderNumber: orderNum,
+        orderDate: item['발주일'],
+        company: item['발주처'],
+        brand: item['브랜드'], // 첫 번째 품목의 브랜드 (발주번호=브랜드 1:1)
+        items: [],
+        totalOrderQty: 0,
+        totalConfirmedQty: 0,
+        totalPurchaseAmt: 0,
+        totalSupplyAmt: 0
+      };
+    }
+
+    // 품목 추가
+    aggregated[orderNum].items.push(item);
+
+    // 합계 계산
+    var confirmedQty = Number(item['확정수량']) || 0;
+    aggregated[orderNum].totalConfirmedQty += confirmedQty;
+    aggregated[orderNum].totalPurchaseAmt += confirmedQty * (Number(item['매입가']) || 0);
+    aggregated[orderNum].totalSupplyAmt += confirmedQty * (Number(item['공급가']) || 0);
+  });
+
+  // 2. 마진 계산 (집계 후)
+  Object.keys(aggregated).forEach(function(key) {
+    var agg = aggregated[key];
+    agg.totalMarginAmt = agg.totalSupplyAmt - agg.totalPurchaseAmt;
+    agg.marginRate = agg.totalSupplyAmt > 0
+      ? ((agg.totalMarginAmt / agg.totalSupplyAmt) * 100).toFixed(1)
+      : 0;
+  });
+
+  // 3. 테이블 렌더링
+  Object.keys(aggregated).forEach(function(orderNum) {
+    var agg = aggregated[orderNum];
+    var tr = document.createElement('tr');
+
+    // 체크박스 (발주번호 저장)
+    var checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.dataset.orderNumber = agg.orderNumber;
+    checkbox.dataset.company = agg.company;
+
+    // ... 셀 추가
+  });
+}
+```
+
+**핵심 포인트:**
+- **2단계 처리**: 집계 → 파생 계산 (마진, 비율 등)
+- **데이터 구조**: 발주번호를 key로 한 객체, items 배열로 품목 보관
+- **1:1 필드**: 발주번호 = 브랜드 (첫 품목 값 사용)
+- **합계 필드**: 수량, 금액 등은 품목별 합산
+
+---
+
+## 7.2 패턴 적용 가이드
+
+**다른 메뉴에 적용할 때:**
+
+1. **청구서 관리**:
+   - 레이아웃: 7.1.1 그대로 적용
+   - 체크박스: 7.1.2 패턴 (일괄 발행, 일괄 삭제)
+   - 상태 표시: 7.1.3 패턴 (발행 상태 ✓✗)
+   - 모달: 청구서 상세 + 상태 변경 섹션 분리
+
+2. **매출/매입 마감**:
+   - 레이아웃: 7.1.1 응용 (마감 기간, 거래처 필터)
+   - 체크박스: 일괄 마감, 일괄 잠금 해제
+   - 상태 표시: 마감 상태 (미마감/마감중/완료/잠금)
+   - 모달: 마감 상세 + 항목 편집
+
+3. **발주 관리**:
+   - 레이아웃: 7.1.1
+   - 체크박스: 일괄 삭제, 일괄 상태 변경
+   - 집계 패턴: 7.1.7 (발주번호 단위)
+
+**핵심 원칙:**
+- ✅ 사용자 경험 일관성 (같은 패턴 = 학습 비용 감소)
+- ✅ 코드 재사용성 (검증된 로직 재활용)
+- ✅ 유지보수성 (한 곳 수정 → 다른 곳 참고)
+
+---
+
 ## C. 변경 이력
 
 | 버전 | 날짜 | 변경 내용 |
@@ -1685,6 +2083,7 @@ OB.initSomePagePage = function() {
 | 2.2.1 | 2025-12-06 | Issue #003 해결 (확정수량 수정, 4개 상태 저장, 마진 정보), Issue #004 해결 (마감 검색조건, 마감 내역 조회), 발주내역 목록 진행상태 컬럼 추가 |
 | 2.3.0 | 2025-12-06 | **Codex 통합 (테스트 진행 중)** - Issue #005~#011 해결, 거래원장 페이지 신규, 인보이스관리 페이지 신규, 마감상세 모달, 청구서 재출력, 코드 리팩토링 (+1,783줄/-566줄) |
 | **2.4.0** | **2025-12-16** | **🔴 설계 개선 및 구현 계획** - 거래원장 4개 상태 컬럼 명시 (매입발주/매입결제/매출결제/출고), Phase 1-2 (2-Track 청구서) 설계 추가, 거래원장 페이지 표준 구조 정의, 3단계 구현 로드맵 수립 |
+| **2.5.0** | **2025-12-18** | **📐 UI/UX 패턴 템플릿 추가 (PART 7)** - 거래원장을 표준 템플릿으로 정의, 7가지 핵심 패턴 문서화 (레이아웃, 체크박스, 상태 표시, 모달, 일괄 작업, 백엔드 처리, 데이터 집계), 다른 메뉴(청구서, 마감 등) 참고 기준 확립 |
 
 ---
 
