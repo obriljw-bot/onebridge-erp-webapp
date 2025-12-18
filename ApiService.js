@@ -925,3 +925,11 @@ function updateOrderStatusApi(orderId, statuses) {
   var result = updateOrderStatus(orderId, statuses);
   return safeReturn(result);
 }
+
+/**
+ * 발주 상태 일괄 업데이트
+ */
+function updateBulkOrderStatusApi(params) {
+  var result = updateBulkOrderStatus(params);
+  return safeReturn(result);
+}

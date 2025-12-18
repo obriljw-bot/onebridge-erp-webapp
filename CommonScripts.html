@@ -194,9 +194,13 @@
 
   OB.formatDate = function(date) {
     if (!date) return '';
-    if (typeof date === 'string') return date;
 
-    var d = new Date(date);
+    // 문자열이든 Date 객체든 항상 Date로 변환 후 년-월-일만 추출
+    var d = date instanceof Date ? date : new Date(date);
+
+    // Invalid Date 체크
+    if (isNaN(d.getTime())) return '';
+
     var year = d.getFullYear();
     var month = String(d.getMonth() + 1).padStart(2, '0');
     var day = String(d.getDate()).padStart(2, '0');
@@ -3994,21 +3998,33 @@
         td.textContent = agg.marginRate + '%';
         tr.appendChild(td);
 
-        // 상태 (✓✗ 형태)
+        // 상태 (✓✗ 형태, 색상 입히기)
         td = document.createElement('td');
         td.style.textAlign = 'center';
         td.style.fontFamily = 'monospace';
         td.style.fontSize = '14px';
-        td.title = '매입발주: ' + (agg.buyOrder || '미설정') + ' | 매입결제: ' + (agg.payBuy || '미설정') + ' | 매출결제: ' + (agg.paySell || '미설정') + ' | 출고: ' + (agg.ship || '미설정');
+        td.style.fontWeight = 'bold';
 
         function getStatusSymbol(status) {
-          if (!status) return '✗';
+          if (!status) return { symbol: '✗', color: '#dc2626' }; // 빨간색
           var completed = ['완료', '결제완료', '발주완료', '출고완료', 'COMPLETED', 'PAID', 'CONFIRMED'];
-          return completed.indexOf(status) !== -1 ? '✓' : '✗';
+          var isCompleted = completed.indexOf(status) !== -1;
+          return {
+            symbol: isCompleted ? '✓' : '✗',
+            color: isCompleted ? '#059669' : '#dc2626' // 초록색 : 빨간색
+          };
         }
 
-        var statusText = getStatusSymbol(agg.buyOrder) + getStatusSymbol(agg.payBuy) + getStatusSymbol(agg.paySell) + getStatusSymbol(agg.ship);
-        td.textContent = statusText;
+        // 각 상태를 span으로 감싸서 색상 적용
+        var statuses = [agg.buyOrder, agg.payBuy, agg.paySell, agg.ship];
+        statuses.forEach(function(status) {
+          var result = getStatusSymbol(status);
+          var span = document.createElement('span');
+          span.textContent = result.symbol;
+          span.style.color = result.color;
+          td.appendChild(span);
+        });
+
         tr.appendChild(td);
 
         tbody.appendChild(tr);
@@ -4024,13 +4040,15 @@
         var checkedBoxes = Array.prototype.filter.call(checkboxes, function(cb) { return cb.checked; });
         var count = checkedBoxes.length;
 
-        if (count > 0) {
-          bulkInvoiceBtn.style.display = 'inline-block';
-          bulkStatusBtn.style.display = 'inline-block';
+        // 버튼 항상 표시, disabled 속성으로 제어
+        if (bulkInvoiceBtn) {
+          bulkInvoiceBtn.disabled = count === 0;
+        }
+        if (bulkStatusBtn) {
+          bulkStatusBtn.disabled = count === 0;
+        }
+        if (selectedCountSpan) {
           selectedCountSpan.textContent = count;
-        } else {
-          bulkInvoiceBtn.style.display = 'none';
-          bulkStatusBtn.style.display = 'none';
         }
 
         // 전체 선택 체크박스 상태 업데이트
@@ -4514,6 +4532,8 @@
         if (confirm(orderNumbers.length + '건의 발주로 청구서를 생성하시겠습니까?')) {
           OB.showLoading('청구서 생성 중...');
 
+          var company = Object.keys(companies)[0]; // 이미 단일 거래처 검증 완료
+
           google.script.run
             .withSuccessHandler(function(res) {
               OB.hideLoading();
@@ -4532,7 +4552,11 @@
               OB.hideLoading();
               alert('청구서 생성 실패: ' + err.message);
             })
-            .createDirectBillingApi({ orderNumbers: orderNumbers });
+            .createDirectBillingApi({
+              orderNumbers: orderNumbers,
+              type: '매출',
+              company: company
+            });
         }
       });
     }
