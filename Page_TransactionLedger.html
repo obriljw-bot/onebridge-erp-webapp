@@ -90,26 +90,36 @@
     </div>
   </div>
 
+  <!-- 일괄 액션 버튼 -->
+  <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+    <button class="ledger-btn primary" id="ledger-bulk-invoice-btn" style="display:none;">
+      <span id="ledger-selected-count">0</span>건 선택 - 청구서 생성
+    </button>
+    <button class="ledger-btn secondary" id="ledger-bulk-status-btn" style="display:none;">
+      선택 항목 상태 변경
+    </button>
+  </div>
+
   <div class="ledger-table-wrap">
     <table class="ledger-table">
       <thead>
         <tr>
+          <th style="width:40px;"><input type="checkbox" id="ledger-select-all" title="전체 선택"></th>
           <th>발주일</th>
           <th>발주번호</th>
           <th>발주처</th>
-          <th class="num">품목수</th>
-          <th class="num">총 발주수량</th>
-          <th class="num">총 확정수량</th>
-          <th class="num">총 공급액</th>
-          <th>매입발주</th>
-          <th>매입결제</th>
-          <th>매출결제</th>
-          <th>출고</th>
-          <th>액션</th>
+          <th>브랜드</th>
+          <th class="num">수량</th>
+          <th class="num">확정수량</th>
+          <th class="num">매입액</th>
+          <th class="num">공급액</th>
+          <th class="num">마진액</th>
+          <th class="num">마진율</th>
+          <th style="text-align:center;" title="매입발주/매입결제/매출결제/출고">상태</th>
         </tr>
       </thead>
       <tbody id="ledger-tbody">
-        <tr><td colspan="12" class="ledger-empty">조회 결과가 없습니다. 필터를 설정 후 조회하세요.</td></tr>
+        <tr><td colspan="13" class="ledger-empty">조회 결과가 없습니다. 필터를 설정 후 조회하세요.</td></tr>
       </tbody>
     </table>
   </div>
