@@ -1,9 +1,9 @@
 # OneBridge ERP v2.3 (SSR Hybrid) — Complete Architecture & Development Standards
 
 ## Document Information
-- **Version**: 2.5.0
-- **Last Updated**: 2025-12-18
-- **Status**: 📐 UI/UX Pattern Templates Added (패턴 템플릿 확립)
+- **Version**: 2.6.0
+- **Last Updated**: 2025-12-19
+- **Status**: 💰 결제관리 시스템 명세 추가 (Payment Management System Spec)
 - **Purpose**: 시스템 아키텍처 명세 + 개발 표준 + UI/UX 패턴 템플릿 + 트러블슈팅 가이드
 
 > ⚠️ **IMPORTANT**: 이 문서는 OneBridge ERP 개발의 **정규 참조 문서**입니다.
@@ -2073,6 +2073,1189 @@ function renderTable() {
 
 ---
 
+# PART 8: 결제관리 시스템
+
+## 8.1. 개요
+
+### 8.1.1. 목적
+- **입출금 추적**: 거래처별 입금/출금 내역을 수동으로 기록하고 관리
+- **회사비용 관리**: 회사 운영비, 경비 등 비용 항목을 독립적으로 관리
+- **문서 연계**: 청구서/매입발주서 문서번호와 결제 내역을 연결하여 추적성 확보
+- **회계 기초 데이터**: 추후 회계 장부, 현금흐름표 등의 기초 데이터로 활용
+
+### 8.1.2. 핵심 설계 원칙
+- ✅ **수동 입력 방식**: 자동화가 아닌 사용자가 직접 입력/수정/삭제
+- ✅ **문서 연결 선택적**: 문서번호 없이도 입출금 기록 가능
+- ✅ **히스토리 보존**: 삭제된 데이터도 소프트 삭제로 추후 확인 가능
+- ✅ **심플한 UI**: 복잡한 회계 용어 지양, 직관적인 입출금 개념 사용
+
+### 8.1.3. 주요 기능
+1. **입출금 내역 관리**
+   - 거래처별 입금/출금 기록 추가, 수정, 삭제
+   - 문서번호 자동완성으로 청구서와 연결
+   - 날짜/거래처/문서번호 필터 검색
+   - 요약 통계 (총 입금, 총 출금, 순이익)
+
+2. **회사비용 관리**
+   - 비용 항목별 지출 기록
+   - 날짜/항목 필터 검색
+   - 요약 통계 (항목별 합계)
+
+3. **청구서 이력 관리**
+   - 청구서 취소 및 재발급 (확정수량 변경 시)
+   - 원본-대체 청구서 연결 관계 추적
+   - 취소된 청구서도 히스토리 보존
+
+---
+
+## 8.2. 데이터 구조
+
+### 8.2.1. [결제내역] 시트
+
+**위치**: `발주_통합DB` 스프레드시트 > `결제내역` 시트
+
+**컬럼 구조**:
+```
+| 컬럼명      | 타입      | 설명                          | 필수 | 예시값                |
+|------------|-----------|------------------------------|------|-----------------------|
+| 결제ID      | 문자열    | 자동생성 (PAY-YYYYMMDD-001)   | O    | PAY-20251219-001      |
+| 결제일      | 날짜      | 입금/출금 발생일               | O    | 2025-12-19            |
+| 결제유형    | 문자열    | 입금 또는 출금                 | O    | 입금                  |
+| 거래처명    | 문자열    | 거래처 이름                    | O    | A거래처               |
+| 금액        | 숫자      | 입금/출금 금액                 | O    | 500000                |
+| 결제수단    | 문자열    | 현금/카드/계좌이체/기타        | O    | 계좌이체              |
+| 문서번호    | 문자열    | 청구DB의 청구ID (선택)         | X    | INV-20251219-003      |
+| 발주번호    | 문자열    | 거래원장의 발주번호 (직접연결) | X    | GMP-20251201-001      |
+| 비고        | 문자열    | 메모                           | X    | 1차 부분 결제         |
+| 삭제여부    | 논리값    | TRUE/FALSE                     | O    | FALSE                 |
+| 삭제일시    | 타임스탬프| 삭제한 시각                    | X    | 2025-12-20 10:30:25   |
+| 삭제자      | 문자열    | 삭제한 사용자 이메일           | X    | user@example.com      |
+| 입력일시    | 타임스탬프| 생성 시각                      | O    | 2025-12-19 14:30:25   |
+| 입력자      | 문자열    | 생성 사용자 이메일             | O    | user@example.com      |
+```
+
+**데이터 예시**:
+```
+결제ID              결제일      결제유형  거래처명  금액      결제수단    문서번호           발주번호         비고        삭제여부  입력일시              입력자
+PAY-20251219-001   2025-12-19  입금      A거래처  500000    계좌이체    INV-20251219-003   GMP-20251201-001 1차 부분    FALSE     2025-12-19 14:30:25   user@example.com
+PAY-20251218-002   2025-12-18  출금      B공급처  300000    카드        INV-20251210-005   GMP-20251205-002 전액 결제   FALSE     2025-12-18 09:15:10   user@example.com
+```
+
+**인덱스/검색 키**:
+- 결제일 (날짜 범위 검색)
+- 거래처명 (부분 일치 검색)
+- 문서번호 (정확 일치)
+- 삭제여부 (활성 데이터 필터링)
+
+---
+
+### 8.2.2. [회사비용] 시트
+
+**위치**: `발주_통합DB` 스프레드시트 > `회사비용` 시트
+
+**컬럼 구조**:
+```
+| 컬럼명      | 타입      | 설명                          | 필수 | 예시값                |
+|------------|-----------|------------------------------|------|-----------------------|
+| 비용ID      | 문자열    | 자동생성 (EXP-YYYYMMDD-001)   | O    | EXP-20251219-001      |
+| 비용일      | 날짜      | 비용 발생일                    | O    | 2025-12-19            |
+| 비용항목    | 문자열    | 드롭다운 선택                  | O    | 통신비                |
+| 금액        | 숫자      | 비용 금액                      | O    | 50000                 |
+| 결제수단    | 문자열    | 현금/카드/계좌이체/기타        | O    | 카드                  |
+| 비고        | 문자열    | 메모                           | X    | 사무실 인터넷 요금    |
+| 삭제여부    | 논리값    | TRUE/FALSE                     | O    | FALSE                 |
+| 삭제일시    | 타임스탬프| 삭제한 시각                    | X    | -                     |
+| 삭제자      | 문자열    | 삭제한 사용자 이메일           | X    | -                     |
+| 입력일시    | 타임스탬프| 생성 시각                      | O    | 2025-12-19 14:30:25   |
+| 입력자      | 문자열    | 생성 사용자 이메일             | O    | user@example.com      |
+```
+
+**비용항목 드롭다운 옵션**:
+```
+- 인건비
+- 임차료
+- 통신비
+- 교통비
+- 소모품비
+- 접대비
+- 광고선전비
+- 식비
+- 기타
+```
+
+**데이터 예시**:
+```
+비용ID              비용일      비용항목  금액    결제수단    비고                  삭제여부  입력일시              입력자
+EXP-20251219-001   2025-12-19  통신비    50000   카드        사무실 인터넷 요금    FALSE     2025-12-19 14:30:25   user@example.com
+EXP-20251218-002   2025-12-18  식비      30000   현금        직원 회식             FALSE     2025-12-18 19:00:00   user@example.com
+```
+
+---
+
+### 8.2.3. [청구DB] 시트 확장
+
+**기존 컬럼에 추가**:
+```
+| 컬럼명          | 타입      | 설명                          | 필수 | 예시값                |
+|----------------|-----------|------------------------------|------|-----------------------|
+| 대체청구서      | 문자열    | 취소 시 새로 발급한 청구서 ID  | X    | INV-20251220-004      |
+| 원본청구서      | 문자열    | 재발급 시 원본 청구서 ID       | X    | INV-20251219-003      |
+```
+
+**청구서 상태 확장**:
+```
+기존: DRAFT, ISSUED, PAID
+추가: CANCELLED (취소됨)
+```
+
+**청구서 취소 후 재발급 예시**:
+```
+청구ID              청구유형  업체명    청구금액  청구상태   대체청구서         원본청구서         비고
+INV-20251219-003   매출      A거래처  1000000   CANCELLED  INV-20251220-004   -                  확정수량 변경으로 취소
+INV-20251220-004   매출      A거래처  1200000   ISSUED     -                  INV-20251219-003   수정 청구서
+```
+
+---
+
+## 8.3. 백엔드 아키텍처
+
+### 8.3.1. PaymentService.js 함수 목록
+
+**파일 생성**: `PaymentService.js` (새 파일)
+
+**함수 정의**:
+
+#### 입출금 관리
+```javascript
+/**
+ * 입출금 기록 추가
+ * @param {Object} params - { date, type, company, amount, method, docNumber, orderNumber, notes }
+ * @return {Object} { success, paymentId, message, error }
+ */
+function addPaymentRecord(params)
+
+/**
+ * 입출금 조회 (필터링)
+ * @param {Object} params - { type, company, startDate, endDate, docNumber, includeDeleted }
+ * @return {Object} { success, payments: [], error }
+ */
+function getPaymentRecords(params)
+
+/**
+ * 입출금 수정
+ * @param {Object} params - { paymentId, date, type, company, amount, method, docNumber, orderNumber, notes }
+ * @return {Object} { success, message, error }
+ */
+function updatePaymentRecord(params)
+
+/**
+ * 입출금 삭제 (소프트 삭제)
+ * @param {Object} params - { paymentId }
+ * @return {Object} { success, message, error }
+ */
+function deletePaymentRecord(params)
+
+/**
+ * 입출금 요약 통계
+ * @param {Object} params - { startDate, endDate, company }
+ * @return {Object} { success, totalIncome, totalExpense, netProfit, error }
+ */
+function getPaymentSummary(params)
+
+/**
+ * 문서번호 자동완성 검색
+ * @param {Object} params - { query }
+ * @return {Object} { success, suggestions: [{ docNumber, company, date, amount }], error }
+ */
+function searchDocumentNumbers(params)
+```
+
+#### 회사비용 관리
+```javascript
+/**
+ * 비용 기록 추가
+ * @param {Object} params - { date, category, amount, method, notes }
+ * @return {Object} { success, expenseId, message, error }
+ */
+function addExpenseRecord(params)
+
+/**
+ * 비용 조회 (필터링)
+ * @param {Object} params - { category, startDate, endDate, includeDeleted }
+ * @return {Object} { success, expenses: [], error }
+ */
+function getExpenseRecords(params)
+
+/**
+ * 비용 수정
+ * @param {Object} params - { expenseId, date, category, amount, method, notes }
+ * @return {Object} { success, message, error }
+ */
+function updateExpenseRecord(params)
+
+/**
+ * 비용 삭제 (소프트 삭제)
+ * @param {Object} params - { expenseId }
+ * @return {Object} { success, message, error }
+ */
+function deleteExpenseRecord(params)
+
+/**
+ * 비용 요약 통계
+ * @param {Object} params - { startDate, endDate, category }
+ * @return {Object} { success, totalExpense, byCategory: {}, error }
+ */
+function getExpenseSummary(params)
+```
+
+#### 청구서 이력 관리
+```javascript
+/**
+ * 청구서 취소 및 재발급
+ * @param {Object} params - { invoiceId, reason, newOrderNumbers, newAmount }
+ * @return {Object} { success, oldInvoiceId, newInvoiceId, message, error }
+ */
+function cancelAndReissueInvoice(params)
+
+/**
+ * 청구서 이력 조회 (원본-대체 관계 추적)
+ * @param {Object} params - { invoiceId }
+ * @return {Object} { success, history: [{ invoiceId, status, date, amount, relation }], error }
+ */
+function getInvoiceHistory(params)
+```
+
+#### 유틸리티
+```javascript
+/**
+ * 결제ID 생성 (PAY-YYYYMMDD-001)
+ */
+function generatePaymentId()
+
+/**
+ * 비용ID 생성 (EXP-YYYYMMDD-001)
+ */
+function generateExpenseId()
+
+/**
+ * 소프트 삭제 처리 (공통)
+ * @param {Sheet} sheet
+ * @param {string} id
+ * @param {string} idColumnName
+ */
+function softDeleteRecord(sheet, id, idColumnName)
+```
+
+---
+
+### 8.3.2. API 엔드포인트 (ApiService.js 추가)
+
+**ApiService.js에 추가할 래퍼 함수**:
+
+```javascript
+// 입출금 관리
+function addPaymentRecordApi(params) { return safeReturn(addPaymentRecord(params)); }
+function getPaymentRecordsApi(params) { return safeReturn(getPaymentRecords(params)); }
+function updatePaymentRecordApi(params) { return safeReturn(updatePaymentRecord(params)); }
+function deletePaymentRecordApi(params) { return safeReturn(deletePaymentRecord(params)); }
+function getPaymentSummaryApi(params) { return safeReturn(getPaymentSummary(params)); }
+function searchDocumentNumbersApi(params) { return safeReturn(searchDocumentNumbers(params)); }
+
+// 회사비용 관리
+function addExpenseRecordApi(params) { return safeReturn(addExpenseRecord(params)); }
+function getExpenseRecordsApi(params) { return safeReturn(getExpenseRecords(params)); }
+function updateExpenseRecordApi(params) { return safeReturn(updateExpenseRecord(params)); }
+function deleteExpenseRecordApi(params) { return safeReturn(deleteExpenseRecord(params)); }
+function getExpenseSummaryApi(params) { return safeReturn(getExpenseSummary(params)); }
+
+// 청구서 이력 관리
+function cancelAndReissueInvoiceApi(params) { return safeReturn(cancelAndReissueInvoice(params)); }
+function getInvoiceHistoryApi(params) { return safeReturn(getInvoiceHistory(params)); }
+```
+
+---
+
+## 8.4. 프론트엔드 UI
+
+### 8.4.1. Page_PaymentManagement.html 구조
+
+**파일 생성**: `Page_PaymentManagement.html` (새 파일)
+
+**레이아웃**:
+```html
+<div class="ob-container">
+
+  <!-- 탭 네비게이션 -->
+  <div class="tab-navigation">
+    <div class="tab-nav-item active" data-tab="payment-records">
+      💰 입출금 내역
+    </div>
+    <div class="tab-nav-item" data-tab="company-expenses">
+      💸 회사비용
+    </div>
+  </div>
+
+  <!-- ========== 탭 1: 입출금 내역 ========== -->
+  <div id="tab-payment-records" class="tab-content active">
+
+    <!-- 검색 필터 -->
+    <div class="ob-topbar">
+      <label>유형</label>
+      <select id="payment-type-filter">
+        <option value="">전체</option>
+        <option value="입금">입금</option>
+        <option value="출금">출금</option>
+      </select>
+
+      <label>거래처</label>
+      <input id="payment-company-filter" placeholder="거래처명">
+
+      <label>기간</label>
+      <input id="payment-start-date" type="date">
+      <input id="payment-end-date" type="date">
+
+      <label>문서번호</label>
+      <input id="payment-doc-filter" placeholder="INV-...">
+
+      <button id="payment-search-btn" class="ob-btn primary">조회</button>
+      <button id="payment-reset-btn" class="ob-btn secondary">초기화</button>
+      <button id="payment-add-btn" class="ob-btn success">+ 입출금 기록 추가</button>
+    </div>
+
+    <!-- 요약 카드 -->
+    <div class="payment-summary">
+      <div class="summary-card income">
+        <div class="summary-label">총 입금액</div>
+        <div class="summary-value" id="payment-total-income">₩0</div>
+      </div>
+      <div class="summary-card expense">
+        <div class="summary-label">총 출금액</div>
+        <div class="summary-value" id="payment-total-expense">₩0</div>
+      </div>
+      <div class="summary-card profit">
+        <div class="summary-label">순이익</div>
+        <div class="summary-value" id="payment-net-profit">₩0</div>
+      </div>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="ob-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>일자</th>
+            <th>유형</th>
+            <th>거래처</th>
+            <th class="num">금액</th>
+            <th>결제수단</th>
+            <th>문서번호</th>
+            <th>비고</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody id="payment-records-tbody">
+          <tr><td colspan="8" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 내보내기 버튼 -->
+    <div class="export-buttons">
+      <button id="payment-export-excel" class="ob-btn secondary">📥 Excel 내보내기</button>
+      <button id="payment-export-pdf" class="ob-btn secondary">📄 PDF 내보내기</button>
+    </div>
+
+  </div>
+
+  <!-- ========== 탭 2: 회사비용 ========== -->
+  <div id="tab-company-expenses" class="tab-content">
+
+    <!-- 검색 필터 -->
+    <div class="ob-topbar">
+      <label>항목</label>
+      <select id="expense-category-filter">
+        <option value="">전체</option>
+        <option value="인건비">인건비</option>
+        <option value="임차료">임차료</option>
+        <option value="통신비">통신비</option>
+        <option value="교통비">교통비</option>
+        <option value="소모품비">소모품비</option>
+        <option value="접대비">접대비</option>
+        <option value="광고선전비">광고선전비</option>
+        <option value="식비">식비</option>
+        <option value="기타">기타</option>
+      </select>
+
+      <label>기간</label>
+      <input id="expense-start-date" type="date">
+      <input id="expense-end-date" type="date">
+
+      <button id="expense-search-btn" class="ob-btn primary">조회</button>
+      <button id="expense-reset-btn" class="ob-btn secondary">초기화</button>
+      <button id="expense-add-btn" class="ob-btn success">+ 비용 추가</button>
+    </div>
+
+    <!-- 요약 카드 -->
+    <div class="expense-summary">
+      <div class="summary-card">
+        <div class="summary-label">총 비용</div>
+        <div class="summary-value" id="expense-total">₩0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">항목별 통계</div>
+        <div class="summary-detail" id="expense-by-category"></div>
+      </div>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="ob-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>일자</th>
+            <th>항목</th>
+            <th class="num">금액</th>
+            <th>결제수단</th>
+            <th>비고</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody id="expense-records-tbody">
+          <tr><td colspan="6" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 내보내기 버튼 -->
+    <div class="export-buttons">
+      <button id="expense-export-excel" class="ob-btn secondary">📥 Excel 내보내기</button>
+      <button id="expense-export-pdf" class="ob-btn secondary">📄 PDF 내보내기</button>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- 입출금 추가/수정 모달 -->
+<div id="payment-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="payment-modal-title">입출금 기록 추가</h3>
+      <span class="modal-close">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>유형 <span class="required">*</span></label>
+        <div class="radio-group">
+          <label><input type="radio" name="payment-type" value="입금" checked> 입금</label>
+          <label><input type="radio" name="payment-type" value="출금"> 출금</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>일자 <span class="required">*</span></label>
+        <input type="date" id="payment-date-input" required>
+      </div>
+      <div class="form-group">
+        <label>거래처 <span class="required">*</span></label>
+        <input type="text" id="payment-company-input" required>
+      </div>
+      <div class="form-group">
+        <label>금액 <span class="required">*</span></label>
+        <input type="number" id="payment-amount-input" min="0" required>
+      </div>
+      <div class="form-group">
+        <label>결제수단 <span class="required">*</span></label>
+        <select id="payment-method-input" required>
+          <option value="현금">현금</option>
+          <option value="카드">카드</option>
+          <option value="계좌이체">계좌이체</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>문서번호 (선택)</label>
+        <input type="text" id="payment-doc-input" placeholder="INV-..." autocomplete="off">
+        <div id="payment-doc-suggestions" class="autocomplete-suggestions"></div>
+      </div>
+      <div class="form-group">
+        <label>비고</label>
+        <input type="text" id="payment-notes-input">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="payment-save-btn" class="ob-btn primary">저장</button>
+      <button id="payment-cancel-btn" class="ob-btn secondary">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 회사비용 추가/수정 모달 -->
+<div id="expense-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="expense-modal-title">비용 추가</h3>
+      <span class="modal-close">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>일자 <span class="required">*</span></label>
+        <input type="date" id="expense-date-input" required>
+      </div>
+      <div class="form-group">
+        <label>항목 <span class="required">*</span></label>
+        <select id="expense-category-input" required>
+          <option value="인건비">인건비</option>
+          <option value="임차료">임차료</option>
+          <option value="통신비">통신비</option>
+          <option value="교통비">교통비</option>
+          <option value="소모품비">소모품비</option>
+          <option value="접대비">접대비</option>
+          <option value="광고선전비">광고선전비</option>
+          <option value="식비">식비</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>금액 <span class="required">*</span></label>
+        <input type="number" id="expense-amount-input" min="0" required>
+      </div>
+      <div class="form-group">
+        <label>결제수단 <span class="required">*</span></label>
+        <select id="expense-method-input" required>
+          <option value="현금">현금</option>
+          <option value="카드">카드</option>
+          <option value="계좌이체">계좌이체</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>비고</label>
+        <input type="text" id="expense-notes-input">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="expense-save-btn" class="ob-btn primary">저장</button>
+      <button id="expense-cancel-btn" class="ob-btn secondary">취소</button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+### 8.4.2. CommonScripts.html 추가 - 페이지 초기화 함수
+
+**CommonScripts.html에 추가**:
+
+```javascript
+/**
+ * 결제관리 페이지 초기화
+ */
+function initPaymentManagement() {
+  console.log('[initPaymentManagement] 결제관리 페이지 초기화');
+
+  // 탭 전환 이벤트
+  document.querySelectorAll('.tab-nav-item').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var targetTab = this.dataset.tab;
+
+      // 탭 활성화
+      document.querySelectorAll('.tab-nav-item').forEach(function(t) {
+        t.classList.remove('active');
+      });
+      this.classList.add('active');
+
+      // 콘텐츠 표시
+      document.querySelectorAll('.tab-content').forEach(function(c) {
+        c.classList.remove('active');
+      });
+      document.getElementById('tab-' + targetTab).classList.add('active');
+    });
+  });
+
+  // 입출금 내역 탭 초기화
+  initPaymentRecordsTab();
+
+  // 회사비용 탭 초기화
+  initExpenseRecordsTab();
+}
+
+/**
+ * 입출금 내역 탭 초기화
+ */
+function initPaymentRecordsTab() {
+  // 조회 버튼
+  document.getElementById('payment-search-btn').addEventListener('click', function() {
+    loadPaymentRecords();
+  });
+
+  // 초기화 버튼
+  document.getElementById('payment-reset-btn').addEventListener('click', function() {
+    document.getElementById('payment-type-filter').value = '';
+    document.getElementById('payment-company-filter').value = '';
+    document.getElementById('payment-start-date').value = '';
+    document.getElementById('payment-end-date').value = '';
+    document.getElementById('payment-doc-filter').value = '';
+  });
+
+  // 추가 버튼
+  document.getElementById('payment-add-btn').addEventListener('click', function() {
+    openPaymentModal('add');
+  });
+
+  // Excel 내보내기
+  document.getElementById('payment-export-excel').addEventListener('click', function() {
+    exportPaymentToExcel();
+  });
+
+  // PDF 내보내기
+  document.getElementById('payment-export-pdf').addEventListener('click', function() {
+    exportPaymentToPDF();
+  });
+
+  // 문서번호 자동완성
+  setupDocumentAutocomplete();
+
+  // 초기 로드
+  loadPaymentRecords();
+}
+
+/**
+ * 회사비용 탭 초기화
+ */
+function initExpenseRecordsTab() {
+  // 조회 버튼
+  document.getElementById('expense-search-btn').addEventListener('click', function() {
+    loadExpenseRecords();
+  });
+
+  // 초기화 버튼
+  document.getElementById('expense-reset-btn').addEventListener('click', function() {
+    document.getElementById('expense-category-filter').value = '';
+    document.getElementById('expense-start-date').value = '';
+    document.getElementById('expense-end-date').value = '';
+  });
+
+  // 추가 버튼
+  document.getElementById('expense-add-btn').addEventListener('click', function() {
+    openExpenseModal('add');
+  });
+
+  // Excel 내보내기
+  document.getElementById('expense-export-excel').addEventListener('click', function() {
+    exportExpenseToExcel();
+  });
+
+  // PDF 내보내기
+  document.getElementById('expense-export-pdf').addEventListener('click', function() {
+    exportExpenseToPDF();
+  });
+}
+
+/**
+ * 입출금 기록 로드
+ */
+function loadPaymentRecords() {
+  var params = {
+    type: document.getElementById('payment-type-filter').value,
+    company: document.getElementById('payment-company-filter').value,
+    startDate: document.getElementById('payment-start-date').value,
+    endDate: document.getElementById('payment-end-date').value,
+    docNumber: document.getElementById('payment-doc-filter').value,
+    includeDeleted: false
+  };
+
+  OB.showLoading('입출금 내역 조회 중...');
+
+  google.script.run
+    .withSuccessHandler(function(response) {
+      OB.hideLoading();
+      if (response.success) {
+        renderPaymentRecords(response.payments);
+        updatePaymentSummary(response.payments);
+      } else {
+        OB.showError(response.error || '조회 실패');
+      }
+    })
+    .withFailureHandler(function(error) {
+      OB.hideLoading();
+      OB.showError('조회 중 오류 발생: ' + error.message);
+    })
+    .getPaymentRecordsApi(params);
+}
+
+/**
+ * 입출금 테이블 렌더링
+ */
+function renderPaymentRecords(payments) {
+  var tbody = document.getElementById('payment-records-tbody');
+  tbody.innerHTML = '';
+
+  if (!payments || payments.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>';
+    return;
+  }
+
+  payments.forEach(function(payment) {
+    var tr = document.createElement('tr');
+
+    // 유형에 따라 색상 구분
+    var typeClass = payment.type === '입금' ? 'income' : 'expense';
+
+    tr.innerHTML =
+      '<td>' + OB.formatDate(payment.date) + '</td>' +
+      '<td><span class="badge ' + typeClass + '">' + payment.type + '</span></td>' +
+      '<td>' + payment.company + '</td>' +
+      '<td class="num">' + OB.formatNumber(payment.amount) + '원</td>' +
+      '<td>' + payment.method + '</td>' +
+      '<td>' + (payment.docNumber || '-') + '</td>' +
+      '<td>' + (payment.notes || '-') + '</td>' +
+      '<td>' +
+        '<button class="action-btn edit" data-id="' + payment.paymentId + '">수정</button> ' +
+        '<button class="action-btn delete" data-id="' + payment.paymentId + '">삭제</button>' +
+      '</td>';
+
+    tbody.appendChild(tr);
+  });
+
+  // 수정/삭제 버튼 이벤트
+  tbody.querySelectorAll('.edit').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var paymentId = this.dataset.id;
+      openPaymentModal('edit', paymentId);
+    });
+  });
+
+  tbody.querySelectorAll('.delete').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var paymentId = this.dataset.id;
+      deletePayment(paymentId);
+    });
+  });
+}
+
+/**
+ * 입출금 요약 업데이트
+ */
+function updatePaymentSummary(payments) {
+  var totalIncome = 0;
+  var totalExpense = 0;
+
+  payments.forEach(function(payment) {
+    if (payment.type === '입금') {
+      totalIncome += Number(payment.amount) || 0;
+    } else {
+      totalExpense += Number(payment.amount) || 0;
+    }
+  });
+
+  var netProfit = totalIncome - totalExpense;
+
+  document.getElementById('payment-total-income').textContent = '₩' + OB.formatNumber(totalIncome);
+  document.getElementById('payment-total-expense').textContent = '₩' + OB.formatNumber(totalExpense);
+  document.getElementById('payment-net-profit').textContent = '₩' + OB.formatNumber(netProfit);
+
+  // 순이익 색상
+  var profitEl = document.getElementById('payment-net-profit');
+  if (netProfit > 0) {
+    profitEl.style.color = '#059669';
+  } else if (netProfit < 0) {
+    profitEl.style.color = '#dc2626';
+  } else {
+    profitEl.style.color = '#6b7280';
+  }
+}
+
+/**
+ * 문서번호 자동완성 설정
+ */
+function setupDocumentAutocomplete() {
+  var input = document.getElementById('payment-doc-input');
+  var suggestionsDiv = document.getElementById('payment-doc-suggestions');
+
+  input.addEventListener('input', function() {
+    var query = this.value.trim();
+
+    if (query.length < 3) {
+      suggestionsDiv.innerHTML = '';
+      suggestionsDiv.style.display = 'none';
+      return;
+    }
+
+    // 문서번호 검색
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success && response.suggestions.length > 0) {
+          renderDocumentSuggestions(response.suggestions, suggestionsDiv, input);
+        } else {
+          suggestionsDiv.innerHTML = '';
+          suggestionsDiv.style.display = 'none';
+        }
+      })
+      .searchDocumentNumbersApi({ query: query });
+  });
+
+  // 외부 클릭 시 닫기
+  document.addEventListener('click', function(e) {
+    if (e.target !== input) {
+      suggestionsDiv.style.display = 'none';
+    }
+  });
+}
+
+/**
+ * 문서번호 제안 렌더링
+ */
+function renderDocumentSuggestions(suggestions, container, input) {
+  container.innerHTML = '';
+  container.style.display = 'block';
+
+  suggestions.forEach(function(suggestion) {
+    var div = document.createElement('div');
+    div.className = 'suggestion-item';
+    div.textContent = suggestion.docNumber + ' (' + suggestion.company + ')';
+
+    div.addEventListener('click', function() {
+      input.value = suggestion.docNumber;
+      container.style.display = 'none';
+    });
+
+    container.appendChild(div);
+  });
+}
+
+// ... (더 많은 함수들: openPaymentModal, savePayment, deletePayment, exportPaymentToExcel 등)
+```
+
+---
+
+## 8.5. 거래원장 연동
+
+### 8.5.1. 상세 모달 문서 정보 섹션
+
+**CommonScripts.html 수정** - 거래원장 상세 모달에 추가:
+
+```javascript
+/**
+ * 거래원장 상세 모달 - 문서 정보 섹션 렌더링
+ */
+function renderDocumentInfoSection(orderNumber) {
+  var container = document.getElementById('ledger-doc-info');
+
+  if (!container) return;
+
+  container.innerHTML = '<div style="text-align:center;color:#777;">조회 중...</div>';
+
+  // 청구서 존재 여부 확인
+  google.script.run
+    .withSuccessHandler(function(response) {
+      if (response.success) {
+        if (response.exists && response.invoices.length > 0) {
+          // 케이스 1: 청구서 발급됨
+          var invoice = response.invoices[0]; // 1:1 관계이므로 첫 번째 것만
+
+          container.innerHTML =
+            '<div class="doc-info-box success">' +
+              '<div class="doc-status-badge success">✅ 청구서 발급됨</div>' +
+              '<div class="doc-details">' +
+                '<div class="doc-detail-row">' +
+                  '<span class="doc-label">문서번호:</span> ' +
+                  '<span class="doc-value">' + invoice.invoiceId + '</span>' +
+                '</div>' +
+                '<div class="doc-detail-row">' +
+                  '<span class="doc-label">발급일:</span> ' +
+                  '<span class="doc-value">' + OB.formatDate(invoice.invoiceDate) + '</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+        } else {
+          // 케이스 2: 청구서 미발급
+          container.innerHTML =
+            '<div class="doc-info-box warning">' +
+              '<div class="doc-status-badge warning">⚠️ 청구서 미발급</div>' +
+            '</div>';
+        }
+      } else {
+        container.innerHTML = '<div style="color:#dc2626;">조회 실패: ' + response.error + '</div>';
+      }
+    })
+    .withFailureHandler(function(error) {
+      container.innerHTML = '<div style="color:#dc2626;">오류 발생: ' + error.message + '</div>';
+    })
+    .checkInvoiceExistsApi({ orderNumber: orderNumber });
+}
+```
+
+**CSS 스타일 (CommonHead.html에 추가)**:
+
+```css
+/* 문서 정보 섹션 */
+.ledger-modal-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.ledger-modal-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  color: #374151;
+}
+
+.doc-info-box {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.doc-info-box.success {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.doc-info-box.warning {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.doc-status-badge {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.doc-status-badge.success {
+  color: #059669;
+}
+
+.doc-status-badge.warning {
+  color: #d97706;
+}
+
+.doc-details {
+  margin-top: 8px;
+}
+
+.doc-detail-row {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 4px 0;
+}
+
+.doc-label {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.doc-value {
+  color: #1f2937;
+}
+```
+
+---
+
+## 8.6. 사용 시나리오
+
+### 시나리오 1: 청구서 발급 후 입금 기록
+
+**사용자 플로우**:
+```
+1. [거래원장] 메뉴에서 발주건 확인
+2. [청구서 생성] 버튼 클릭 → 청구DB에 INV-20251219-003 생성
+3. 거래처로부터 500,000원 입금 확인 (실제 은행 거래)
+4. [결제관리] 메뉴 → [입출금 내역] 탭 → [+ 입출금 기록 추가]
+5. 모달에서 입력:
+   - 유형: 입금
+   - 일자: 2025-12-19
+   - 거래처: A거래처
+   - 금액: 500000
+   - 결제수단: 계좌이체
+   - 문서번호: INV-2... (자동완성으로 INV-20251219-003 선택)
+   - 비고: 1차 부분 결제
+6. [저장] 클릭 → 결제내역 시트에 PAY-20251219-001 생성
+7. 요약 통계에서 총 입금액 500,000원 확인
+```
+
+**데이터 연결**:
+```
+[거래원장]
+발주번호: GMP-20251201-001
+
+[청구DB]
+청구ID: INV-20251219-003
+발주번호: ["GMP-20251201-001"]
+
+[결제내역]
+결제ID: PAY-20251219-001
+문서번호: INV-20251219-003
+발주번호: GMP-20251201-001
+```
+
+---
+
+### 시나리오 2: 확정수량 변경으로 청구서 재발급
+
+**사용자 플로우**:
+```
+1. [거래원장] 상세 모달에서 확정수량 100개 → 120개로 수정
+2. 기존 청구서 INV-20251219-003 취소 필요
+3. [결제관리] 또는 [청구서 관리]에서 취소 기능 실행
+   - 기존 청구서 상태: ISSUED → CANCELLED
+   - 대체청구서: INV-20251220-004 (자동 생성)
+4. 새 청구서 INV-20251220-004 발행
+   - 원본청구서: INV-20251219-003
+   - 금액: 1,200,000원 (수정된 수량 기준)
+5. 거래처에게 INV-20251220-004 전달
+```
+
+**데이터 이력**:
+```
+[청구DB]
+청구ID              상태       금액       대체청구서         원본청구서
+INV-20251219-003   CANCELLED  1,000,000  INV-20251220-004  -
+INV-20251220-004   ISSUED     1,200,000  -                 INV-20251219-003
+
+히스토리 조회 시:
+INV-20251219-003 → 취소됨 (수정 청구서: INV-20251220-004)
+INV-20251220-004 → 발급완료 (원본 청구서: INV-20251219-003)
+```
+
+---
+
+### 시나리오 3: 회사비용 기록 (문서 없음)
+
+**사용자 플로우**:
+```
+1. [결제관리] 메뉴 → [회사비용] 탭
+2. [+ 비용 추가] 클릭
+3. 모달에서 입력:
+   - 일자: 2025-12-19
+   - 항목: 통신비
+   - 금액: 50000
+   - 결제수단: 카드
+   - 비고: 사무실 인터넷 요금
+4. [저장] 클릭 → 회사비용 시트에 EXP-20251219-001 생성
+5. 요약 통계에서 총 비용 50,000원, 통신비 항목 확인
+```
+
+**데이터 독립성**:
+```
+[회사비용]
+비용ID: EXP-20251219-001
+항목: 통신비
+금액: 50000
+
+→ 문서번호, 발주번호 없이도 독립적으로 기록 가능
+```
+
+---
+
+### 시나리오 4: 입출금 내역 Excel 내보내기
+
+**사용자 플로우**:
+```
+1. [결제관리] → [입출금 내역] 탭
+2. 필터 설정:
+   - 기간: 2025-12-01 ~ 2025-12-31
+   - 유형: 전체
+3. [조회] 클릭 → 100건 조회
+4. [📥 Excel 내보내기] 클릭
+5. 구글 시트로 내보내기:
+   - 시트명: "결제내역_20251219"
+   - 컬럼: 결제ID, 결제일, 결제유형, 거래처명, 금액, 결제수단, 문서번호, 발주번호, 비고
+   - 데이터: 현재 화면에 표시된 전체 데이터 (필터 적용된 상태)
+6. 새 탭에서 구글 시트 열림 → 다운로드 또는 인쇄 가능
+```
+
+---
+
+## 8.7. 구현 체크리스트
+
+### Phase 1: 데이터 구조 (완료 시 체크)
+- [ ] [결제내역] 시트 생성 (14개 컬럼)
+- [ ] [회사비용] 시트 생성 (11개 컬럼)
+- [ ] [청구DB] 시트에 "대체청구서", "원본청구서" 컬럼 추가
+- [ ] 데이터 유효성 검사 (드롭다운) 설정
+
+### Phase 2: 백엔드 (완료 시 체크)
+- [ ] PaymentService.js 생성
+  - [ ] addPaymentRecord()
+  - [ ] getPaymentRecords()
+  - [ ] updatePaymentRecord()
+  - [ ] deletePaymentRecord() - 소프트 삭제
+  - [ ] getPaymentSummary()
+  - [ ] searchDocumentNumbers()
+  - [ ] addExpenseRecord()
+  - [ ] getExpenseRecords()
+  - [ ] updateExpenseRecord()
+  - [ ] deleteExpenseRecord() - 소프트 삭제
+  - [ ] getExpenseSummary()
+  - [ ] cancelAndReissueInvoice()
+  - [ ] getInvoiceHistory()
+  - [ ] generatePaymentId()
+  - [ ] generateExpenseId()
+
+- [ ] ApiService.js 수정
+  - [ ] 12개 API 래퍼 함수 추가
+
+### Phase 3: 프론트엔드 (완료 시 체크)
+- [ ] Page_PaymentManagement.html 생성
+  - [ ] 2개 탭 구조 (입출금 내역, 회사비용)
+  - [ ] 입출금 내역 테이블 + 필터
+  - [ ] 회사비용 테이블 + 필터
+  - [ ] 입출금 추가/수정 모달
+  - [ ] 회사비용 추가/수정 모달
+  - [ ] 요약 카드 (통계)
+  - [ ] 내보내기 버튼
+
+- [ ] CommonScripts.html 수정
+  - [ ] initPaymentManagement()
+  - [ ] loadPaymentRecords()
+  - [ ] renderPaymentRecords()
+  - [ ] updatePaymentSummary()
+  - [ ] setupDocumentAutocomplete()
+  - [ ] openPaymentModal()
+  - [ ] savePayment()
+  - [ ] deletePayment()
+  - [ ] loadExpenseRecords()
+  - [ ] renderExpenseRecords()
+  - [ ] openExpenseModal()
+  - [ ] saveExpense()
+  - [ ] deleteExpense()
+  - [ ] exportPaymentToExcel()
+  - [ ] exportPaymentToPDF()
+  - [ ] exportExpenseToExcel()
+  - [ ] exportExpenseToPDF()
+
+- [ ] CommonHead.html 수정
+  - [ ] 결제관리 스타일 추가
+  - [ ] 모달 스타일
+  - [ ] 자동완성 스타일
+
+### Phase 4: 거래원장 연동 (완료 시 체크)
+- [ ] CommonScripts.html 수정
+  - [ ] renderDocumentInfoSection()
+  - [ ] 거래원장 상세 모달에 섹션 추가
+
+- [ ] Layout.html 수정 (필요 시)
+  - [ ] 거래원장 모달 HTML 구조 업데이트
+
+### Phase 5: 청구서 이력 관리 (완료 시 체크)
+- [ ] InvoiceService.js 수정
+  - [ ] createInvoiceFromSettlement() 확장 (대체청구서, 원본청구서 처리)
+
+### Phase 6: 테스트 (완료 시 체크)
+- [ ] 입출금 CRUD 테스트
+- [ ] 회사비용 CRUD 테스트
+- [ ] 문서번호 자동완성 테스트
+- [ ] 청구서 취소/재발급 테스트
+- [ ] 소프트 삭제 테스트
+- [ ] Excel/PDF 내보내기 테스트
+- [ ] 거래원장 문서 정보 표시 테스트
+
+---
+
 ## C. 변경 이력
 
 | 버전 | 날짜 | 변경 내용 |
@@ -2084,6 +3267,7 @@ function renderTable() {
 | 2.3.0 | 2025-12-06 | **Codex 통합 (테스트 진행 중)** - Issue #005~#011 해결, 거래원장 페이지 신규, 인보이스관리 페이지 신규, 마감상세 모달, 청구서 재출력, 코드 리팩토링 (+1,783줄/-566줄) |
 | **2.4.0** | **2025-12-16** | **🔴 설계 개선 및 구현 계획** - 거래원장 4개 상태 컬럼 명시 (매입발주/매입결제/매출결제/출고), Phase 1-2 (2-Track 청구서) 설계 추가, 거래원장 페이지 표준 구조 정의, 3단계 구현 로드맵 수립 |
 | **2.5.0** | **2025-12-18** | **📐 UI/UX 패턴 템플릿 추가 (PART 7)** - 거래원장을 표준 템플릿으로 정의, 7가지 핵심 패턴 문서화 (레이아웃, 체크박스, 상태 표시, 모달, 일괄 작업, 백엔드 처리, 데이터 집계), 다른 메뉴(청구서, 마감 등) 참고 기준 확립 |
+| **2.6.0** | **2025-12-19** | **💰 결제관리 시스템 명세 추가 (PART 8)** - 입출금 내역 관리, 회사비용 관리, 청구서 취소/재발급 로직, 문서번호 자동완성, 소프트 삭제, Excel/PDF 내보내기, 거래원장 문서 정보 섹션, 데이터 구조 설계 (결제내역/회사비용 시트), PaymentService.js 함수 명세, UI/UX 구조 정의, 4가지 사용 시나리오, 구현 체크리스트 |
 
 ---
 
