@@ -933,3 +933,105 @@ function updateBulkOrderStatusApi(params) {
   var result = updateBulkOrderStatus(params);
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * 결제관리 API (PaymentService) - Phase 2
+ * ============================================================
+ */
+
+/**
+ * 입출금 내역 추가
+ */
+function addPaymentRecordApi(params) {
+  var result = addPaymentRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 입출금 내역 조회
+ */
+function getPaymentRecordsApi(params) {
+  var result = getPaymentRecords(params);
+  return safeReturn(result);
+}
+
+/**
+ * 입출금 내역 수정
+ */
+function updatePaymentRecordApi(params) {
+  var result = updatePaymentRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 입출금 내역 삭제 (소프트 삭제)
+ */
+function deletePaymentRecordApi(params) {
+  var result = deletePaymentRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 입출금 통계 요약
+ */
+function getPaymentSummaryApi(params) {
+  var result = getPaymentSummary(params);
+  return safeReturn(result);
+}
+
+/**
+ * 문서번호 자동완성 검색
+ */
+function searchDocumentNumbersApi(params) {
+  var result = searchDocumentNumbers(params);
+  return safeReturn(result);
+}
+
+/**
+ * 회사비용 추가
+ */
+function addExpenseRecordApi(params) {
+  var result = addExpenseRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 회사비용 조회
+ */
+function getExpenseRecordsApi(params) {
+  var result = getExpenseRecords(params);
+  return safeReturn(result);
+}
+
+/**
+ * 회사비용 수정
+ */
+function updateExpenseRecordApi(params) {
+  var result = updateExpenseRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 회사비용 삭제 (소프트 삭제)
+ */
+function deleteExpenseRecordApi(params) {
+  var result = deleteExpenseRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 회사비용 통계 요약
+ */
+function getExpenseSummaryApi(params) {
+  var result = getExpenseSummary(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 이력 조회 (취소/재발급 체인)
+ */
+function getInvoiceHistoryApi(params) {
+  var result = getInvoiceHistory(params);
+  return safeReturn(result);
+}
