@@ -1035,3 +1035,11 @@ function getInvoiceHistoryApi(params) {
   var result = getInvoiceHistory(params);
   return safeReturn(result);
 }
+
+/**
+ * 청구서 취소 및 재발급
+ */
+function cancelAndReissueInvoiceApi(params) {
+  var result = cancelAndReissueInvoice(params);
+  return safeReturn(result);
+}
