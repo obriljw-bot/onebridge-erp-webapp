@@ -5816,6 +5816,134 @@
       .deleteExpenseRecordApi({ expenseId: expenseId });
   }
 
+  // ============================================================
+  // 거래원장 - 문서 정보 섹션 (Phase 4)
+  // ============================================================
+
+  /**
+   * 거래 상세 정보 보기 (문서 정보 포함)
+   */
+  function viewTransactionDetail(orderCode) {
+    if (!orderCode) {
+      alert('발주번호가 필요합니다.');
+      return;
+    }
+
+    OB.showLoading('거래 상세 조회 중...');
+
+    // 거래 정보 조회
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (!result || !result.success) {
+          OB.hideLoading();
+          alert('거래 정보 조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+          return;
+        }
+
+        // 거래 정보 표시
+        var transactions = result.transactions || [];
+        if (transactions.length === 0) {
+          OB.hideLoading();
+          alert('거래 정보를 찾을 수 없습니다.');
+          return;
+        }
+
+        // 첫 번째 거래 정보로 표시 (같은 발주번호는 동일한 기본 정보를 가짐)
+        var tx = transactions[0];
+
+        document.getElementById('detail-order-date').textContent = tx.orderDate || '-';
+        document.getElementById('detail-order-code').textContent = tx.orderCode || '-';
+        document.getElementById('detail-buyer').textContent = tx.buyer || '-';
+        document.getElementById('detail-brand').textContent = tx.brand || '-';
+
+        // 수량과 금액 합계 계산
+        var totalOrderQty = 0;
+        var totalConfirmedQty = 0;
+        var totalPurchaseAmount = 0;
+        var totalSupplyAmount = 0;
+
+        transactions.forEach(function(t) {
+          totalOrderQty += parseFloat(t.orderQty || 0);
+          totalConfirmedQty += parseFloat(t.confirmedQty || 0);
+          totalPurchaseAmount += parseFloat(t.purchaseAmount || 0);
+          totalSupplyAmount += parseFloat(t.supplyAmount || 0);
+        });
+
+        document.getElementById('detail-order-qty').textContent = OB.formatNumber(totalOrderQty);
+        document.getElementById('detail-confirmed-qty').textContent = OB.formatNumber(totalConfirmedQty);
+        document.getElementById('detail-purchase-amount').textContent = '₩' + OB.formatNumber(totalPurchaseAmount);
+        document.getElementById('detail-supply-amount').textContent = '₩' + OB.formatNumber(totalSupplyAmount);
+
+        // 모달 표시
+        document.getElementById('ledger-detail-modal').classList.add('active');
+
+        // 관련 결제 내역 로드
+        loadDocumentPayments(orderCode);
+      })
+      .withFailureHandler(function(error) {
+        OB.hideLoading();
+        console.error('[ERROR] Load transaction detail failed:', error);
+        alert('거래 정보 조회 실패: ' + error.message);
+      })
+      .getTransactionsApi({ orderCode: orderCode });
+  }
+
+  /**
+   * 문서 관련 결제 내역 로드
+   */
+  function loadDocumentPayments(orderCode) {
+    // 발주번호로 결제 내역 조회
+    google.script.run
+      .withSuccessHandler(function(result) {
+        OB.hideLoading();
+
+        if (!result || !result.success) {
+          console.error('결제 내역 조회 실패:', result);
+          renderDocumentPayments([]);
+          return;
+        }
+
+        renderDocumentPayments(result.payments || []);
+      })
+      .withFailureHandler(function(error) {
+        OB.hideLoading();
+        console.error('[ERROR] Load document payments failed:', error);
+        renderDocumentPayments([]);
+      })
+      .getPaymentRecordsApi({
+        orderNumber: orderCode,
+        includeDeleted: false
+      });
+  }
+
+  /**
+   * 문서 정보 섹션 - 결제 내역 렌더링
+   */
+  function renderDocumentPayments(payments) {
+    var tbody = document.getElementById('ledger-payment-tbody');
+
+    if (!payments || payments.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="ledger-payment-empty">이 발주와 관련된 결제 내역이 없습니다.</td></tr>';
+      return;
+    }
+
+    var rows = payments.map(function(payment) {
+      var badgeClass = payment.type === '입금' ? 'income' : 'expense';
+
+      return '<tr>' +
+        '<td>' + (payment.paymentId || '') + '</td>' +
+        '<td>' + (payment.date || '') + '</td>' +
+        '<td><span class="ledger-payment-badge ' + badgeClass + '">' + (payment.type || '') + '</span></td>' +
+        '<td>' + (payment.company || '') + '</td>' +
+        '<td class="num">₩' + OB.formatNumber(payment.amount || 0) + '</td>' +
+        '<td>' + (payment.method || '') + '</td>' +
+        '<td>' + (payment.notes || '-') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    tbody.innerHTML = rows;
+  }
+
 </script>
 
 <!-- 전역 로딩 오버레이 -->

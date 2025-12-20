@@ -31,6 +31,33 @@
 
   .ledger-action-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .ledger-status-select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; min-width: 120px; }
+
+  /* 거래 상세 모달 */
+  .ledger-detail-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; }
+  .ledger-detail-modal.active { display: flex; }
+  .ledger-detail-content { background: #fff; border-radius: 12px; max-width: 900px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 20px; position: relative; }
+  .ledger-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb; }
+  .ledger-detail-header h2 { margin: 0; font-size: 20px; color: #111827; }
+  .ledger-detail-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280; padding: 0; width: 32px; height: 32px; }
+  .ledger-detail-close:hover { color: #111827; }
+  .ledger-detail-section { margin-bottom: 20px; }
+  .ledger-detail-section h3 { margin: 0 0 10px; font-size: 16px; color: #374151; font-weight: 600; }
+  .ledger-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .ledger-detail-field { padding: 10px; background: #f9fafb; border-radius: 6px; }
+  .ledger-detail-field-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; font-weight: 600; }
+  .ledger-detail-field-value { font-size: 14px; color: #111827; font-weight: 500; }
+
+  /* 문서 정보 섹션 (결제 내역) */
+  .ledger-payment-section { background: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; }
+  .ledger-payment-section h3 { color: #1e40af; }
+  .ledger-payment-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .ledger-payment-table th, .ledger-payment-table td { padding: 8px; border-bottom: 1px solid #dbeafe; text-align: left; }
+  .ledger-payment-table th { background: #dbeafe; font-weight: 600; color: #1e40af; }
+  .ledger-payment-table td.num { text-align: right; }
+  .ledger-payment-empty { text-align: center; padding: 20px; color: #6b7280; font-size: 13px; }
+  .ledger-payment-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+  .ledger-payment-badge.income { background: #d1fae5; color: #065f46; }
+  .ledger-payment-badge.expense { background: #fee2e2; color: #991b1b; }
 </style>
 
 <div class="ledger-wrap">
@@ -124,3 +151,93 @@
     </table>
   </div>
 </div>
+
+<!-- 거래 상세 모달 -->
+<div class="ledger-detail-modal" id="ledger-detail-modal">
+  <div class="ledger-detail-content">
+    <div class="ledger-detail-header">
+      <h2>거래 상세 정보</h2>
+      <button class="ledger-detail-close" id="ledger-detail-close">&times;</button>
+    </div>
+
+    <!-- 기본 정보 -->
+    <div class="ledger-detail-section">
+      <h3>발주 정보</h3>
+      <div class="ledger-detail-grid">
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">발주일</div>
+          <div class="ledger-detail-field-value" id="detail-order-date">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">발주번호</div>
+          <div class="ledger-detail-field-value" id="detail-order-code">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">발주처</div>
+          <div class="ledger-detail-field-value" id="detail-buyer">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">브랜드</div>
+          <div class="ledger-detail-field-value" id="detail-brand">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">발주수량</div>
+          <div class="ledger-detail-field-value" id="detail-order-qty">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">확정수량</div>
+          <div class="ledger-detail-field-value" id="detail-confirmed-qty">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">매입액</div>
+          <div class="ledger-detail-field-value" id="detail-purchase-amount">-</div>
+        </div>
+        <div class="ledger-detail-field">
+          <div class="ledger-detail-field-label">공급액</div>
+          <div class="ledger-detail-field-value" id="detail-supply-amount">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 문서 정보 섹션 (결제 내역) -->
+    <div class="ledger-detail-section ledger-payment-section">
+      <h3>📋 문서 정보 - 관련 결제 내역</h3>
+      <div id="ledger-payment-info">
+        <table class="ledger-payment-table">
+          <thead>
+            <tr>
+              <th>결제ID</th>
+              <th>결제일</th>
+              <th>유형</th>
+              <th>거래처</th>
+              <th class="num">금액</th>
+              <th>결제수단</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-payment-tbody">
+            <tr><td colspan="7" class="ledger-payment-empty">관련 결제 내역이 없습니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // 모달 닫기 이벤트
+  document.getElementById('ledger-detail-close').addEventListener('click', function() {
+    document.getElementById('ledger-detail-modal').classList.remove('active');
+  });
+
+  // 모달 외부 클릭시 닫기
+  document.getElementById('ledger-detail-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.classList.remove('active');
+    }
+  });
+
+  // 거래 상세 보기 함수 (CommonScripts.html에서 구현)
+  function viewTransactionDetail(orderCode) { /* CommonScripts.html 참조 */ }
+</script>
