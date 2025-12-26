@@ -116,6 +116,15 @@ function addPaymentRecord(params) {
 
     Logger.log('[addPaymentRecord] ✅ 입출금 기록 추가 (' + nextRow + '행): ' + paymentId);
 
+    // 발주 연동: 결제 상태 재계산 및 동기화
+    if (params.orderNumber && params.orderNumber !== '') {
+      var syncResult = syncOrderPaymentStatus(params.orderNumber, params.type);
+      if (!syncResult.success) {
+        Logger.log('[addPaymentRecord] ⚠️ 발주 동기화 실패: ' + syncResult.error);
+        // 동기화 실패해도 입출금 추가는 성공으로 처리
+      }
+    }
+
     return {
       success: true,
       paymentId: paymentId,
@@ -293,12 +302,19 @@ function updatePaymentRecord(params) {
 
     var col = function(name) { return header.indexOf(name); };
     var cPaymentId = col('결제ID');
+    var cOrderNumber = col('발주번호');
+    var cType = col('결제유형');
 
     // 해당 행 찾기
     var rowIndex = -1;
+    var oldOrderNumber = '';
+    var oldType = '';
+
     for (var i = 1; i < data.length; i++) {
       if (data[i][cPaymentId] === params.paymentId) {
         rowIndex = i + 1; // 1-based
+        oldOrderNumber = data[i][cOrderNumber] || '';
+        oldType = data[i][cType] || '';
         break;
       }
     }
@@ -329,14 +345,23 @@ function updatePaymentRecord(params) {
     if (params.docNumber !== undefined) {
       sheet.getRange(rowIndex, col('문서번호') + 1).setValue(params.docNumber);
     }
-    if (params.orderNumber !== undefined) {
-      sheet.getRange(rowIndex, col('발주번호') + 1).setValue(params.orderNumber);
-    }
+    // 발주번호는 수정 불가 (복잡도 때문에 제외)
     if (params.notes !== undefined) {
       sheet.getRange(rowIndex, col('비고') + 1).setValue(params.notes);
     }
 
     Logger.log('[updatePaymentRecord] ✅ 입출금 수정: ' + params.paymentId);
+
+    // 발주 연동: 결제 상태 재계산 및 동기화
+    var newType = params.type || oldType;
+
+    if (oldOrderNumber && oldOrderNumber !== '') {
+      var syncResult = syncOrderPaymentStatus(oldOrderNumber, newType);
+      if (!syncResult.success) {
+        Logger.log('[updatePaymentRecord] ⚠️ 발주 동기화 실패: ' + syncResult.error);
+        // 동기화 실패해도 입출금 수정은 성공으로 처리
+      }
+    }
 
     return {
       success: true,
@@ -1341,4 +1366,130 @@ function formatDateString(date) {
   var day = String(d.getDate()).padStart(2, '0');
 
   return year + '-' + month + '-' + day;
+}
+
+// ============================================================
+// 발주 연동 함수 (Payment-Order Sync)
+// ============================================================
+
+/**
+ * 발주의 결제 상태 자동 계산
+ * @param {string} orderId - 발주번호
+ * @param {string} paymentType - '입금' 또는 '출금'
+ * @return {string} '미결제' | '부분결제' | '결제완료'
+ */
+function calculatePaymentStatus(orderId, paymentType) {
+  try {
+    if (!orderId || !paymentType) {
+      return '미결제';
+    }
+
+    // 1. 발주 정보 조회
+    var orderResult = getOrderDetail(orderId);
+    if (!orderResult.success || !orderResult.orderItems || orderResult.orderItems.length === 0) {
+      Logger.log('[calculatePaymentStatus] 발주 없음: ' + orderId);
+      return '미결제';
+    }
+
+    var order = orderResult.orderItems[0];
+    var totalAmount = Number(order['확정금액']) || 0;
+
+    if (totalAmount === 0) {
+      Logger.log('[calculatePaymentStatus] 발주 금액 0: ' + orderId);
+      return '미결제';
+    }
+
+    // 2. 해당 발주번호에 대한 모든 입출금 내역 조회
+    var paymentsResult = getPaymentRecords({
+      includeDeleted: false
+    });
+
+    if (!paymentsResult.success) {
+      Logger.log('[calculatePaymentStatus] 입출금 조회 실패');
+      return '미결제';
+    }
+
+    // 3. 해당 발주번호 + 결제유형에 맞는 결제 합계 계산
+    var totalPaid = 0;
+    var payments = paymentsResult.payments || [];
+
+    for (var i = 0; i < payments.length; i++) {
+      var payment = payments[i];
+      if (payment.orderNumber === orderId && payment.type === paymentType) {
+        totalPaid += Number(payment.amount) || 0;
+      }
+    }
+
+    Logger.log('[calculatePaymentStatus] 발주: ' + orderId + ', 총액: ' + totalAmount + ', 결제액: ' + totalPaid);
+
+    // 4. 상태 판단
+    if (totalPaid === 0) {
+      return '미결제';
+    } else if (totalPaid < totalAmount) {
+      return '부분결제';
+    } else {
+      return '결제완료';
+    }
+
+  } catch (error) {
+    Logger.log('[calculatePaymentStatus] ❌ 오류: ' + error.message);
+    return '미결제';
+  }
+}
+
+/**
+ * 입출금 내역과 발주DB 결제 상태 동기화
+ * @param {string} orderNumber - 발주번호
+ * @param {string} paymentType - '입금' 또는 '출금'
+ * @return {Object} { success, message, error }
+ */
+function syncOrderPaymentStatus(orderNumber, paymentType) {
+  try {
+    if (!orderNumber || orderNumber === '') {
+      return { success: true, message: '발주번호 없음 (동기화 불필요)' };
+    }
+
+    if (!paymentType || (paymentType !== '입금' && paymentType !== '출금')) {
+      return {
+        success: false,
+        error: '결제유형이 올바르지 않습니다: ' + paymentType
+      };
+    }
+
+    // 결제 상태 계산
+    var status = calculatePaymentStatus(orderNumber, paymentType);
+
+    // 발주DB 업데이트할 컬럼 결정
+    var statusKey = paymentType === '입금' ? 'paySell' : 'payBuy';
+    var statuses = {};
+    statuses[statusKey] = status;
+
+    // 발주 상태 업데이트
+    var updateResult = updateOrderStatus(orderNumber, statuses);
+
+    if (!updateResult.success) {
+      Logger.log('[syncOrderPaymentStatus] ❌ 발주 상태 업데이트 실패: ' + updateResult.error);
+      return {
+        success: false,
+        error: '발주 상태 업데이트 실패: ' + updateResult.error
+      };
+    }
+
+    Logger.log('[syncOrderPaymentStatus] ✅ 발주 ' + orderNumber + ' - ' + statusKey + ': ' + status);
+
+    return {
+      success: true,
+      message: '발주 상태 동기화 완료',
+      orderNumber: orderNumber,
+      statusKey: statusKey,
+      status: status
+    };
+
+  } catch (error) {
+    Logger.log('[syncOrderPaymentStatus] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '발주 동기화 중 오류: ' + error.message
+    };
+  }
 }

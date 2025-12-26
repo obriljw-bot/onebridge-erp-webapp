@@ -5426,7 +5426,7 @@
         actionButtons = '<span style="color:#9ca3af; font-size:11px;">삭제됨</span>';
       }
 
-      return '<tr>' +
+      return '<tr data-payment-id="' + payment.paymentId + '">' +
         '<td>' + (payment.paymentId || '') + '</td>' +
         '<td>' + (payment.date || '') + '</td>' +
         '<td><span class="payment-badge ' + badgeClass + '">' + (payment.type || '') + '</span></td>' +
@@ -5541,11 +5541,199 @@
   }
 
   /**
-   * 입출금 내역 수정
+   * 입출금 내역 수정 - 인라인 편집 모드 활성화
    */
   function editPayment(paymentId) {
-    alert('입출금 내역 수정 기능은 향후 구현 예정입니다.\n결제ID: ' + paymentId);
-    // TODO: 편집 모달 구현
+    var row = document.querySelector('tr[data-payment-id="' + paymentId + '"]');
+    if (!row) {
+      alert('해당 결제 내역을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 이미 편집 중인지 확인
+    if (row.classList.contains('editing')) {
+      return;
+    }
+
+    // 다른 편집 중인 행이 있으면 취소
+    var editingRows = document.querySelectorAll('.payment-list tbody tr.editing');
+    editingRows.forEach(function(r) {
+      if (r.dataset.paymentId) {
+        cancelEditPayment(r.dataset.paymentId);
+      }
+    });
+
+    // 편집 모드로 전환
+    row.classList.add('editing');
+
+    var cells = row.cells;
+
+    // 원본 데이터 저장 (취소 시 복원용)
+    row.dataset.original = JSON.stringify({
+      date: cells[1].textContent.trim(),
+      type: cells[2].querySelector('.payment-badge') ? cells[2].querySelector('.payment-badge').textContent.trim() : '',
+      company: cells[3].textContent.trim(),
+      amount: cells[4].textContent.replace(/[₩,]/g, '').trim(),
+      method: cells[5].textContent.trim(),
+      docNumber: cells[6].textContent.trim(),
+      orderNumber: cells[7].textContent.trim(),
+      notes: cells[8].textContent.trim()
+    });
+
+    var original = JSON.parse(row.dataset.original);
+
+    // 결제일 (1번 셀)
+    cells[1].innerHTML = '<input type="date" class="edit-input" value="' + original.date + '" />';
+
+    // 결제유형 (2번 셀)
+    cells[2].innerHTML =
+      '<select class="edit-select">' +
+      '<option value="입금"' + (original.type === '입금' ? ' selected' : '') + '>입금</option>' +
+      '<option value="출금"' + (original.type === '출금' ? ' selected' : '') + '>출금</option>' +
+      '</select>';
+
+    // 거래처명 (3번 셀)
+    cells[3].innerHTML = '<input type="text" class="edit-input" value="' + original.company + '" />';
+
+    // 금액 (4번 셀)
+    cells[4].innerHTML = '<input type="number" class="edit-input" value="' + original.amount + '" min="1" />';
+
+    // 결제수단 (5번 셀)
+    cells[5].innerHTML =
+      '<select class="edit-select">' +
+      '<option value="현금"' + (original.method === '현금' ? ' selected' : '') + '>현금</option>' +
+      '<option value="카드"' + (original.method === '카드' ? ' selected' : '') + '>카드</option>' +
+      '<option value="계좌이체"' + (original.method === '계좌이체' ? ' selected' : '') + '>계좌이체</option>' +
+      '<option value="기타"' + (original.method === '기타' ? ' selected' : '') + '>기타</option>' +
+      '</select>';
+
+    // 문서번호 (6번 셀)
+    cells[6].innerHTML = '<input type="text" class="edit-input" value="' + (original.docNumber === '-' ? '' : original.docNumber) + '" />';
+
+    // 발주번호 (7번 셀) - 수정 불가, 읽기 전용 표시
+    cells[7].innerHTML = '<span style="color:#9ca3af;">' + original.orderNumber + ' (수정불가)</span>';
+
+    // 비고 (8번 셀)
+    cells[8].innerHTML = '<input type="text" class="edit-input" value="' + (original.notes === '-' ? '' : original.notes) + '" />';
+
+    // 액션 버튼 (10번 셀)
+    cells[10].innerHTML =
+      '<button class="payment-btn payment-btn-small success" onclick="savePaymentEdit(\'' + paymentId + '\')">저장</button> ' +
+      '<button class="payment-btn payment-btn-small" onclick="cancelEditPayment(\'' + paymentId + '\')">취소</button>';
+  }
+
+  /**
+   * 입출금 수정 저장
+   */
+  function savePaymentEdit(paymentId) {
+    var row = document.querySelector('tr[data-payment-id="' + paymentId + '"]');
+    if (!row) return;
+
+    var cells = row.cells;
+
+    // 입력값 수집
+    var date = cells[1].querySelector('input').value;
+    var type = cells[2].querySelector('select').value;
+    var company = cells[3].querySelector('input').value.trim();
+    var amount = parseFloat(cells[4].querySelector('input').value);
+    var method = cells[5].querySelector('select').value;
+    var docNumber = cells[6].querySelector('input').value.trim();
+    var notes = cells[8].querySelector('input').value.trim();
+
+    // 유효성 검사
+    if (!date) {
+      alert('결제일을 입력하세요.');
+      cells[1].querySelector('input').focus();
+      return;
+    }
+    if (!type) {
+      alert('결제유형을 선택하세요.');
+      cells[2].querySelector('select').focus();
+      return;
+    }
+    if (!company) {
+      alert('거래처명을 입력하세요.');
+      cells[3].querySelector('input').focus();
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      alert('올바른 금액을 입력하세요.');
+      cells[4].querySelector('input').focus();
+      return;
+    }
+    if (!method) {
+      alert('결제수단을 선택하세요.');
+      cells[5].querySelector('select').focus();
+      return;
+    }
+
+    var params = {
+      paymentId: paymentId,
+      date: date,
+      type: type,
+      company: company,
+      amount: amount,
+      method: method,
+      docNumber: docNumber || '',
+      notes: notes || ''
+    };
+
+    OB.showLoading('입출금 내역 수정 중...');
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        OB.hideLoading();
+
+        if (!result || !result.success) {
+          alert('입출금 내역 수정 실패: ' + (result ? result.error : '알 수 없는 오류'));
+          return;
+        }
+
+        alert('입출금 내역이 수정되었습니다.');
+
+        // 편집 모드 해제 및 목록 새로고침
+        row.classList.remove('editing');
+        loadPaymentList();
+        loadPaymentSummary();
+      })
+      .withFailureHandler(function(error) {
+        OB.hideLoading();
+        console.error('[ERROR] Update payment failed:', error);
+        alert('입출금 내역 수정 실패: ' + error.message);
+      })
+      .updatePaymentRecordApi(params);
+  }
+
+  /**
+   * 입출금 수정 취소
+   */
+  function cancelEditPayment(paymentId) {
+    var row = document.querySelector('tr[data-payment-id="' + paymentId + '"]');
+    if (!row || !row.classList.contains('editing')) return;
+
+    // 원본 데이터 복원
+    if (row.dataset.original) {
+      var original = JSON.parse(row.dataset.original);
+      var cells = row.cells;
+
+      cells[1].textContent = original.date;
+      cells[2].innerHTML = '<span class="payment-badge ' +
+        (original.type === '입금' ? 'income' : 'expense') + '">' +
+        original.type + '</span>';
+      cells[3].textContent = original.company;
+      cells[4].innerHTML = '₩' + OB.formatNumber(original.amount);
+      cells[5].textContent = original.method;
+      cells[6].textContent = original.docNumber || '-';
+      cells[7].textContent = original.orderNumber || '-';
+      cells[8].textContent = original.notes || '-';
+      cells[10].innerHTML =
+        '<button class="payment-btn payment-btn-small warning" onclick="editPayment(\'' + paymentId + '\')">수정</button> ' +
+        '<button class="payment-btn payment-btn-small danger" onclick="deletePayment(\'' + paymentId + '\')">삭제</button>';
+
+      delete row.dataset.original;
+    }
+
+    row.classList.remove('editing');
   }
 
   /**
