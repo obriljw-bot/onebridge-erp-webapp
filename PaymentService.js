@@ -184,6 +184,11 @@ function getPaymentRecords(params) {
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
 
+      // 빈 행 스킵 (결제ID가 없으면 빈 행으로 간주)
+      if (!row[cPaymentId] || row[cPaymentId] === '') {
+        continue;
+      }
+
       // 삭제 여부 체크
       if (!includeDeleted && row[cDeleted]) {
         continue;
@@ -670,6 +675,11 @@ function getExpenseRecords(params) {
 
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
+
+      // 빈 행 스킵 (비용ID가 없으면 빈 행으로 간주)
+      if (!row[cExpenseId] || row[cExpenseId] === '') {
+        continue;
+      }
 
       // 삭제 여부 체크
       if (!includeDeleted && row[cDeleted]) {
