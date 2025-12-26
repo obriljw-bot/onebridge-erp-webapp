@@ -99,10 +99,22 @@ function addPaymentRecord(params) {
       user                            // 입력자
     ];
 
-    // 시트에 추가
-    sheet.appendRow(rowData);
+    // 시트에 추가 - 실제 데이터가 있는 마지막 행 다음에 삽입
+    var lastDataRow = 1; // 헤더 행
+    var allData = sheet.getDataRange().getValues();
 
-    Logger.log('[addPaymentRecord] ✅ 입출금 기록 추가: ' + paymentId);
+    // 역순으로 검색하여 결제ID가 있는 마지막 행 찾기
+    for (var i = allData.length - 1; i > 0; i--) {
+      if (allData[i][0] && allData[i][0] !== '') { // 결제ID 컬럼 (첫 번째 컬럼)
+        lastDataRow = i + 1; // 배열 인덱스는 0부터, 행 번호는 1부터
+        break;
+      }
+    }
+
+    var nextRow = lastDataRow + 1;
+    sheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
+
+    Logger.log('[addPaymentRecord] ✅ 입출금 기록 추가 (' + nextRow + '행): ' + paymentId);
 
     return {
       success: true,
@@ -598,10 +610,22 @@ function addExpenseRecord(params) {
       user                            // 입력자
     ];
 
-    // 시트에 추가
-    sheet.appendRow(rowData);
+    // 시트에 추가 - 실제 데이터가 있는 마지막 행 다음에 삽입
+    var lastDataRow = 1; // 헤더 행
+    var allData = sheet.getDataRange().getValues();
 
-    Logger.log('[addExpenseRecord] ✅ 비용 기록 추가: ' + expenseId);
+    // 역순으로 검색하여 비용ID가 있는 마지막 행 찾기
+    for (var i = allData.length - 1; i > 0; i--) {
+      if (allData[i][0] && allData[i][0] !== '') { // 비용ID 컬럼 (첫 번째 컬럼)
+        lastDataRow = i + 1; // 배열 인덱스는 0부터, 행 번호는 1부터
+        break;
+      }
+    }
+
+    var nextRow = lastDataRow + 1;
+    sheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
+
+    Logger.log('[addExpenseRecord] ✅ 비용 기록 추가 (' + nextRow + '행): ' + expenseId);
 
     return {
       success: true,
