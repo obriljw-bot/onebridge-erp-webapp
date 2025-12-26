@@ -5905,7 +5905,7 @@
 
       var categoryStyle = isDeleted ? 'deleted' : '';
 
-      return '<tr>' +
+      return '<tr data-expense-id="' + expense.expenseId + '">' +
         '<td>' + (expense.expenseId || '') + '</td>' +
         '<td>' + (expense.date || '') + '</td>' +
         '<td><span class="payment-badge ' + categoryStyle + '">' + (expense.category || '') + '</span></td>' +
@@ -5969,11 +5969,173 @@
   }
 
   /**
-   * 회사비용 수정
+   * 회사비용 수정 - 인라인 편집 모드 활성화
    */
   function editExpense(expenseId) {
-    alert('회사비용 수정 기능은 향후 구현 예정입니다.\n비용ID: ' + expenseId);
-    // TODO: 편집 모달 구현
+    var row = document.querySelector('tr[data-expense-id="' + expenseId + '"]');
+    if (!row) {
+      alert('해당 비용 내역을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 이미 편집 중인지 확인
+    if (row.classList.contains('editing')) {
+      return;
+    }
+
+    // 다른 편집 중인 행이 있으면 취소
+    var editingRows = document.querySelectorAll('.expense-list tbody tr.editing');
+    editingRows.forEach(function(r) {
+      if (r.dataset.expenseId) {
+        cancelEditExpense(r.dataset.expenseId);
+      }
+    });
+
+    // 편집 모드로 전환
+    row.classList.add('editing');
+
+    var cells = row.cells;
+
+    // 원본 데이터 저장
+    row.dataset.original = JSON.stringify({
+      date: cells[1].textContent.trim(),
+      category: cells[2].textContent.trim(),
+      amount: cells[3].textContent.replace(/[₩,]/g, '').trim(),
+      method: cells[4].textContent.trim(),
+      notes: cells[5].textContent.trim()
+    });
+
+    var original = JSON.parse(row.dataset.original);
+
+    // 비용일 (1번 셀)
+    cells[1].innerHTML = '<input type="date" class="edit-input" value="' + original.date + '" />';
+
+    // 비용항목 (2번 셀)
+    var categories = ['인건비', '임차료', '통신비', '교통비', '소모품비', '접대비', '광고선전비', '식비', '기타'];
+    var categoryOptions = categories.map(function(cat) {
+      return '<option value="' + cat + '"' + (original.category === cat ? ' selected' : '') + '>' + cat + '</option>';
+    }).join('');
+    cells[2].innerHTML = '<select class="edit-select">' + categoryOptions + '</select>';
+
+    // 금액 (3번 셀)
+    cells[3].innerHTML = '<input type="number" class="edit-input" value="' + original.amount + '" min="1" />';
+
+    // 결제수단 (4번 셀)
+    cells[4].innerHTML =
+      '<select class="edit-select">' +
+      '<option value="현금"' + (original.method === '현금' ? ' selected' : '') + '>현금</option>' +
+      '<option value="카드"' + (original.method === '카드' ? ' selected' : '') + '>카드</option>' +
+      '<option value="계좌이체"' + (original.method === '계좌이체' ? ' selected' : '') + '>계좌이체</option>' +
+      '<option value="기타"' + (original.method === '기타' ? ' selected' : '') + '>기타</option>' +
+      '</select>';
+
+    // 비고 (5번 셀)
+    cells[5].innerHTML = '<input type="text" class="edit-input" value="' + (original.notes === '-' ? '' : original.notes) + '" />';
+
+    // 액션 버튼 (7번 셀)
+    cells[7].innerHTML =
+      '<button class="payment-btn payment-btn-small success" onclick="saveExpenseEdit(\'' + expenseId + '\')">저장</button> ' +
+      '<button class="payment-btn payment-btn-small" onclick="cancelEditExpense(\'' + expenseId + '\')">취소</button>';
+  }
+
+  /**
+   * 회사비용 수정 저장
+   */
+  function saveExpenseEdit(expenseId) {
+    var row = document.querySelector('tr[data-expense-id="' + expenseId + '"]');
+    if (!row) return;
+
+    var cells = row.cells;
+
+    // 입력값 수집
+    var date = cells[1].querySelector('input').value;
+    var category = cells[2].querySelector('select').value;
+    var amount = parseFloat(cells[3].querySelector('input').value);
+    var method = cells[4].querySelector('select').value;
+    var notes = cells[5].querySelector('input').value.trim();
+
+    // 유효성 검사
+    if (!date) {
+      alert('비용일을 입력하세요.');
+      cells[1].querySelector('input').focus();
+      return;
+    }
+    if (!category) {
+      alert('비용항목을 선택하세요.');
+      cells[2].querySelector('select').focus();
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      alert('올바른 금액을 입력하세요.');
+      cells[3].querySelector('input').focus();
+      return;
+    }
+    if (!method) {
+      alert('결제수단을 선택하세요.');
+      cells[4].querySelector('select').focus();
+      return;
+    }
+
+    var params = {
+      expenseId: expenseId,
+      date: date,
+      category: category,
+      amount: amount,
+      method: method,
+      notes: notes || ''
+    };
+
+    OB.showLoading('회사비용 수정 중...');
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        OB.hideLoading();
+
+        if (!result || !result.success) {
+          alert('회사비용 수정 실패: ' + (result ? result.error : '알 수 없는 오류'));
+          return;
+        }
+
+        alert('회사비용이 수정되었습니다.');
+
+        // 편집 모드 해제 및 목록 새로고침
+        row.classList.remove('editing');
+        loadExpenseList();
+        loadExpenseSummary();
+      })
+      .withFailureHandler(function(error) {
+        OB.hideLoading();
+        console.error('[ERROR] Update expense failed:', error);
+        alert('회사비용 수정 실패: ' + error.message);
+      })
+      .updateExpenseRecordApi(params);
+  }
+
+  /**
+   * 회사비용 수정 취소
+   */
+  function cancelEditExpense(expenseId) {
+    var row = document.querySelector('tr[data-expense-id="' + expenseId + '"]');
+    if (!row || !row.classList.contains('editing')) return;
+
+    // 원본 데이터 복원
+    if (row.dataset.original) {
+      var original = JSON.parse(row.dataset.original);
+      var cells = row.cells;
+
+      cells[1].textContent = original.date;
+      cells[2].textContent = original.category;
+      cells[3].innerHTML = '₩' + OB.formatNumber(original.amount);
+      cells[4].textContent = original.method;
+      cells[5].textContent = original.notes || '-';
+      cells[7].innerHTML =
+        '<button class="payment-btn payment-btn-small warning" onclick="editExpense(\'' + expenseId + '\')">수정</button> ' +
+        '<button class="payment-btn payment-btn-small danger" onclick="deleteExpense(\'' + expenseId + '\')">삭제</button>';
+
+      delete row.dataset.original;
+    }
+
+    row.classList.remove('editing');
   }
 
   /**
