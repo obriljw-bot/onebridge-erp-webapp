@@ -22,6 +22,143 @@ var INVOICE_SHEET_NAME = '청구DB';
 // ============================================================
 
 /**
+ * 거래원장 결제 상태 업데이트
+ *
+ * @param {string} invoiceId - 청구서 ID
+ * @param {string} paymentType - 결제유형 (입금/출금)
+ * @param {string} status - 상태 값 (예: '결제완료', '미결제')
+ * @returns {Object} { success, updatedCount, message, error }
+ */
+function updateLedgerPaymentStatus(invoiceId, paymentType, status) {
+  try {
+    Logger.log('[updateLedgerPaymentStatus] 시작 - invoiceId: ' + invoiceId + ', paymentType: ' + paymentType + ', status: ' + status);
+
+    if (!invoiceId || invoiceId === '') {
+      return {
+        success: false,
+        error: '청구서 ID가 필요합니다.'
+      };
+    }
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+
+    // 1. 청구DB에서 orderNumbers 조회
+    var invoiceSheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+    if (!invoiceSheet) {
+      Logger.log('[updateLedgerPaymentStatus] 청구DB 시트를 찾을 수 없습니다.');
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var invoiceData = invoiceSheet.getDataRange().getValues();
+    var invoiceHeaders = invoiceData[0];
+    var invoiceIdCol = invoiceHeaders.indexOf('청구ID');
+    var orderNumbersCol = invoiceHeaders.indexOf('orderNumbers');
+
+    if (invoiceIdCol === -1 || orderNumbersCol === -1) {
+      Logger.log('[updateLedgerPaymentStatus] 필요한 컬럼을 찾을 수 없습니다.');
+      return {
+        success: false,
+        error: '청구DB에서 필요한 컬럼을 찾을 수 없습니다.'
+      };
+    }
+
+    // 청구서 행 찾기
+    var orderNumbers = [];
+    for (var i = 1; i < invoiceData.length; i++) {
+      if (invoiceData[i][invoiceIdCol] === invoiceId) {
+        var orderNumbersJson = invoiceData[i][orderNumbersCol];
+
+        // JSON 문자열 파싱
+        if (orderNumbersJson && orderNumbersJson !== '') {
+          try {
+            orderNumbers = JSON.parse(orderNumbersJson);
+          } catch (parseError) {
+            Logger.log('[updateLedgerPaymentStatus] orderNumbers JSON 파싱 오류: ' + parseError.message);
+          }
+        }
+        break;
+      }
+    }
+
+    if (!orderNumbers || orderNumbers.length === 0) {
+      Logger.log('[updateLedgerPaymentStatus] 청구서에 연결된 발주번호가 없습니다.');
+      return {
+        success: true,
+        updatedCount: 0,
+        message: '연결된 발주번호가 없어 거래원장을 업데이트하지 않았습니다.'
+      };
+    }
+
+    Logger.log('[updateLedgerPaymentStatus] 발주번호 목록: ' + JSON.stringify(orderNumbers));
+
+    // 2. 거래원장에서 해당 발주번호들의 결제 상태 업데이트
+    var ledgerSheet = ss.getSheetByName('거래원장');
+    if (!ledgerSheet) {
+      Logger.log('[updateLedgerPaymentStatus] 거래원장 시트를 찾을 수 없습니다.');
+      return {
+        success: false,
+        error: '거래원장 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var ledgerData = ledgerSheet.getDataRange().getValues();
+    var ledgerHeaders = ledgerData[0];
+    var ledgerOrderNumCol = ledgerHeaders.indexOf('발주번호');
+    var purchasePaymentCol = ledgerHeaders.indexOf('매입결제'); // 출금 시 업데이트
+    var salesPaymentCol = ledgerHeaders.indexOf('매출결제');   // 입금 시 업데이트
+
+    if (ledgerOrderNumCol === -1 || purchasePaymentCol === -1 || salesPaymentCol === -1) {
+      Logger.log('[updateLedgerPaymentStatus] 거래원장에서 필요한 컬럼을 찾을 수 없습니다.');
+      return {
+        success: false,
+        error: '거래원장에서 필요한 컬럼을 찾을 수 없습니다.'
+      };
+    }
+
+    // 업데이트할 컬럼 결정
+    var targetCol = (paymentType === '입금') ? salesPaymentCol : purchasePaymentCol;
+    var targetColName = (paymentType === '입금') ? '매출결제' : '매입결제';
+
+    var updatedCount = 0;
+    var updatedRows = [];
+
+    // 발주번호 목록에 있는 각 발주에 대해 거래원장 업데이트
+    for (var j = 0; j < orderNumbers.length; j++) {
+      var targetOrderNumber = orderNumbers[j];
+
+      for (var k = 1; k < ledgerData.length; k++) {
+        if (ledgerData[k][ledgerOrderNumCol] === targetOrderNumber) {
+          // 상태 업데이트
+          ledgerSheet.getRange(k + 1, targetCol + 1).setValue(status);
+          updatedCount++;
+          updatedRows.push(k + 1);
+          Logger.log('[updateLedgerPaymentStatus] 업데이트: 행 ' + (k + 1) + ', 발주번호: ' + targetOrderNumber + ', ' + targetColName + ' = ' + status);
+        }
+      }
+    }
+
+    Logger.log('[updateLedgerPaymentStatus] ✅ 완료 - ' + updatedCount + '개 행 업데이트');
+
+    return {
+      success: true,
+      updatedCount: updatedCount,
+      message: updatedCount + '개 거래원장 행의 ' + targetColName + ' 상태를 "' + status + '"로 업데이트했습니다.',
+      updatedRows: updatedRows
+    };
+
+  } catch (error) {
+    Logger.log('[updateLedgerPaymentStatus] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '거래원장 업데이트 중 오류 발생: ' + error.message
+    };
+  }
+}
+
+/**
  * 입출금 기록 추가
  * @param {Object} params
  *   - date: 결제일 (YYYY-MM-DD)
@@ -122,6 +259,17 @@ function addPaymentRecord(params) {
       if (!syncResult.success) {
         Logger.log('[addPaymentRecord] ⚠️ 발주 동기화 실패: ' + syncResult.error);
         // 동기화 실패해도 입출금 추가는 성공으로 처리
+      }
+    }
+
+    // 거래원장 연동: 청구서 기반 결제인 경우 거래원장의 결제 상태 업데이트
+    if (params.docNumber && params.docNumber !== '') {
+      var ledgerUpdateResult = updateLedgerPaymentStatus(params.docNumber, params.type, '결제완료');
+      if (ledgerUpdateResult.success) {
+        Logger.log('[addPaymentRecord] ✅ 거래원장 업데이트 성공: ' + ledgerUpdateResult.message);
+      } else {
+        Logger.log('[addPaymentRecord] ⚠️ 거래원장 업데이트 실패: ' + ledgerUpdateResult.error);
+        // 거래원장 업데이트 실패해도 입출금 추가는 성공으로 처리
       }
     }
 
