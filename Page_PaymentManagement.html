@@ -82,56 +82,15 @@
   <!-- ============================================================ -->
   <div class="payment-tab-content active" id="tab-payments">
 
-    <!-- 입출금 추가 -->
+    <!-- 입출금 추가 (모달 방식) -->
     <div class="payment-panel">
       <h2>입출금 내역 추가</h2>
-      <div class="payment-flex">
-        <div class="payment-field">
-          <label for="payment-date">결제일 *</label>
-          <input type="date" id="payment-date" required />
-        </div>
-        <div class="payment-field">
-          <label for="payment-type">결제유형 *</label>
-          <select id="payment-type" required>
-            <option value="">선택하세요</option>
-            <option value="입금">입금</option>
-            <option value="출금">출금</option>
-          </select>
-        </div>
-        <div class="payment-field">
-          <label for="payment-company">거래처명 *</label>
-          <input type="text" id="payment-company" placeholder="거래처명을 입력" required />
-        </div>
-        <div class="payment-field">
-          <label for="payment-amount">금액 *</label>
-          <input type="number" id="payment-amount" min="0" placeholder="금액을 입력" required />
-        </div>
-        <div class="payment-field">
-          <label for="payment-method">결제수단 *</label>
-          <select id="payment-method" required>
-            <option value="">선택하세요</option>
-            <option value="현금">현금</option>
-            <option value="카드">카드</option>
-            <option value="계좌이체">계좌이체</option>
-            <option value="기타">기타</option>
-          </select>
-        </div>
-        <div class="payment-field">
-          <label for="payment-docnum">문서번호</label>
-          <input type="text" id="payment-docnum" placeholder="INV-20250101-001" />
-          <div class="autocomplete-dropdown" id="payment-docnum-dropdown"></div>
-        </div>
-        <div class="payment-field">
-          <label for="payment-ordernum">발주번호</label>
-          <input type="text" id="payment-ordernum" placeholder="GMP-20250101-001" />
-        </div>
-        <div class="payment-field wide">
-          <label for="payment-notes">비고</label>
-          <input type="text" id="payment-notes" placeholder="선택사항" />
-        </div>
-        <button class="payment-btn success" id="payment-add-btn">추가</button>
-        <button class="payment-btn secondary" id="payment-reset-btn">초기화</button>
-      </div>
+      <p style="font-size: 13px; color: #6b7280; margin: 8px 0 12px;">
+        💡 청구서를 기반으로 입출금 기록을 추가합니다. (4단계 프로세스: 결제유형 선택 → 청구서 검색 → 상세 확인 → 결제 정보 입력)
+      </p>
+      <button class="payment-btn primary" onclick="openPaymentModal()" style="font-size: 14px; padding: 10px 20px;">
+        💰 신규 입출금 기록 추가
+      </button>
     </div>
 
     <!-- 입출금 통계 -->

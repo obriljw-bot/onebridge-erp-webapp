@@ -6516,6 +6516,633 @@
     }
   }
 
+  // ============================================================
+  // 결제 관리 리뉴얼 - 모달 UI (4단계 프로세스)
+  // ============================================================
+
+  /**
+   * 전역 변수: 모달 상태
+   */
+  var PAYMENT_MODAL_STATE = {
+    currentStep: 1,
+    paymentType: null,  // '입금' or '출금'
+    selectedInvoice: null,
+    invoiceDetail: null
+  };
+
+  /**
+   * 결제 입력 모달 열기 (Step 1: 결제유형 선택)
+   */
+  function openPaymentModal() {
+    // 상태 초기화
+    PAYMENT_MODAL_STATE = {
+      currentStep: 1,
+      paymentType: null,
+      selectedInvoice: null,
+      invoiceDetail: null
+    };
+
+    // 모달 HTML 생성
+    var modalHTML = '<div id="payment-modal-overlay" class="payment-modal-overlay">' +
+      '<div class="payment-modal-content">' +
+        '<div class="payment-modal-header">' +
+          '<h3 id="payment-modal-title">💰 신규 입출금 기록 추가</h3>' +
+          '<button class="payment-modal-close" onclick="closePaymentModal()">✕</button>' +
+        '</div>' +
+        '<div id="payment-modal-body" class="payment-modal-body">' +
+          '<!-- 단계별 컨텐츠 -->' +
+        '</div>' +
+        '<div id="payment-modal-footer" class="payment-modal-footer">' +
+          '<!-- 네비게이션 버튼 -->' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Step 1 렌더링
+    renderStep1PaymentType();
+  }
+
+  /**
+   * Step 1: 결제유형 선택
+   */
+  function renderStep1PaymentType() {
+    PAYMENT_MODAL_STATE.currentStep = 1;
+
+    var body = document.getElementById('payment-modal-body');
+    var footer = document.getElementById('payment-modal-footer');
+
+    body.innerHTML =
+      '<div class="payment-step-container">' +
+        '<div class="payment-step-indicator">[Step 1/4] 결제 유형 선택</div>' +
+        '<p class="payment-step-desc">어떤 유형의 결제를 입력하시겠습니까?</p>' +
+        '<div class="payment-type-selection">' +
+          '<div class="payment-type-card" onclick="selectPaymentType(\'입금\')">' +
+            '<div class="payment-type-icon">💰</div>' +
+            '<h4>입금</h4>' +
+            '<p>고객사로부터<br>받은 금액</p>' +
+            '<p class="payment-type-label">(매출결제)</p>' +
+            '<button class="payment-btn primary">선택</button>' +
+          '</div>' +
+          '<div class="payment-type-card" onclick="selectPaymentType(\'출금\')">' +
+            '<div class="payment-type-icon">💸</div>' +
+            '<h4>출금</h4>' +
+            '<p>공급사에게<br>지불한 금액</p>' +
+            '<p class="payment-type-label">(매입결제)</p>' +
+            '<button class="payment-btn primary">선택</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    footer.innerHTML = '<button class="payment-btn secondary" onclick="closePaymentModal()">취소</button>';
+  }
+
+  /**
+   * 결제유형 선택 처리
+   */
+  function selectPaymentType(type) {
+    PAYMENT_MODAL_STATE.paymentType = type;
+    renderStep2InvoiceSearch();
+  }
+
+  /**
+   * Step 2: 청구서 검색 및 선택
+   */
+  function renderStep2InvoiceSearch() {
+    PAYMENT_MODAL_STATE.currentStep = 2;
+
+    var type = PAYMENT_MODAL_STATE.paymentType;
+    var title = type === '입금' ? '💰 신규 입출금 기록 추가 - 입금' : '💸 신규 입출금 기록 추가 - 출금';
+    var companyLabel = type === '입금' ? '고객사' : '공급사';
+    var desc = type === '입금' ? '고객사에게 발행한 청구서를 검색합니다.' : '공급사로부터 받은 청구서를 검색합니다.';
+
+    document.getElementById('payment-modal-title').textContent = title;
+
+    var body = document.getElementById('payment-modal-body');
+    var footer = document.getElementById('payment-modal-footer');
+
+    body.innerHTML =
+      '<div class="payment-step-container">' +
+        '<div class="payment-step-indicator">[Step 2/4] 청구서 선택</div>' +
+        '<p class="payment-step-desc">💡 ' + desc + '</p>' +
+        '<div class="payment-search-box">' +
+          '<input type="text" id="invoice-search-input" placeholder="청구서 번호 또는 ' + companyLabel + '명 검색 (3자 이상)" />' +
+          '<button class="payment-btn primary" onclick="searchInvoicesUI()">🔍 검색</button>' +
+        '</div>' +
+        '<div id="invoice-search-results" class="invoice-search-results">' +
+          '<p class="payment-empty-msg">검색어를 3자 이상 입력하고 검색 버튼을 클릭하세요.</p>' +
+        '</div>' +
+        '<div class="payment-temp-invoice">' +
+          '<button class="payment-btn secondary" onclick="openTempInvoiceModal()">📄 청구서 없음 (임시 생성)</button>' +
+        '</div>' +
+      '</div>';
+
+    footer.innerHTML =
+      '<button class="payment-btn secondary" onclick="goToPrevStep()">← 이전</button>' +
+      '<span style="flex:1;"></span>';
+
+    // Enter 키로 검색
+    setTimeout(function() {
+      var input = document.getElementById('invoice-search-input');
+      if (input) {
+        input.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            searchInvoicesUI();
+          }
+        });
+        input.focus();
+      }
+    }, 100);
+  }
+
+  /**
+   * 청구서 검색 UI
+   */
+  function searchInvoicesUI() {
+    var query = document.getElementById('invoice-search-input').value.trim();
+
+    if (query.length < 3) {
+      alert('검색어를 3자 이상 입력해주세요.');
+      return;
+    }
+
+    var resultsDiv = document.getElementById('invoice-search-results');
+    resultsDiv.innerHTML = '<p class="payment-loading-msg">검색 중...</p>';
+
+    var params = {
+      query: query,
+      paymentType: PAYMENT_MODAL_STATE.paymentType
+    };
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          renderInvoiceSearchResults(result.invoices);
+        } else {
+          resultsDiv.innerHTML = '<p class="payment-error-msg">❌ ' + result.error + '</p>';
+        }
+      })
+      .withFailureHandler(function(error) {
+        resultsDiv.innerHTML = '<p class="payment-error-msg">❌ 검색 중 오류 발생: ' + error.message + '</p>';
+      })
+      .searchInvoicesApi(params);
+  }
+
+  /**
+   * 청구서 검색 결과 렌더링
+   */
+  function renderInvoiceSearchResults(invoices) {
+    var resultsDiv = document.getElementById('invoice-search-results');
+
+    if (!invoices || invoices.length === 0) {
+      resultsDiv.innerHTML = '<p class="payment-empty-msg">검색 결과가 없습니다.</p>';
+      return;
+    }
+
+    var companyLabel = PAYMENT_MODAL_STATE.paymentType === '입금' ? '고객사' : '공급사';
+
+    var html = '<div class="invoice-list">';
+
+    invoices.forEach(function(invoice) {
+      var statusClass = invoice.status === 'ISSUED' ? 'status-issued' :
+                        invoice.status === 'DRAFT' ? 'status-draft' :
+                        invoice.status === 'PAID' ? 'status-paid' : '';
+
+      html +=
+        '<div class="invoice-item" onclick="selectInvoice(\'' + invoice.invoiceId + '\')">' +
+          '<div class="invoice-item-header">' +
+            '<span class="invoice-id">' + invoice.invoiceId + '</span>' +
+            '<span class="invoice-status ' + statusClass + '">' + invoice.status + '</span>' +
+          '</div>' +
+          '<div class="invoice-item-body">' +
+            '<div>' + companyLabel + ': <strong>' + invoice.company + '</strong></div>' +
+            '<div>브랜드: ' + (invoice.brands || '없음') + '</div>' +
+            '<div>청구일: ' + invoice.date + ' | 금액: <strong>' + Number(invoice.amount).toLocaleString() + '원</strong></div>' +
+            '<div>발주: ' + invoice.orderCount + '건</div>' +
+          '</div>' +
+        '</div>';
+    });
+
+    html += '</div>';
+
+    resultsDiv.innerHTML = html;
+  }
+
+  /**
+   * 청구서 선택
+   */
+  function selectInvoice(invoiceId) {
+    PAYMENT_MODAL_STATE.selectedInvoice = invoiceId;
+
+    // 로딩 표시
+    var body = document.getElementById('payment-modal-body');
+    body.innerHTML = '<p class="payment-loading-msg">청구서 상세 정보를 불러오는 중...</p>';
+
+    // 청구서 상세 조회
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          PAYMENT_MODAL_STATE.invoiceDetail = result.invoice;
+          renderStep3InvoiceDetail();
+        } else {
+          alert('❌ ' + result.error);
+          renderStep2InvoiceSearch();  // 다시 검색 화면으로
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert('❌ 청구서 조회 중 오류: ' + error.message);
+        renderStep2InvoiceSearch();
+      })
+      .getInvoiceDetailApi(invoiceId);
+  }
+
+  /**
+   * Step 3: 청구서 세부 확인
+   */
+  function renderStep3InvoiceDetail() {
+    PAYMENT_MODAL_STATE.currentStep = 3;
+
+    var invoice = PAYMENT_MODAL_STATE.invoiceDetail;
+    var companyLabel = PAYMENT_MODAL_STATE.paymentType === '입금' ? '고객사' : '공급사';
+
+    var body = document.getElementById('payment-modal-body');
+    var footer = document.getElementById('payment-modal-footer');
+
+    var ordersHTML = '';
+    var totalAmount = 0;
+
+    if (invoice.orders && invoice.orders.length > 0) {
+      ordersHTML = '<table class="invoice-detail-table">' +
+        '<thead><tr>' +
+          '<th>발주번호</th>' +
+          '<th>발주일</th>' +
+          '<th>브랜드</th>' +
+          '<th>금액</th>' +
+        '</tr></thead>' +
+        '<tbody>';
+
+      invoice.orders.forEach(function(order) {
+        ordersHTML += '<tr>' +
+          '<td>' + order.orderNumber + '</td>' +
+          '<td>' + order.orderDate + '</td>' +
+          '<td>' + order.brand + '</td>' +
+          '<td class="text-right">' + Number(order.amount).toLocaleString() + '원</td>' +
+        '</tr>';
+        totalAmount += Number(order.amount);
+      });
+
+      ordersHTML += '</tbody>' +
+        '<tfoot><tr>' +
+          '<td colspan="3" class="text-right"><strong>합계</strong></td>' +
+          '<td class="text-right"><strong>' + totalAmount.toLocaleString() + '원</strong></td>' +
+        '</tr></tfoot>' +
+        '</table>';
+    } else {
+      ordersHTML = '<p class="payment-info-msg">💡 이 청구서에 연결된 발주가 없습니다. (임시 청구서)</p>';
+      totalAmount = invoice.amount;
+    }
+
+    body.innerHTML =
+      '<div class="payment-step-container">' +
+        '<div class="payment-step-indicator">[Step 3/4] 청구서 상세 확인</div>' +
+        '<div class="invoice-detail-header">' +
+          '<div>선택된 청구서: <strong>' + invoice.invoiceId + '</strong></div>' +
+          '<div>' + companyLabel + ': <strong>' + invoice.company + '</strong> | 청구일: ' + invoice.date + '</div>' +
+        '</div>' +
+        '<div class="invoice-detail-section">' +
+          '<h4>📋 포함된 발주 내역</h4>' +
+          ordersHTML +
+        '</div>' +
+        '<p class="payment-info-msg">💡 품목 세부 정보는 발주 상세보기에서 확인 가능합니다.</p>' +
+      '</div>';
+
+    footer.innerHTML =
+      '<button class="payment-btn secondary" onclick="goToPrevStep()">← 이전</button>' +
+      '<span style="flex:1;"></span>' +
+      '<button class="payment-btn primary" onclick="renderStep4PaymentForm()">다음 단계 →</button>';
+  }
+
+  /**
+   * Step 4: 결제 정보 입력 및 검증
+   */
+  function renderStep4PaymentForm() {
+    PAYMENT_MODAL_STATE.currentStep = 4;
+
+    var invoice = PAYMENT_MODAL_STATE.invoiceDetail;
+    var type = PAYMENT_MODAL_STATE.paymentType;
+    var companyLabel = type === '입금' ? '고객사' : '공급사';
+
+    var body = document.getElementById('payment-modal-body');
+    var footer = document.getElementById('payment-modal-footer');
+
+    var today = new Date().toISOString().split('T')[0];
+
+    body.innerHTML =
+      '<div class="payment-step-container">' +
+        '<div class="payment-step-indicator">[Step 4/4] 결제 정보 입력</div>' +
+        '<div class="payment-info-banner">' +
+          '<div>청구서: <strong>' + invoice.invoiceId + '</strong> (' + invoice.company + ')</div>' +
+          '<div>청구금액: <strong>' + Number(invoice.amount).toLocaleString() + '원</strong></div>' +
+        '</div>' +
+        '<div class="payment-form-section">' +
+          '<h4>💳 결제 정보</h4>' +
+          '<div class="payment-form-row">' +
+            '<label>결제일 *</label>' +
+            '<input type="date" id="final-payment-date" value="' + today + '" class="payment-input" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>결제유형 *</label>' +
+            '<select id="final-payment-type" class="payment-input" disabled>' +
+              '<option value="' + type + '" selected>' + type + '</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>결제금액 *</label>' +
+            '<input type="number" id="final-payment-amount" value="' + invoice.amount + '" ' +
+              'class="payment-input" min="1" oninput="validatePaymentAmount()" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>결제수단 *</label>' +
+            '<select id="final-payment-method" class="payment-input">' +
+              '<option value="현금">현금</option>' +
+              '<option value="카드">카드</option>' +
+              '<option value="계좌이체" selected>계좌이체</option>' +
+              '<option value="기타">기타</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>비고</label>' +
+            '<input type="text" id="final-payment-notes" class="payment-input" placeholder="선택사항" />' +
+          '</div>' +
+        '</div>' +
+        '<div id="amount-validation-result" class="amount-validation-result"></div>' +
+      '</div>';
+
+    footer.innerHTML =
+      '<button class="payment-btn secondary" onclick="goToPrevStep()">← 이전</button>' +
+      '<span style="flex:1;"></span>' +
+      '<button id="final-save-btn" class="payment-btn primary" onclick="savePaymentFromModal()">💾 저장</button>';
+
+    // 초기 금액 검증
+    setTimeout(function() {
+      validatePaymentAmount();
+    }, 100);
+  }
+
+  /**
+   * 금액 검증
+   */
+  function validatePaymentAmount() {
+    var invoice = PAYMENT_MODAL_STATE.invoiceDetail;
+    var inputAmount = Number(document.getElementById('final-payment-amount').value) || 0;
+    var invoiceAmount = Number(invoice.amount) || 0;
+
+    var resultDiv = document.getElementById('amount-validation-result');
+    var saveBtn = document.getElementById('final-save-btn');
+
+    if (inputAmount === invoiceAmount) {
+      resultDiv.innerHTML =
+        '<div class="amount-validation success">' +
+          '<div class="validation-icon">✅</div>' +
+          '<div class="validation-details">' +
+            '<div class="validation-title">결제금액과 청구금액이 일치합니다.</div>' +
+            '<div class="validation-row">청구금액: ' + invoiceAmount.toLocaleString() + '원</div>' +
+            '<div class="validation-row">결제금액: ' + inputAmount.toLocaleString() + '원</div>' +
+            '<div class="validation-row">차액: 0원</div>' +
+          '</div>' +
+        '</div>';
+      saveBtn.disabled = false;
+      saveBtn.classList.remove('disabled');
+    } else {
+      var diff = inputAmount - invoiceAmount;
+      resultDiv.innerHTML =
+        '<div class="amount-validation error">' +
+          '<div class="validation-icon">❌</div>' +
+          '<div class="validation-details">' +
+            '<div class="validation-title">결제금액과 청구금액이 일치하지 않습니다.</div>' +
+            '<div class="validation-row">청구금액: ' + invoiceAmount.toLocaleString() + '원</div>' +
+            '<div class="validation-row">결제금액: ' + inputAmount.toLocaleString() + '원</div>' +
+            '<div class="validation-row">차액: ' + (diff > 0 ? '+' : '') + diff.toLocaleString() + '원</div>' +
+            '<div class="validation-message">💡 금액을 수정해주세요. 또는 청구서를 다시 확인해주세요.</div>' +
+          '</div>' +
+        '</div>';
+      saveBtn.disabled = true;
+      saveBtn.classList.add('disabled');
+    }
+  }
+
+  /**
+   * 모달에서 결제 저장
+   */
+  function savePaymentFromModal() {
+    var invoice = PAYMENT_MODAL_STATE.invoiceDetail;
+    var type = PAYMENT_MODAL_STATE.paymentType;
+
+    var date = document.getElementById('final-payment-date').value;
+    var amount = Number(document.getElementById('final-payment-amount').value);
+    var method = document.getElementById('final-payment-method').value;
+    var notes = document.getElementById('final-payment-notes').value.trim();
+
+    // 유효성 검사
+    if (!date) {
+      alert('결제일을 입력해주세요.');
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      alert('올바른 금액을 입력해주세요.');
+      return;
+    }
+
+    if (amount !== invoice.amount) {
+      alert('❌ 결제금액과 청구금액이 일치하지 않습니다.\n금액을 확인해주세요.');
+      return;
+    }
+
+    // DRAFT 청구서 경고
+    if (invoice.status === 'DRAFT') {
+      if (!confirm('⚠️ 미발행 청구서입니다.\n청구서 발행 후 결제 입력을 권장합니다.\n\n계속 진행하시겠습니까?')) {
+        return;
+      }
+    }
+
+    var params = {
+      date: date,
+      type: type,
+      company: invoice.company,
+      amount: amount,
+      method: method,
+      docNumber: invoice.invoiceId,
+      notes: notes
+    };
+
+    // 로딩 표시
+    var saveBtn = document.getElementById('final-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중...';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          alert('✅ 입출금 기록이 추가되었습니다.');
+          closePaymentModal();
+          loadPaymentList();
+          loadPaymentSummary();
+        } else {
+          alert('❌ ' + result.error);
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 저장';
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert('❌ 저장 중 오류 발생: ' + error.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 저장';
+      })
+      .addPaymentRecordApi(params);
+  }
+
+  /**
+   * 임시 청구서 생성 모달
+   */
+  function openTempInvoiceModal() {
+    var type = PAYMENT_MODAL_STATE.paymentType;
+    var companyLabel = type === '입금' ? '고객사' : '공급사';
+    var title = type === '입금' ? '📄 임시 청구서 생성 - 매출 (입금)' : '📄 임시 청구서 생성 - 매입 (출금)';
+    var desc = type === '입금' ? '고객사에게 발행할 임시 청구서를 생성합니다.' : '공급사로부터 받은 임시 청구서를 생성합니다.';
+
+    var body = document.getElementById('payment-modal-body');
+    var footer = document.getElementById('payment-modal-footer');
+
+    var today = new Date().toISOString().split('T')[0];
+
+    body.innerHTML =
+      '<div class="payment-step-container">' +
+        '<h3>' + title + '</h3>' +
+        '<p class="payment-step-desc">💡 ' + desc + '</p>' +
+        '<div class="payment-form-section">' +
+          '<div class="payment-form-row">' +
+            '<label>' + companyLabel + '명 *</label>' +
+            '<input type="text" id="temp-invoice-company" class="payment-input" placeholder="' + companyLabel + '명을 입력하세요" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>청구일 *</label>' +
+            '<input type="date" id="temp-invoice-date" value="' + today + '" class="payment-input" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>청구금액 *</label>' +
+            '<input type="number" id="temp-invoice-amount" class="payment-input" min="1" placeholder="금액을 입력하세요" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>비고</label>' +
+            '<input type="text" id="temp-invoice-notes" class="payment-input" value="임시 생성 (정식 청구서 발행 예정)" />' +
+          '</div>' +
+        '</div>' +
+        '<div class="payment-info-banner">' +
+          '<div><strong>자동 설정:</strong></div>' +
+          '<div>- 청구유형: ' + (type === '입금' ? 'SALES (매출)' : 'PURCHASE (매입)') + '</div>' +
+          '<div>- 상태: DRAFT</div>' +
+        '</div>' +
+        '<div class="payment-warning-box">' +
+          '<div><strong>⚠️ 주의사항:</strong></div>' +
+          '<div>- 임시 청구서는 발주번호가 없습니다.</div>' +
+          '<div>- 정식 청구서 발행 후 반드시 연결해주세요.</div>' +
+          '<div>- 임시 청구서는 DRAFT 상태로 생성됩니다.</div>' +
+        '</div>' +
+      '</div>';
+
+    footer.innerHTML =
+      '<button class="payment-btn secondary" onclick="renderStep2InvoiceSearch()">취소</button>' +
+      '<span style="flex:1;"></span>' +
+      '<button class="payment-btn primary" onclick="createTempInvoiceUI()">📄 생성 후 계속</button>';
+  }
+
+  /**
+   * 임시 청구서 생성 실행
+   */
+  function createTempInvoiceUI() {
+    var type = PAYMENT_MODAL_STATE.paymentType;
+    var company = document.getElementById('temp-invoice-company').value.trim();
+    var date = document.getElementById('temp-invoice-date').value;
+    var amount = Number(document.getElementById('temp-invoice-amount').value) || 0;
+
+    if (!company) {
+      alert('업체명을 입력해주세요.');
+      return;
+    }
+
+    if (!date) {
+      alert('청구일을 입력해주세요.');
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      alert('올바른 금액을 입력해주세요.');
+      return;
+    }
+
+    var params = {
+      company: company,
+      paymentType: type,
+      amount: amount,
+      date: date
+    };
+
+    var body = document.getElementById('payment-modal-body');
+    body.innerHTML = '<p class="payment-loading-msg">임시 청구서 생성 중...</p>';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          alert('✅ ' + result.message);
+          // 생성된 청구서 선택
+          selectInvoice(result.invoiceId);
+        } else {
+          alert('❌ ' + result.error);
+          openTempInvoiceModal();  // 다시 입력 화면으로
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert('❌ 임시 청구서 생성 중 오류: ' + error.message);
+        openTempInvoiceModal();
+      })
+      .createTempInvoiceApi(params);
+  }
+
+  /**
+   * 이전 단계로 이동
+   */
+  function goToPrevStep() {
+    var currentStep = PAYMENT_MODAL_STATE.currentStep;
+
+    if (currentStep === 2) {
+      renderStep1PaymentType();
+    } else if (currentStep === 3) {
+      renderStep2InvoiceSearch();
+    } else if (currentStep === 4) {
+      renderStep3InvoiceDetail();
+    }
+  }
+
+  /**
+   * 모달 닫기
+   */
+  function closePaymentModal() {
+    var modal = document.getElementById('payment-modal-overlay');
+    if (modal) {
+      modal.remove();
+    }
+
+    // 상태 초기화
+    PAYMENT_MODAL_STATE = {
+      currentStep: 1,
+      paymentType: null,
+      selectedInvoice: null,
+      invoiceDetail: null
+    };
+  }
+
 </script>
 
 <!-- 전역 로딩 오버레이 -->
