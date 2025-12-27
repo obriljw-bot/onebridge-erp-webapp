@@ -1043,3 +1043,41 @@ function cancelAndReissueInvoiceApi(params) {
   var result = cancelAndReissueInvoice(params);
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * 결제 관리 리뉴얼 - 청구서 연동 API
+ * ============================================================
+ */
+
+/**
+ * 청구서 검색 (결제유형별 필터)
+ */
+function searchInvoicesApi(params) {
+  var result = searchInvoices(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 상세 조회
+ */
+function getInvoiceDetailApi(invoiceId) {
+  var result = getInvoiceDetail(invoiceId);
+  return safeReturn(result);
+}
+
+/**
+ * 임시 청구서 생성
+ */
+function createTempInvoiceApi(params) {
+  var result = createTempInvoice(params);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 상태 검증
+ */
+function validateInvoiceForPaymentApi(invoice) {
+  var result = validateInvoiceForPayment(invoice);
+  return safeReturn(result);
+}

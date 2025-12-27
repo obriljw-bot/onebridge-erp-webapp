@@ -1493,3 +1493,514 @@ function syncOrderPaymentStatus(orderNumber, paymentType) {
     };
   }
 }
+
+// ============================================================
+// 청구서 연동 기능 (결제 관리 리뉴얼)
+// ============================================================
+
+/**
+ * 청구서 검색 (결제유형별 필터링)
+ * @param {Object} params - { query, paymentType }
+ * @return {Object} { success, invoices: [...] }
+ */
+function searchInvoices(params) {
+  try {
+    var query = String(params.query || '').toUpperCase();
+    var paymentType = params.paymentType;  // '입금' or '출금'
+
+    if (!paymentType) {
+      return {
+        success: false,
+        error: '결제유형을 선택해주세요.'
+      };
+    }
+
+    // 결제유형에 따라 청구서 타입 결정
+    var invoiceType = paymentType === '입금' ? 'SALES' : 'PURCHASE';
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+
+    if (data.length <= 1) {
+      return {
+        success: true,
+        invoices: []
+      };
+    }
+
+    var header = data[0];
+
+    var col = function(name) { return header.indexOf(name); };
+    var cInvoiceId = col('청구ID');
+    var cType = col('청구유형');
+    var cCompany = col('업체명');
+    var cDate = col('청구일');
+    var cAmount = col('청구금액');
+    var cStatus = col('청구상태');
+    var cOrderNumbers = col('orderNumbers');
+
+    var invoices = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // 청구서 타입 필터링
+      if (row[cType] !== invoiceType) {
+        continue;
+      }
+
+      // CANCELLED 제외
+      if (row[cStatus] === 'CANCELLED') {
+        continue;
+      }
+
+      // 검색어 매칭
+      var invoiceId = String(row[cInvoiceId] || '');
+      var company = String(row[cCompany] || '');
+
+      if (query.length >= 3 &&
+          invoiceId.toUpperCase().indexOf(query) === -1 &&
+          company.toUpperCase().indexOf(query) === -1) {
+        continue;
+      }
+
+      // orderNumbers에서 브랜드 목록 조회
+      var orderNumbers = JSON.parse(row[cOrderNumbers] || '[]');
+      var brands = getUniqueBrands(orderNumbers);
+
+      invoices.push({
+        invoiceId: invoiceId,
+        type: row[cType],
+        company: company,
+        brands: brands.join(', '),
+        date: formatDateString(row[cDate]),
+        amount: Number(row[cAmount]) || 0,
+        status: row[cStatus],
+        orderCount: orderNumbers.length
+      });
+
+      if (invoices.length >= 10) break;
+    }
+
+    Logger.log('[searchInvoices] 검색 결과: ' + invoices.length + '건 (타입: ' + invoiceType + ')');
+
+    return {
+      success: true,
+      invoices: invoices
+    };
+
+  } catch (error) {
+    Logger.log('[searchInvoices] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '청구서 검색 중 오류: ' + error.message
+    };
+  }
+}
+
+/**
+ * 발주번호 목록에서 고유 브랜드 추출
+ * @param {Array} orderNumbers - 발주번호 배열
+ * @return {Array} 브랜드 목록
+ */
+function getUniqueBrands(orderNumbers) {
+  try {
+    if (!orderNumbers || orderNumbers.length === 0) {
+      return [];
+    }
+
+    var brands = [];
+    var seen = {};
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName('거래원장');
+
+    if (!sheet) {
+      Logger.log('[getUniqueBrands] 경고: 거래원장 시트를 찾을 수 없습니다.');
+      return [];
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    var colOrderNumber = header.indexOf('발주번호');
+    var colBrand = header.indexOf('브랜드');
+
+    if (colOrderNumber === -1 || colBrand === -1) {
+      Logger.log('[getUniqueBrands] 경고: 필수 컬럼을 찾을 수 없습니다.');
+      return [];
+    }
+
+    orderNumbers.forEach(function(orderId) {
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][colOrderNumber] === orderId) {
+          var brand = String(data[i][colBrand] || '').trim();
+          if (brand && !seen[brand]) {
+            brands.push(brand);
+            seen[brand] = true;
+          }
+        }
+      }
+    });
+
+    return brands;
+
+  } catch (error) {
+    Logger.log('[getUniqueBrands] ❌ 오류: ' + error.message);
+    return [];
+  }
+}
+
+/**
+ * 청구서 상세 조회
+ * @param {String} invoiceId - 청구서 ID
+ * @return {Object} { success, invoice: {...} }
+ */
+function getInvoiceDetail(invoiceId) {
+  try {
+    if (!invoiceId) {
+      return {
+        success: false,
+        error: '청구서 ID가 필요합니다.'
+      };
+    }
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    var col = function(name) { return header.indexOf(name); };
+    var cInvoiceId = col('청구ID');
+    var cType = col('청구유형');
+    var cCompany = col('업체명');
+    var cDate = col('청구일');
+    var cAmount = col('청구금액');
+    var cStatus = col('청구상태');
+    var cOrderNumbers = col('orderNumbers');
+    var cBillingType = col('billingType');
+    var cSettlementId = col('마감ID');
+    var cNotes = col('비고');
+
+    // 청구서 찾기
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      if (row[cInvoiceId] === invoiceId) {
+        var orderNumbers = JSON.parse(row[cOrderNumbers] || '[]');
+        var orders = [];
+
+        // 각 발주번호별 상세 정보 조회
+        if (orderNumbers.length > 0) {
+          orders = getOrdersDetailForInvoice(orderNumbers);
+        }
+
+        var invoice = {
+          invoiceId: row[cInvoiceId],
+          type: row[cType],
+          company: row[cCompany],
+          date: formatDateString(row[cDate]),
+          amount: Number(row[cAmount]) || 0,
+          status: row[cStatus],
+          billingType: row[cBillingType] || 'DIRECT',
+          settlementId: row[cSettlementId] || '',
+          notes: row[cNotes] || '',
+          orderNumbers: orderNumbers,
+          orders: orders
+        };
+
+        Logger.log('[getInvoiceDetail] ✅ 청구서 조회 완료: ' + invoiceId);
+
+        return {
+          success: true,
+          invoice: invoice
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: '청구서를 찾을 수 없습니다.'
+    };
+
+  } catch (error) {
+    Logger.log('[getInvoiceDetail] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '청구서 조회 중 오류: ' + error.message
+    };
+  }
+}
+
+/**
+ * 발주번호 목록에 대한 상세 정보 조회 (브랜드 단위)
+ * @param {Array} orderNumbers - 발주번호 배열
+ * @return {Array} 발주 상세 정보 배열
+ */
+function getOrdersDetailForInvoice(orderNumbers) {
+  try {
+    var orders = [];
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName('거래원장');
+
+    if (!sheet) {
+      return [];
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    var col = function(name) { return header.indexOf(name); };
+    var cOrderNumber = col('발주번호');
+    var cOrderDate = col('발주일');
+    var cBrand = col('브랜드');
+    var cConfirmedAmount = col('확정금액');
+
+    // 발주번호별로 그룹핑 (브랜드 단위)
+    var orderMap = {};
+
+    orderNumbers.forEach(function(orderId) {
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+
+        if (row[cOrderNumber] === orderId) {
+          if (!orderMap[orderId]) {
+            orderMap[orderId] = {
+              orderNumber: orderId,
+              orderDate: formatDateString(row[cOrderDate]),
+              brands: [],
+              totalAmount: 0
+            };
+          }
+
+          var brand = String(row[cBrand] || '').trim();
+          var amount = Number(row[cConfirmedAmount]) || 0;
+
+          if (brand && orderMap[orderId].brands.indexOf(brand) === -1) {
+            orderMap[orderId].brands.push(brand);
+          }
+
+          orderMap[orderId].totalAmount += amount;
+        }
+      }
+    });
+
+    // 배열로 변환
+    for (var orderId in orderMap) {
+      var order = orderMap[orderId];
+      orders.push({
+        orderNumber: order.orderNumber,
+        orderDate: order.orderDate,
+        brand: order.brands.join(', '),
+        amount: order.totalAmount
+      });
+    }
+
+    return orders;
+
+  } catch (error) {
+    Logger.log('[getOrdersDetailForInvoice] ❌ 오류: ' + error.message);
+    return [];
+  }
+}
+
+/**
+ * 임시 청구서 생성
+ * @param {Object} params - { company, paymentType, amount, date }
+ * @return {Object} { success, invoiceId, invoiceType }
+ */
+function createTempInvoice(params) {
+  try {
+    var company = params.company || '';
+    var paymentType = params.paymentType;  // '입금' or '출금'
+    var amount = params.amount || 0;
+    var date = params.date || new Date();
+
+    if (!company || !paymentType || !amount) {
+      return {
+        success: false,
+        error: '필수 정보를 입력해주세요.'
+      };
+    }
+
+    // 결제유형에 따라 청구서 타입 자동 결정
+    var invoiceType = paymentType === '입금' ? 'SALES' : 'PURCHASE';
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+
+    if (!sheet) {
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    // 임시 청구서 ID 생성
+    var now = new Date();
+    var dateStr = formatYearMonth(now) + String(now.getDate()).padStart(2, '0');
+    var data = sheet.getDataRange().getValues();
+    var seq = 1;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] && String(data[i][0]).startsWith('INV-TEMP-' + dateStr)) {
+        seq++;
+      }
+    }
+
+    var invoiceId = 'INV-TEMP-' + dateStr + '-' + String(seq).padStart(3, '0');
+
+    var user = Session.getActiveUser().getEmail();
+
+    // 청구DB 구조에 맞게 데이터 구성
+    var header = data[0];
+    var rowData = [];
+
+    // 각 컬럼 순서대로 값 설정
+    header.forEach(function(colName) {
+      switch(colName) {
+        case '청구ID':
+          rowData.push(invoiceId);
+          break;
+        case '청구유형':
+          rowData.push(invoiceType);
+          break;
+        case '업체명':
+          rowData.push(company);
+          break;
+        case '마감ID':
+          rowData.push('');
+          break;
+        case '청구일':
+          rowData.push(date);
+          break;
+        case '청구금액':
+          rowData.push(amount);
+          break;
+        case '청구상태':
+          rowData.push('DRAFT');
+          break;
+        case '비고':
+          rowData.push('임시 생성 (정식 청구서 발행 예정)');
+          break;
+        case '생성일시':
+          rowData.push(now);
+          break;
+        case '생성자':
+          rowData.push(user);
+          break;
+        case '발행일시':
+          rowData.push('');
+          break;
+        case '발행자':
+          rowData.push('');
+          break;
+        case '결제일시':
+          rowData.push('');
+          break;
+        case '대체청구서':
+          rowData.push('');
+          break;
+        case '원본청구서':
+          rowData.push('');
+          break;
+        case 'billingType':
+          rowData.push('DIRECT');
+          break;
+        case 'orderNumbers':
+          rowData.push('[]');
+          break;
+        default:
+          rowData.push('');
+      }
+    });
+
+    sheet.appendRow(rowData);
+
+    Logger.log('[createTempInvoice] ✅ 임시 청구서 생성: ' + invoiceId + ' (' + invoiceType + ')');
+
+    return {
+      success: true,
+      invoiceId: invoiceId,
+      invoiceType: invoiceType,
+      message: '임시 청구서가 생성되었습니다.'
+    };
+
+  } catch (error) {
+    Logger.log('[createTempInvoice] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '임시 청구서 생성 중 오류: ' + error.message
+    };
+  }
+}
+
+/**
+ * 청구서 상태 검증 (결제 입력 가능 여부)
+ * @param {Object} invoice - 청구서 객체
+ * @return {Object} { valid, error, warning }
+ */
+function validateInvoiceForPayment(invoice) {
+  try {
+    if (!invoice || !invoice.status) {
+      return {
+        valid: false,
+        error: '청구서 정보가 올바르지 않습니다.'
+      };
+    }
+
+    switch(invoice.status) {
+      case 'CANCELLED':
+        return {
+          valid: false,
+          error: '❌ 취소된 청구서입니다.\n다른 청구서를 선택해주세요.'
+        };
+
+      case 'PAID':
+        return {
+          valid: false,
+          error: '❌ 이미 결제 완료된 청구서입니다.\n추가 결제가 필요한 경우 새 청구서를 발행해주세요.'
+        };
+
+      case 'DRAFT':
+        return {
+          valid: true,
+          warning: '⚠️ 미발행 청구서입니다.\n청구서 발행 후 결제 입력을 권장합니다.'
+        };
+
+      case 'ISSUED':
+        return {
+          valid: true
+        };
+
+      default:
+        return {
+          valid: true
+        };
+    }
+
+  } catch (error) {
+    Logger.log('[validateInvoiceForPayment] ❌ 오류: ' + error.message);
+    return {
+      valid: false,
+      error: '청구서 검증 중 오류가 발생했습니다.'
+    };
+  }
+}

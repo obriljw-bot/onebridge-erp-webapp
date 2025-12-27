@@ -207,19 +207,24 @@ function extendInvoiceSheet(ss) {
 
   Logger.log('[extendInvoiceSheet] 기존 컬럼 수: ' + headers.length);
 
-  // "대체청구서", "원본청구서" 컬럼이 이미 있는지 확인
+  // 필요한 컬럼 확인
   var hasReplacement = headers.indexOf('대체청구서') !== -1;
   var hasOriginal = headers.indexOf('원본청구서') !== -1;
+  var hasBillingType = headers.indexOf('billingType') !== -1;
+  var hasOrderNumbers = headers.indexOf('orderNumbers') !== -1;
 
-  if (hasReplacement && hasOriginal) {
-    Logger.log('[extendInvoiceSheet] 이미 컬럼이 존재합니다. 건너뜁니다.');
+  // 이미 모든 컬럼이 있는지 확인
+  if (hasReplacement && hasOriginal && hasBillingType && hasOrderNumbers) {
+    Logger.log('[extendInvoiceSheet] 이미 모든 컬럼이 존재합니다. 건너뜁니다.');
     return sheet;
   }
 
-  // 컬럼 추가
+  // 추가할 컬럼 목록
   var newColumns = [];
   if (!hasReplacement) newColumns.push('대체청구서');
   if (!hasOriginal) newColumns.push('원본청구서');
+  if (!hasBillingType) newColumns.push('billingType');
+  if (!hasOrderNumbers) newColumns.push('orderNumbers');
 
   if (newColumns.length > 0) {
     var startCol = headers.length + 1;
