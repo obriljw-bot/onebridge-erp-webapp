@@ -3930,6 +3930,7 @@
         checkbox.className = 'ledger-row-checkbox';
         checkbox.dataset.orderNumber = agg.orderNumber;
         checkbox.dataset.company = agg.company;
+        checkbox.dataset.amount = agg.totalSupplyAmt;  // 공급액 (청구 금액)
         checkTd.appendChild(checkbox);
         tr.appendChild(checkTd);
 
