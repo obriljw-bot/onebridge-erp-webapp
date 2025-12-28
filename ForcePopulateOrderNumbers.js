@@ -15,8 +15,9 @@
  * ============================================================
  */
 
-var PAYMENT_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs';
-var OB_SETTLEMENT_DETAIL_SHEET = '마감상세DB';
+// 상수는 SettlementService.js 및 다른 파일에 이미 정의되어 있으므로 재선언하지 않음
+// var PAYMENT_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs';
+// var OB_SETTLEMENT_DETAIL_SHEET = '마감상세DB';
 
 /**
  * 메인 실행 함수
