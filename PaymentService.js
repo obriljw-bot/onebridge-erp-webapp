@@ -511,6 +511,18 @@ function updatePaymentRecord(params) {
       }
     }
 
+    // 거래원장 연동: 청구서 기반 결제인 경우 거래원장의 결제 상태 업데이트
+    var newDocNumber = params.docNumber !== undefined ? params.docNumber : data[rowIndex - 1][col('문서번호')];
+    if (newDocNumber && newDocNumber !== '') {
+      var ledgerUpdateResult = updateLedgerPaymentStatus(newDocNumber, newType, '결제완료');
+      if (ledgerUpdateResult.success) {
+        Logger.log('[updatePaymentRecord] ✅ 거래원장 업데이트 성공: ' + ledgerUpdateResult.message);
+      } else {
+        Logger.log('[updatePaymentRecord] ⚠️ 거래원장 업데이트 실패: ' + ledgerUpdateResult.error);
+        // 거래원장 업데이트 실패해도 입출금 수정은 성공으로 처리
+      }
+    }
+
     return {
       success: true,
       message: '입출금 기록이 수정되었습니다.'
@@ -547,6 +559,44 @@ function deletePaymentRecord(params) {
         success: false,
         error: '결제내역 시트를 찾을 수 없습니다.'
       };
+    }
+
+    // 삭제 전에 거래원장 복원을 위해 정보 조회
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+    var col = function(name) { return header.indexOf(name); };
+
+    var docNumber = '';
+    var paymentType = '';
+    var orderNumber = '';
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][col('결제ID')] === params.paymentId) {
+        docNumber = data[i][col('문서번호')] || '';
+        paymentType = data[i][col('결제유형')] || '';
+        orderNumber = data[i][col('발주번호')] || '';
+        break;
+      }
+    }
+
+    // 거래원장 연동: 결제 삭제 시 거래원장 상태 복원
+    if (docNumber && docNumber !== '') {
+      var ledgerUpdateResult = updateLedgerPaymentStatus(docNumber, paymentType, '미결제');
+      if (ledgerUpdateResult.success) {
+        Logger.log('[deletePaymentRecord] ✅ 거래원장 복원 성공: ' + ledgerUpdateResult.message);
+      } else {
+        Logger.log('[deletePaymentRecord] ⚠️ 거래원장 복원 실패: ' + ledgerUpdateResult.error);
+        // 거래원장 복원 실패해도 입출금 삭제는 진행
+      }
+    }
+
+    // 발주 연동: 결제 상태 재계산
+    if (orderNumber && orderNumber !== '') {
+      var syncResult = syncOrderPaymentStatus(orderNumber, paymentType);
+      if (!syncResult.success) {
+        Logger.log('[deletePaymentRecord] ⚠️ 발주 동기화 실패: ' + syncResult.error);
+        // 동기화 실패해도 입출금 삭제는 진행
+      }
     }
 
     var result = softDeleteRecord(sheet, params.paymentId, '결제ID');
