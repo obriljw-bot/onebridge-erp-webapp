@@ -18,6 +18,9 @@
  * Phase A: 긴급 수정
  */
 
+// 스프레드시트 ID 상수
+var MIGRATION_SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs'; // 발주_통합DB
+
 /**
  * 마이그레이션 1: 청구유형 값 표준화
  *
@@ -35,7 +38,7 @@ function migrateBillingTypes() {
   Logger.log('=== [마이그레이션 1] 청구유형 값 표준화 시작 ===');
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.openById(MIGRATION_SS_ID);
     var invoiceSheet = ss.getSheetByName('청구DB');
 
     if (!invoiceSheet) {
@@ -123,7 +126,7 @@ function migrateOrderNumbers() {
   Logger.log('=== [마이그레이션 2] 발주번호 컬럼 데이터 이관 시작 ===');
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.openById(MIGRATION_SS_ID);
     var invoiceSheet = ss.getSheetByName('청구DB');
 
     if (!invoiceSheet) {
@@ -213,7 +216,7 @@ function migrateBillingType() {
   Logger.log('=== [마이그레이션 3] billingType 컬럼 채우기 시작 ===');
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.openById(MIGRATION_SS_ID);
     var invoiceSheet = ss.getSheetByName('청구DB');
 
     if (!invoiceSheet) {
