@@ -821,10 +821,11 @@ function createBilling(params) {
     var amount = params.amount || 0;
     var notes = params.notes || '';
 
-    if (!settlementId || !type || !company) {
+    // 필수 정보 검증 (settlementId는 선택사항 - 직접 청구서인 경우 없을 수 있음)
+    if (!type || !company) {
       return {
         success: false,
-        error: '필수 정보를 입력해주세요.'
+        error: '필수 정보를 입력해주세요 (청구유형, 업체명).'
       };
     }
 
@@ -839,8 +840,17 @@ function createBilling(params) {
     // billingType 결정 (마감ID 기반 청구서는 "SETTLEMENT", 직접 생성은 "DIRECT")
     var billingType = (settlementId && settlementId !== '') ? 'SETTLEMENT' : 'DIRECT';
 
-    // 발주번호 목록 조회 (마감 기반인 경우)
-    var orderNumbers = getOrderNumbersFromSettlement(settlementId);
+    // 발주번호 목록 결정
+    var orderNumbers = [];
+    if (params.orderNumbers && params.orderNumbers.length > 0) {
+      // 1. 파라미터로 orderNumbers가 직접 전달된 경우 (직접 청구서)
+      orderNumbers = params.orderNumbers;
+      Logger.log('[createBilling] orderNumbers 직접 전달: ' + JSON.stringify(orderNumbers));
+    } else if (settlementId && settlementId !== '') {
+      // 2. settlementId로 orderNumbers 조회 (마감 기반 청구서)
+      orderNumbers = getOrderNumbersFromSettlement(settlementId);
+      Logger.log('[createBilling] settlementId로 orderNumbers 조회: ' + JSON.stringify(orderNumbers));
+    }
     var orderNumbersJson = JSON.stringify(orderNumbers);
 
     var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);

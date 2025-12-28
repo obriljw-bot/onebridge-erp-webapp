@@ -809,7 +809,7 @@ function aggregateInvoiceDataApi(params) {
  * Settlement 기반 청구서 생성 (Track B)
  */
 function createInvoiceFromSettlementApi(params) {
-  var result = createInvoiceFromSettlement(params);
+  var result = createBilling(params);  // SettlementService.js의 createBilling() 호출
   return safeReturn(result);
 }
 
@@ -818,7 +818,7 @@ function createInvoiceFromSettlementApi(params) {
  * @param {Object} params - { orderNumbers, type, company, invoiceDate, notes }
  */
 function createDirectBillingApi(params) {
-  var result = createInvoiceFromSettlement(params);
+  var result = createBilling(params);  // SettlementService.js의 createBilling() 호출
   return safeReturn(result);
 }
 
