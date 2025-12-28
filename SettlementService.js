@@ -829,13 +829,15 @@ function createBilling(params) {
       };
     }
 
-    // 청구유형 값 표준화 ("매출"→"SALES", "매입"→"PURCHASE")
-    var standardizedType = type;
-    if (type === '매출') {
-      standardizedType = 'SALES';
-    } else if (type === '매입') {
-      standardizedType = 'PURCHASE';
+    // 청구유형 값 검증 - 반드시 표준 값이어야 함
+    if (type !== 'SALES' && type !== 'PURCHASE') {
+      return {
+        success: false,
+        error: '청구유형은 "SALES" 또는 "PURCHASE"만 허용됩니다. 현재 값: "' + type + '"'
+      };
     }
+
+    var standardizedType = type;  // 이미 검증되었으므로 그대로 사용
 
     // billingType 결정 (마감ID 기반 청구서는 "SETTLEMENT", 직접 생성은 "DIRECT")
     var billingType = (settlementId && settlementId !== '') ? 'SETTLEMENT' : 'DIRECT';
