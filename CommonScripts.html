@@ -4521,9 +4521,15 @@
 
         var orderNumbers = [];
         var companies = {};
+        var totalAmount = 0;  // 청구 금액 계산
+
         checkboxes.forEach(function(cb) {
           orderNumbers.push(cb.dataset.orderNumber);
           companies[cb.dataset.company] = true;
+
+          // 체크박스의 data-amount 속성에서 금액 가져오기
+          var amount = parseFloat(cb.dataset.amount) || 0;
+          totalAmount += amount;
         });
 
         // 거래처 일관성 체크
@@ -4532,7 +4538,7 @@
           return;
         }
 
-        if (confirm(orderNumbers.length + '건의 발주로 청구서를 생성하시겠습니까?')) {
+        if (confirm(orderNumbers.length + '건의 발주로 청구서를 생성하시겠습니까?\n총 금액: ₩' + totalAmount.toLocaleString())) {
           OB.showLoading('청구서 생성 중...');
 
           var company = Object.keys(companies)[0]; // 이미 단일 거래처 검증 완료
@@ -4558,7 +4564,8 @@
             .createDirectBillingApi({
               orderNumbers: orderNumbers,
               type: 'SALES',  // 표준 값 사용 (이전: '매출')
-              company: company
+              company: company,
+              amount: totalAmount  // 청구 금액 추가
             });
         }
       });
