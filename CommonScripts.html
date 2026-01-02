@@ -6644,7 +6644,9 @@
   var PAYMENT_MODAL_STATE = {
     currentStep: 1,
     paymentType: null,  // '입금' or '출금'
-    selectedInvoice: null,
+    selectedInvoice: null,  // 단일 선택 (임시 청구서 생성 후 사용)
+    selectedInvoices: [],  // 다중 선택 (청구서 ID 배열)
+    selectedInvoicesData: {},  // 다중 선택 데이터 { invoiceId: { amount, ... } }
     invoiceDetail: null
   };
 
@@ -6657,6 +6659,8 @@
       currentStep: 1,
       paymentType: null,
       selectedInvoice: null,
+      selectedInvoices: [],
+      selectedInvoicesData: {},
       invoiceDetail: null
     };
 
@@ -6758,7 +6762,8 @@
 
     footer.innerHTML =
       '<button class="payment-btn secondary" onclick="goToPrevStep()">← 이전</button>' +
-      '<span style="flex:1;"></span>';
+      '<span style="flex:1;"></span>' +
+      '<button class="payment-btn primary" id="invoice-next-step-btn" disabled onclick="proceedWithSelectedInvoices()">다음 단계 →</button>';
 
     // Enter 키로 검색
     setTimeout(function() {
@@ -6820,24 +6825,37 @@
 
     var companyLabel = PAYMENT_MODAL_STATE.paymentType === '입금' ? '고객사' : '공급사';
 
-    var html = '<div class="invoice-list">';
+    // 선택 요약 영역
+    var html = '<div class="invoice-selection-summary" id="invoice-selection-summary" style="display:none;">' +
+      '<div style="font-weight:600;color:#1e40af;">선택된 청구서: <span id="selected-invoice-count">0</span>건</div>' +
+      '<div style="font-weight:600;color:#059669;">총 청구금액: ₩<span id="selected-invoice-total">0</span></div>' +
+    '</div>';
+
+    html += '<div class="invoice-list">';
 
     invoices.forEach(function(invoice) {
       var statusClass = invoice.status === 'ISSUED' ? 'status-issued' :
                         invoice.status === 'DRAFT' ? 'status-draft' :
                         invoice.status === 'PAID' ? 'status-paid' : '';
 
+      var isSelected = PAYMENT_MODAL_STATE.selectedInvoices.indexOf(invoice.invoiceId) !== -1;
+
       html +=
-        '<div class="invoice-item" onclick="selectInvoice(\'' + invoice.invoiceId + '\')">' +
-          '<div class="invoice-item-header">' +
-            '<span class="invoice-id">' + invoice.invoiceId + '</span>' +
-            '<span class="invoice-status ' + statusClass + '">' + invoice.status + '</span>' +
-          '</div>' +
-          '<div class="invoice-item-body">' +
-            '<div>' + companyLabel + ': <strong>' + invoice.company + '</strong></div>' +
-            '<div>브랜드: ' + (invoice.brands || '없음') + '</div>' +
-            '<div>청구일: ' + invoice.date + ' | 금액: <strong>' + Number(invoice.amount).toLocaleString() + '원</strong></div>' +
-            '<div>발주: ' + invoice.orderCount + '건</div>' +
+        '<div class="invoice-item ' + (isSelected ? 'selected' : '') + '" data-invoice-id="' + invoice.invoiceId + '" data-amount="' + invoice.amount + '">' +
+          '<div style="display:flex;align-items:center;gap:12px;">' +
+            '<input type="checkbox" class="invoice-checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="toggleInvoiceSelection(\'' + invoice.invoiceId + '\', ' + invoice.amount + ')" />' +
+            '<div style="flex:1;">' +
+              '<div class="invoice-item-header">' +
+                '<span class="invoice-id">' + invoice.invoiceId + '</span>' +
+                '<span class="invoice-status ' + statusClass + '">' + invoice.status + '</span>' +
+              '</div>' +
+              '<div class="invoice-item-body">' +
+                '<div>' + companyLabel + ': <strong>' + invoice.company + '</strong></div>' +
+                '<div>브랜드: ' + (invoice.brands || '없음') + '</div>' +
+                '<div>청구일: ' + invoice.date + ' | 금액: <strong>' + Number(invoice.amount).toLocaleString() + '원</strong></div>' +
+                '<div>발주: ' + invoice.orderCount + '건</div>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
         '</div>';
     });
@@ -6845,6 +6863,91 @@
     html += '</div>';
 
     resultsDiv.innerHTML = html;
+
+    // 선택 요약 업데이트
+    updateInvoiceSelectionSummary();
+
+    // "다음 단계" 버튼 활성화/비활성화
+    updateNextStepButton();
+  }
+
+  /**
+   * 청구서 선택/해제 토글
+   */
+  function toggleInvoiceSelection(invoiceId, amount) {
+    var idx = PAYMENT_MODAL_STATE.selectedInvoices.indexOf(invoiceId);
+
+    if (idx === -1) {
+      // 선택
+      PAYMENT_MODAL_STATE.selectedInvoices.push(invoiceId);
+      PAYMENT_MODAL_STATE.selectedInvoicesData[invoiceId] = { amount: amount };
+    } else {
+      // 해제
+      PAYMENT_MODAL_STATE.selectedInvoices.splice(idx, 1);
+      delete PAYMENT_MODAL_STATE.selectedInvoicesData[invoiceId];
+    }
+
+    // 선택 상태 UI 업데이트
+    var items = document.querySelectorAll('.invoice-item');
+    items.forEach(function(item) {
+      var id = item.getAttribute('data-invoice-id');
+      var checkbox = item.querySelector('.invoice-checkbox');
+
+      if (id === invoiceId) {
+        if (checkbox.checked) {
+          item.classList.add('selected');
+        } else {
+          item.classList.remove('selected');
+        }
+      }
+    });
+
+    updateInvoiceSelectionSummary();
+    updateNextStepButton();
+  }
+
+  /**
+   * 선택 요약 업데이트
+   */
+  function updateInvoiceSelectionSummary() {
+    var summaryDiv = document.getElementById('invoice-selection-summary');
+    var countSpan = document.getElementById('selected-invoice-count');
+    var totalSpan = document.getElementById('selected-invoice-total');
+
+    if (!summaryDiv || !countSpan || !totalSpan) return;
+
+    var count = PAYMENT_MODAL_STATE.selectedInvoices.length;
+    var total = 0;
+
+    PAYMENT_MODAL_STATE.selectedInvoices.forEach(function(invoiceId) {
+      var data = PAYMENT_MODAL_STATE.selectedInvoicesData[invoiceId];
+      if (data) {
+        total += data.amount || 0;
+      }
+    });
+
+    countSpan.textContent = count;
+    totalSpan.textContent = total.toLocaleString();
+
+    if (count > 0) {
+      summaryDiv.style.display = 'block';
+    } else {
+      summaryDiv.style.display = 'none';
+    }
+  }
+
+  /**
+   * "다음 단계" 버튼 활성화/비활성화
+   */
+  function updateNextStepButton() {
+    var nextBtn = document.getElementById('invoice-next-step-btn');
+    if (!nextBtn) return;
+
+    if (PAYMENT_MODAL_STATE.selectedInvoices.length > 0) {
+      nextBtn.disabled = false;
+    } else {
+      nextBtn.disabled = true;
+    }
   }
 
   /**
@@ -7257,6 +7360,8 @@
       currentStep: 1,
       paymentType: null,
       selectedInvoice: null,
+      selectedInvoices: [],
+      selectedInvoicesData: {},
       invoiceDetail: null
     };
   }
