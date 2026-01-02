@@ -1969,7 +1969,8 @@ function getOrdersDetailForInvoice(orderNumbers) {
     var cOrderNumber = col('발주번호');
     var cOrderDate = col('발주일');
     var cBrand = col('브랜드');
-    var cConfirmedAmount = col('확정금액');
+    var cConfirmedQty = col('확정수량');
+    var cSupplyPrice = col('공급가');
 
     // 발주번호별로 그룹핑 (브랜드 단위)
     var orderMap = {};
@@ -1989,7 +1990,9 @@ function getOrdersDetailForInvoice(orderNumbers) {
           }
 
           var brand = String(row[cBrand] || '').trim();
-          var amount = Number(row[cConfirmedAmount]) || 0;
+          var confirmedQty = Number(row[cConfirmedQty]) || 0;
+          var supplyPrice = Number(row[cSupplyPrice]) || 0;
+          var amount = confirmedQty * supplyPrice;
 
           if (brand && orderMap[orderId].brands.indexOf(brand) === -1) {
             orderMap[orderId].brands.push(brand);
