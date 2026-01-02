@@ -7085,6 +7085,212 @@
   }
 
   /**
+   * Step 4: 다중 청구서 결제 정보 입력 및 검증
+   */
+  function renderStep4MultiplePaymentForm() {
+    PAYMENT_MODAL_STATE.currentStep = 4;
+
+    var invoices = PAYMENT_MODAL_STATE.invoiceDetailsMultiple;
+    var type = PAYMENT_MODAL_STATE.paymentType;
+    var companyLabel = type === '입금' ? '고객사' : '공급사';
+
+    var body = document.getElementById('payment-modal-body');
+    var footer = document.getElementById('payment-modal-footer');
+
+    // 총 청구금액 계산
+    var totalInvoiceAmount = 0;
+    invoices.forEach(function(invoice) {
+      totalInvoiceAmount += Number(invoice.amount) || 0;
+    });
+
+    var today = new Date().toISOString().split('T')[0];
+
+    body.innerHTML =
+      '<div class="payment-step-container">' +
+        '<div class="payment-step-indicator">[Step 4/4] 결제 정보 입력</div>' +
+        '<div class="payment-info-banner">' +
+          '<div>선택된 청구서: <strong>' + invoices.length + '건</strong></div>' +
+          '<div>총 청구금액: <strong>₩' + totalInvoiceAmount.toLocaleString() + '</strong></div>' +
+        '</div>' +
+        '<div class="payment-form-section">' +
+          '<h4>💳 결제 정보</h4>' +
+          '<div class="payment-form-row">' +
+            '<label>결제일 *</label>' +
+            '<input type="date" id="final-payment-date-multi" value="' + today + '" class="payment-input" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>결제유형 *</label>' +
+            '<select id="final-payment-type-multi" class="payment-input" disabled>' +
+              '<option value="' + type + '" selected>' + type + '</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>결제금액 *</label>' +
+            '<input type="number" id="final-payment-amount-multi" value="' + totalInvoiceAmount + '" ' +
+              'class="payment-input" min="1" oninput="validatePaymentAmountMultiple()" />' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>결제수단 *</label>' +
+            '<select id="final-payment-method-multi" class="payment-input">' +
+              '<option value="현금">현금</option>' +
+              '<option value="카드">카드</option>' +
+              '<option value="계좌이체" selected>계좌이체</option>' +
+              '<option value="기타">기타</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="payment-form-row">' +
+            '<label>비고</label>' +
+            '<input type="text" id="final-payment-notes-multi" class="payment-input" ' +
+              'placeholder="' + invoices.length + '건 일괄 결제" value="' + invoices.length + '건 일괄 결제" />' +
+          '</div>' +
+        '</div>' +
+        '<div id="amount-validation-result-multi" class="amount-validation-result"></div>' +
+      '</div>';
+
+    footer.innerHTML =
+      '<button class="payment-btn secondary" onclick="goToPrevStep()">← 이전</button>' +
+      '<span style="flex:1;"></span>' +
+      '<button id="final-save-btn-multi" class="payment-btn primary" onclick="saveMultiplePaymentFromModal()">💾 저장</button>';
+
+    // 초기 금액 검증
+    setTimeout(function() {
+      validatePaymentAmountMultiple();
+    }, 100);
+  }
+
+  /**
+   * 다중 청구서 금액 검증
+   */
+  function validatePaymentAmountMultiple() {
+    var invoices = PAYMENT_MODAL_STATE.invoiceDetailsMultiple;
+    var inputAmount = Number(document.getElementById('final-payment-amount-multi').value) || 0;
+
+    var totalInvoiceAmount = 0;
+    invoices.forEach(function(invoice) {
+      totalInvoiceAmount += Number(invoice.amount) || 0;
+    });
+
+    var resultDiv = document.getElementById('amount-validation-result-multi');
+    var saveBtn = document.getElementById('final-save-btn-multi');
+
+    if (inputAmount === totalInvoiceAmount) {
+      resultDiv.innerHTML =
+        '<div class="amount-validation success">' +
+          '<div class="validation-icon">✅</div>' +
+          '<div class="validation-details">' +
+            '<div class="validation-title">결제금액과 총 청구금액이 일치합니다.</div>' +
+            '<div class="validation-row">총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + ' (' + invoices.length + '건)</div>' +
+            '<div class="validation-row">결제금액: ₩' + inputAmount.toLocaleString() + '</div>' +
+            '<div class="validation-row">차액: ₩0</div>' +
+          '</div>' +
+        '</div>';
+      saveBtn.disabled = false;
+      saveBtn.classList.remove('disabled');
+    } else {
+      var diff = inputAmount - totalInvoiceAmount;
+      resultDiv.innerHTML =
+        '<div class="amount-validation error">' +
+          '<div class="validation-icon">❌</div>' +
+          '<div class="validation-details">' +
+            '<div class="validation-title">결제금액과 총 청구금액이 일치하지 않습니다.</div>' +
+            '<div class="validation-row">총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + ' (' + invoices.length + '건)</div>' +
+            '<div class="validation-row">결제금액: ₩' + inputAmount.toLocaleString() + '</div>' +
+            '<div class="validation-row">차액: ' + (diff > 0 ? '+' : '') + '₩' + Math.abs(diff).toLocaleString() + ' (' + (diff > 0 ? '초과' : '부족') + ')</div>' +
+            '<div class="validation-message">💡 금액을 수정해주세요. 선택된 청구서의 총 금액과 일치해야 합니다.</div>' +
+          '</div>' +
+        '</div>';
+      saveBtn.disabled = true;
+      saveBtn.classList.add('disabled');
+    }
+  }
+
+  /**
+   * 다중 청구서 결제 저장
+   */
+  function saveMultiplePaymentFromModal() {
+    var invoices = PAYMENT_MODAL_STATE.invoiceDetailsMultiple;
+    var type = PAYMENT_MODAL_STATE.paymentType;
+
+    var date = document.getElementById('final-payment-date-multi').value;
+    var amount = Number(document.getElementById('final-payment-amount-multi').value);
+    var method = document.getElementById('final-payment-method-multi').value;
+    var notes = document.getElementById('final-payment-notes-multi').value.trim();
+
+    // 유효성 검사
+    if (!date) {
+      alert('결제일을 입력해주세요.');
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      alert('올바른 금액을 입력해주세요.');
+      return;
+    }
+
+    // 총 청구금액 계산
+    var totalInvoiceAmount = 0;
+    invoices.forEach(function(invoice) {
+      totalInvoiceAmount += Number(invoice.amount) || 0;
+    });
+
+    // 금액 일치 검증
+    if (amount !== totalInvoiceAmount) {
+      alert('❌ 결제금액과 총 청구금액이 일치하지 않습니다.\n금액을 확인해주세요.');
+      return;
+    }
+
+    // 청구서 ID 배열 생성
+    var invoiceIds = [];
+    var companies = {};
+    invoices.forEach(function(invoice) {
+      invoiceIds.push(invoice.invoiceId);
+      companies[invoice.company] = true;
+    });
+
+    var companyDisplay = Object.keys(companies).join(', ');
+    if (Object.keys(companies).length > 3) {
+      companyDisplay = Object.keys(companies).slice(0, 3).join(', ') + ' 외 ' + (Object.keys(companies).length - 3) + '곳';
+    }
+
+    var params = {
+      date: date,
+      type: type,
+      company: companyDisplay,  // 여러 업체명 표시용
+      amount: amount,
+      method: method,
+      docNumbers: invoiceIds,  // 청구서 ID 배열
+      notes: notes
+    };
+
+    // 로딩 표시
+    var saveBtn = document.getElementById('final-save-btn-multi');
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중...';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          alert('✅ 결제가 정상적으로 저장되었습니다!\n\n' + invoices.length + '건의 청구서가 처리되었습니다.');
+          closePaymentModal();
+          // 결제내역 목록 새로고침
+          if (typeof loadPaymentRecords === 'function') {
+            loadPaymentRecords();
+          }
+        } else {
+          alert('❌ 결제 저장 실패:\n' + result.error);
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 저장';
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert('❌ 서버 오류:\n' + error.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 저장';
+      })
+      .saveMultiplePaymentApi(params);
+  }
+
+  /**
    * Step 3: 청구서 세부 확인
    */
   function renderStep3InvoiceDetail() {
