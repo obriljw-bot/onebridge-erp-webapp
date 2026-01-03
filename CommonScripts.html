@@ -7704,6 +7704,150 @@
     };
   }
 
+  /**
+   * ============================================================
+   * 대시보드 페이지 초기화 (SPEC_04, SPEC_05 통합)
+   * ============================================================
+   */
+  function initDashboardPage() {
+    console.log('📊 대시보드 페이지 초기화 중...');
+
+    // 대시보드 데이터 로드
+    loadDashboardData();
+  }
+
+  /**
+   * 대시보드 데이터 로드 및 위젯 업데이트
+   */
+  function loadDashboardData() {
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response && response.success && response.data) {
+          updateDashboardWidgets(response.data);
+        } else {
+          console.error('❌ 대시보드 데이터 로드 실패:', response.error);
+          // 데이터 로드 실패 시 기본값 표시
+          showDashboardError();
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('❌ 대시보드 API 호출 실패:', error.message);
+        showDashboardError();
+      })
+      .api_getDashboardData();
+  }
+
+  /**
+   * 대시보드 위젯 업데이트
+   */
+  function updateDashboardWidgets(data) {
+    // 오늘 결제 예정 (SPEC_04)
+    if (data.paymentDue) {
+      var 매입 = data.paymentDue.매입 || { count: 0, amount: 0 };
+      var 매출 = data.paymentDue.매출 || { count: 0, amount: 0 };
+
+      var purchaseCountEl = document.getElementById('dashboard-payment-due-purchase-count');
+      var purchaseAmountEl = document.getElementById('dashboard-payment-due-purchase-amount');
+      var salesCountEl = document.getElementById('dashboard-payment-due-sales-count');
+      var salesAmountEl = document.getElementById('dashboard-payment-due-sales-amount');
+
+      if (purchaseCountEl) {
+        purchaseCountEl.textContent = 매입.count + '건';
+      }
+      if (purchaseAmountEl) {
+        purchaseAmountEl.textContent = '₩ ' + (매입.amount || 0).toLocaleString();
+      }
+      if (salesCountEl) {
+        salesCountEl.textContent = 매출.count + '건';
+      }
+      if (salesAmountEl) {
+        salesAmountEl.textContent = '₩ ' + (매출.amount || 0).toLocaleString();
+      }
+    }
+
+    // 미수금/미지급금 현황 (SPEC_05)
+    if (data.receivablePayable) {
+      var 매출현황 = data.receivablePayable.매출 || {};
+      var 매입현황 = data.receivablePayable.매입 || {};
+
+      // 총 미수금 (매출)
+      var receivableTotalEl = document.getElementById('dashboard-receivable-total');
+      var receivableCountEl = document.getElementById('dashboard-receivable-count');
+      if (receivableTotalEl) {
+        receivableTotalEl.textContent = '₩ ' + (매출현황.총미수금 || 0).toLocaleString();
+      }
+      if (receivableCountEl) {
+        var totalCount = (매출현황.정상건수 || 0) + (매출현황.연체건수 || 0);
+        receivableCountEl.textContent = totalCount + '건';
+      }
+
+      // 총 미지급금 (매입)
+      var payableTotalEl = document.getElementById('dashboard-payable-total');
+      var payableCountEl = document.getElementById('dashboard-payable-count');
+      if (payableTotalEl) {
+        payableTotalEl.textContent = '₩ ' + (매입현황.총미지급금 || 0).toLocaleString();
+      }
+      if (payableCountEl) {
+        var totalCount = (매입현황.정상건수 || 0) + (매입현황.연체건수 || 0);
+        payableCountEl.textContent = totalCount + '건';
+      }
+
+      // 연체 건수 (매출)
+      var overdueReceivableEl = document.getElementById('dashboard-overdue-receivable');
+      var overdueReceivableAmountEl = document.getElementById('dashboard-overdue-receivable-amount');
+      if (overdueReceivableEl) {
+        overdueReceivableEl.textContent = (매출현황.연체건수 || 0) + '건';
+      }
+      if (overdueReceivableAmountEl) {
+        overdueReceivableAmountEl.textContent = '₩ ' + (매출현황.연체금액 || 0).toLocaleString();
+      }
+
+      // 연체 건수 (매입)
+      var overduePayableEl = document.getElementById('dashboard-overdue-payable');
+      var overduePayableAmountEl = document.getElementById('dashboard-overdue-payable-amount');
+      if (overduePayableEl) {
+        overduePayableEl.textContent = (매입현황.연체건수 || 0) + '건';
+      }
+      if (overduePayableAmountEl) {
+        overduePayableAmountEl.textContent = '₩ ' + (매입현황.연체금액 || 0).toLocaleString();
+      }
+    }
+
+    console.log('✅ 대시보드 위젯 업데이트 완료');
+  }
+
+  /**
+   * 대시보드 오류 표시
+   */
+  function showDashboardError() {
+    // 모든 위젯을 기본값으로 설정
+    var widgetIds = [
+      'dashboard-payment-due-purchase-count',
+      'dashboard-payment-due-purchase-amount',
+      'dashboard-payment-due-sales-count',
+      'dashboard-payment-due-sales-amount',
+      'dashboard-receivable-total',
+      'dashboard-receivable-count',
+      'dashboard-payable-total',
+      'dashboard-payable-count',
+      'dashboard-overdue-receivable',
+      'dashboard-overdue-receivable-amount',
+      'dashboard-overdue-payable',
+      'dashboard-overdue-payable-amount'
+    ];
+
+    widgetIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        if (id.includes('count') || id.includes('overdue')) {
+          el.textContent = '-';
+        } else {
+          el.textContent = '₩ 0';
+        }
+      }
+    });
+  }
+
 </script>
 
 <!-- 전역 로딩 오버레이 -->

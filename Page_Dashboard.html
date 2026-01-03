@@ -27,6 +27,46 @@
     </div>
   </div>
 
+  <!-- 결제 예정 알림 섹션 (SPEC_04) -->
+  <div class="ob-section-title ob-mb-8">💳 오늘의 결제 현황</div>
+  <div class="ob-kpi-grid ob-mb-12" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+    <div class="ob-kpi-card" style="border-left: 4px solid #dc2626;">
+      <div class="ob-kpi-label">오늘 결제 예정 (매입)</div>
+      <div class="ob-kpi-value" id="dashboard-payment-due-purchase-count">-</div>
+      <div class="ob-kpi-delta" id="dashboard-payment-due-purchase-amount">₩ 0</div>
+    </div>
+    <div class="ob-kpi-card" style="border-left: 4px solid #10b981;">
+      <div class="ob-kpi-label">오늘 입금 예정 (매출)</div>
+      <div class="ob-kpi-value" id="dashboard-payment-due-sales-count">-</div>
+      <div class="ob-kpi-delta" id="dashboard-payment-due-sales-amount">₩ 0</div>
+    </div>
+  </div>
+
+  <!-- 미수금 현황 섹션 (SPEC_05) -->
+  <div class="ob-section-title ob-mb-8">📊 미수금/미지급금 현황</div>
+  <div class="ob-kpi-grid ob-mb-12">
+    <div class="ob-kpi-card">
+      <div class="ob-kpi-label">총 미수금 (매출)</div>
+      <div class="ob-kpi-value" style="color: #10b981;" id="dashboard-receivable-total">₩ 0</div>
+      <div class="ob-kpi-delta" id="dashboard-receivable-count">0건</div>
+    </div>
+    <div class="ob-kpi-card">
+      <div class="ob-kpi-label">총 미지급금 (매입)</div>
+      <div class="ob-kpi-value" style="color: #dc2626;" id="dashboard-payable-total">₩ 0</div>
+      <div class="ob-kpi-delta" id="dashboard-payable-count">0건</div>
+    </div>
+    <div class="ob-kpi-card">
+      <div class="ob-kpi-label">연체 건수 (매출)</div>
+      <div class="ob-kpi-value" style="color: #f59e0b;" id="dashboard-overdue-receivable">0건</div>
+      <div class="ob-kpi-delta warning" id="dashboard-overdue-receivable-amount">₩ 0</div>
+    </div>
+    <div class="ob-kpi-card">
+      <div class="ob-kpi-label">연체 건수 (매입)</div>
+      <div class="ob-kpi-value" style="color: #f59e0b;" id="dashboard-overdue-payable">0건</div>
+      <div class="ob-kpi-delta warning" id="dashboard-overdue-payable-amount">₩ 0</div>
+    </div>
+  </div>
+
   <div class="ob-grid-2">
     <div class="ob-card">
       <div class="ob-card-header">

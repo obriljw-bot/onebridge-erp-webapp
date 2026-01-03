@@ -1089,3 +1089,33 @@ function validateInvoiceForPaymentApi(invoice) {
   var result = validateInvoiceForPayment(invoice);
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * 대시보드 API (SPEC_04, SPEC_05 통합)
+ * ============================================================
+ */
+
+/**
+ * 대시보드 전체 데이터 조회 (한 번의 호출로 모든 위젯 데이터 제공)
+ */
+function api_getDashboardData() {
+  var result = getDashboardData();
+  return safeReturn(result);
+}
+
+/**
+ * 오늘 결제 예정 알림 조회 (SPEC_04)
+ */
+function api_getTodayPaymentDue() {
+  var result = getTodayPaymentDue();
+  return safeReturn(result);
+}
+
+/**
+ * 미수금/미지급금 현황 조회 (SPEC_05)
+ */
+function api_getReceivablePayableSummary() {
+  var result = getReceivablePayableSummary();
+  return safeReturn(result);
+}
