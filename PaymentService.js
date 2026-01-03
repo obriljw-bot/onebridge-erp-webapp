@@ -236,9 +236,19 @@ function addPaymentRecord(params) {
       user                            // 입력자
     ];
 
-    // 시트에 추가 - 실제 데이터가 있는 마지막 행 다음에 삽입 (포맷팅 무시)
+    // 시트에 추가 - A열(결제ID)에서 실제 데이터가 있는 마지막 행 찾기
     var lastRow = sheet.getLastRow();
-    var nextRow = lastRow + 1;
+    var idColumn = sheet.getRange(1, 1, lastRow, 1).getValues(); // A열만 읽기
+
+    var lastDataRow = 1; // 헤더 행
+    for (var i = idColumn.length - 1; i > 0; i--) {
+      if (idColumn[i][0] && idColumn[i][0] !== '') {
+        lastDataRow = i + 1;
+        break;
+      }
+    }
+
+    var nextRow = lastDataRow + 1;
     sheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
 
     Logger.log('[addPaymentRecord] ✅ 입출금 기록 추가 (' + nextRow + '행): ' + paymentId);
@@ -2309,9 +2319,19 @@ function saveMultiplePayment(params) {
       }
     });
 
-    // 결제내역 추가 - 실제 데이터가 있는 마지막 행 다음에 삽입 (포맷팅 무시)
+    // 결제내역 추가 - A열(결제ID)에서 실제 데이터가 있는 마지막 행 찾기
     var lastRow = paymentSheet.getLastRow();
-    var nextRow = lastRow + 1;
+    var idColumn = paymentSheet.getRange(1, 1, lastRow, 1).getValues(); // A열만 읽기
+
+    var lastDataRow = 1; // 헤더 행
+    for (var i = idColumn.length - 1; i > 0; i--) {
+      if (idColumn[i][0] && idColumn[i][0] !== '') {
+        lastDataRow = i + 1;
+        break;
+      }
+    }
+
+    var nextRow = lastDataRow + 1;
     paymentSheet.getRange(nextRow, 1, 1, paymentRow.length).setValues([paymentRow]);
     Logger.log('[saveMultiplePayment] ✅ 결제내역 저장 완료 (' + nextRow + '행): ' + paymentId);
 

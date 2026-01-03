@@ -5544,14 +5544,40 @@
         actionButtons = '<span style="color:#9ca3af; font-size:11px;">삭제됨</span>';
       }
 
+      // 거래처명 요약 처리
+      var companyDisplay = payment.company || '';
+      var companyTooltip = '';
+      if (payment.company && payment.company.includes(',')) {
+        var companies = payment.company.split(',').map(function(c) { return c.trim(); });
+        if (companies.length > 1) {
+          companyDisplay = companies[0] + ' 외 ' + (companies.length - 1) + '곳';
+          companyTooltip = companies.join('\n');
+        }
+      }
+
+      // 문서번호 요약 처리 (JSON 배열 또는 쉼표 구분)
+      var docDisplay = payment.docNumber || '-';
+      var docTooltip = '';
+      if (payment.docNumber && payment.docNumber !== '-') {
+        try {
+          var docs = JSON.parse(payment.docNumber);
+          if (Array.isArray(docs) && docs.length > 1) {
+            docDisplay = docs[0] + ' 외 ' + (docs.length - 1) + '건';
+            docTooltip = docs.join('\n');
+          }
+        } catch (e) {
+          // JSON 파싱 실패 시 그대로 표시
+        }
+      }
+
       return '<tr data-payment-id="' + payment.paymentId + '">' +
         '<td>' + (payment.paymentId || '') + '</td>' +
         '<td>' + (payment.date || '') + '</td>' +
         '<td><span class="payment-badge ' + badgeClass + '">' + (payment.type || '') + '</span></td>' +
-        '<td>' + (payment.company || '') + '</td>' +
+        '<td>' + (companyTooltip ? '<span class="payment-hover-text" title="' + companyTooltip + '">' + companyDisplay + '</span>' : companyDisplay) + '</td>' +
         '<td class="num">₩' + OB.formatNumber(payment.amount || 0) + '</td>' +
         '<td>' + (payment.method || '') + '</td>' +
-        '<td>' + (payment.docNumber || '-') + '</td>' +
+        '<td>' + (docTooltip ? '<span class="payment-hover-text" title="' + docTooltip + '">' + docDisplay + '</span>' : docDisplay) + '</td>' +
         '<td>' + (payment.orderNumber || '-') + '</td>' +
         '<td>' + (payment.notes || '-') + '</td>' +
         '<td>' + (payment.createdAt || '') + '</td>' +
