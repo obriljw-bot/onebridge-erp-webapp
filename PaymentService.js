@@ -2310,9 +2310,21 @@ function saveMultiplePayment(params) {
       }
     });
 
-    // 결제내역 추가
-    paymentSheet.appendRow(paymentRow);
-    Logger.log('[saveMultiplePayment] ✅ 결제내역 저장 완료: ' + paymentId);
+    // 결제내역 추가 - 실제 마지막 행을 찾아서 저장
+    var allData = paymentSheet.getDataRange().getValues();
+    var lastDataRow = 1; // 헤더 행
+
+    // 역순으로 검색하여 결제ID가 있는 마지막 행 찾기
+    for (var i = allData.length - 1; i > 0; i--) {
+      if (allData[i][0] && allData[i][0] !== '') { // 결제ID 컬럼
+        lastDataRow = i + 1;
+        break;
+      }
+    }
+
+    var nextRow = lastDataRow + 1;
+    paymentSheet.getRange(nextRow, 1, 1, paymentRow.length).setValues([paymentRow]);
+    Logger.log('[saveMultiplePayment] ✅ 결제내역 저장 완료 (' + nextRow + '행): ' + paymentId);
 
     // 청구서 상태 업데이트 (PAID로 변경)
     var invoiceData = invoiceSheet.getDataRange().getValues();
@@ -2340,6 +2352,14 @@ function saveMultiplePayment(params) {
         invoiceSheet.getRange(i + 1, colStatus + 1).setValue('PAID');
         updatedCount++;
         Logger.log('[saveMultiplePayment] ✅ 청구서 상태 변경: ' + invoiceId + ' → PAID');
+
+        // 거래원장 결제 상태 업데이트
+        var ledgerUpdateResult = updateLedgerPaymentStatus(invoiceId, type, '결제완료');
+        if (ledgerUpdateResult.success) {
+          Logger.log('[saveMultiplePayment] ✅ 거래원장 업데이트 성공: ' + invoiceId);
+        } else {
+          Logger.log('[saveMultiplePayment] ⚠️ 거래원장 업데이트 실패: ' + ledgerUpdateResult.error);
+        }
       }
     }
 
