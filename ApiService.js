@@ -1119,3 +1119,25 @@ function api_getReceivablePayableSummary() {
   var result = getReceivablePayableSummary();
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * 결제 취소/환불 API (SPEC_02)
+ * ============================================================
+ */
+
+/**
+ * 결제 취소 (Soft Delete + 청구서 상태 복원)
+ */
+function api_cancelPayment(params) {
+  var result = deletePaymentRecord(params);
+  return safeReturn(result);
+}
+
+/**
+ * 환불 처리 (마이너스 결제 기록 생성)
+ */
+function api_createRefund(params) {
+  var result = createRefund(params);
+  return safeReturn(result);
+}

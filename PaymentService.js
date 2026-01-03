@@ -552,57 +552,174 @@ function deletePaymentRecord(params) {
     }
 
     var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
-    var sheet = ss.getSheetByName(PAYMENT_SHEET_NAME);
+    var paymentSheet = ss.getSheetByName(PAYMENT_SHEET_NAME);
+    var invoiceSheet = ss.getSheetByName(INVOICE_SHEET_NAME);
 
-    if (!sheet) {
+    if (!paymentSheet) {
       return {
         success: false,
         error: '결제내역 시트를 찾을 수 없습니다.'
       };
     }
 
-    // 삭제 전에 거래원장 복원을 위해 정보 조회
-    var data = sheet.getDataRange().getValues();
-    var header = data[0];
-    var col = function(name) { return header.indexOf(name); };
+    // ========================================
+    // 1. 결제 정보 조회
+    // ========================================
+    var paymentData = paymentSheet.getDataRange().getValues();
+    var paymentHeader = paymentData[0];
+    var col = function(name) { return paymentHeader.indexOf(name); };
 
+    var paymentRow = null;
+    var paymentRowIndex = -1;
     var docNumber = '';
     var paymentType = '';
     var orderNumber = '';
+    var amount = 0;
 
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][col('결제ID')] === params.paymentId) {
-        docNumber = data[i][col('문서번호')] || '';
-        paymentType = data[i][col('결제유형')] || '';
-        orderNumber = data[i][col('발주번호')] || '';
+    for (var i = 1; i < paymentData.length; i++) {
+      if (paymentData[i][col('결제ID')] === params.paymentId) {
+        paymentRow = paymentData[i];
+        paymentRowIndex = i + 1;
+        docNumber = paymentRow[col('문서번호')] || '';
+        paymentType = paymentRow[col('결제유형')] || '';
+        orderNumber = paymentRow[col('발주번호')] || '';
+        amount = Number(paymentRow[col('금액')]) || 0;
         break;
       }
     }
 
-    // 거래원장 연동: 결제 삭제 시 거래원장 상태 복원
+    if (!paymentRow) {
+      return {
+        success: false,
+        error: '해당 결제 내역을 찾을 수 없습니다.'
+      };
+    }
+
+    Logger.log('[deletePaymentRecord] 결제 취소 시작: ' + params.paymentId);
+    Logger.log('[deletePaymentRecord] 금액: ' + amount.toLocaleString() + '원');
+    Logger.log('[deletePaymentRecord] 문서번호: ' + docNumber);
+
+    // ========================================
+    // 2. 청구서 상태 복원 (SPEC_02)
+    // ========================================
+    if (docNumber && invoiceSheet) {
+      Logger.log('[deletePaymentRecord] 청구서 상태 복원 시작...');
+
+      try {
+        // 문서번호가 JSON 배열인지 확인 (복수 청구서)
+        var invoiceIds = [];
+        try {
+          invoiceIds = JSON.parse(docNumber);
+          if (!Array.isArray(invoiceIds)) {
+            invoiceIds = [docNumber];
+          }
+        } catch (e) {
+          invoiceIds = [docNumber];
+        }
+
+        var invoiceData = invoiceSheet.getDataRange().getValues();
+        var invoiceHeader = invoiceData[0];
+
+        var colInvoiceId = invoiceHeader.indexOf('청구ID');
+        var colStatus = invoiceHeader.indexOf('청구상태');
+        var colAmount = invoiceHeader.indexOf('청구금액');
+        var colPaidAmount = invoiceHeader.indexOf('결제완료금액');
+        var colRemainingBalance = invoiceHeader.indexOf('미수금');
+        var colLastPaymentDate = invoiceHeader.indexOf('최종결제일');
+
+        var supportsPartialPayment = (colPaidAmount !== -1 && colRemainingBalance !== -1);
+
+        var restoredCount = 0;
+
+        for (var j = 0; j < invoiceIds.length; j++) {
+          var invoiceId = invoiceIds[j];
+
+          for (var k = 1; k < invoiceData.length; k++) {
+            if (invoiceData[k][colInvoiceId] === invoiceId) {
+              var invoice = invoiceData[k];
+              var invoiceRowIndex = k + 1;
+
+              if (supportsPartialPayment) {
+                // 부분 결제 지원: 결제완료금액 감소, 미수금 증가
+                var 청구금액 = Number(invoice[colAmount]) || 0;
+                var 현재결제완료금액 = Number(invoice[colPaidAmount]) || 0;
+                var 신규결제완료금액 = Math.max(0, 현재결제완료금액 - amount);
+                var 신규미수금 = 청구금액 - 신규결제완료금액;
+
+                // 상태 결정
+                var 신규상태 = 'ISSUED';
+                if (신규미수금 === 0) {
+                  신규상태 = 'PAID';
+                } else if (신규결제완료금액 > 0) {
+                  신규상태 = 'PAID_PARTIAL';
+                }
+
+                Logger.log('[deletePaymentRecord] 청구서 ' + invoiceId + ' 복원:');
+                Logger.log('   - 결제완료금액: ' + 현재결제완료금액.toLocaleString() + ' → ' + 신규결제완료금액.toLocaleString());
+                Logger.log('   - 미수금: ' + (청구금액 - 현재결제완료금액).toLocaleString() + ' → ' + 신규미수금.toLocaleString());
+                Logger.log('   - 상태: ' + invoice[colStatus] + ' → ' + 신규상태);
+
+                invoiceSheet.getRange(invoiceRowIndex, colStatus + 1).setValue(신규상태);
+                invoiceSheet.getRange(invoiceRowIndex, colPaidAmount + 1).setValue(신규결제완료금액);
+                invoiceSheet.getRange(invoiceRowIndex, colRemainingBalance + 1).setValue(신규미수금);
+
+                // 최종결제일은 유지 (이전 결제 이력이 있을 수 있음)
+
+                // 거래원장 상태 업데이트
+                var ledgerStatus = (신규상태 === 'PAID') ? '결제완료' : (신규상태 === 'PAID_PARTIAL' ? '부분결제' : '미결제');
+                updateLedgerPaymentStatus(invoiceId, paymentType, ledgerStatus);
+
+              } else {
+                // 부분 결제 미지원: 단순히 ISSUED로 복원
+                invoiceSheet.getRange(invoiceRowIndex, colStatus + 1).setValue('ISSUED');
+                Logger.log('[deletePaymentRecord] 청구서 ' + invoiceId + ' 상태 복원: ISSUED');
+
+                updateLedgerPaymentStatus(invoiceId, paymentType, '미결제');
+              }
+
+              restoredCount++;
+              break;
+            }
+          }
+        }
+
+        Logger.log('[deletePaymentRecord] ✅ 청구서 복원 완료: ' + restoredCount + '건');
+
+      } catch (error) {
+        Logger.log('[deletePaymentRecord] ⚠️ 청구서 복원 실패: ' + error.message);
+        // 복원 실패해도 삭제는 진행
+      }
+    }
+
+    // ========================================
+    // 3. 거래원장 연동 (기존 코드 유지)
+    // ========================================
     if (docNumber && docNumber !== '') {
       var ledgerUpdateResult = updateLedgerPaymentStatus(docNumber, paymentType, '미결제');
       if (ledgerUpdateResult.success) {
         Logger.log('[deletePaymentRecord] ✅ 거래원장 복원 성공: ' + ledgerUpdateResult.message);
       } else {
         Logger.log('[deletePaymentRecord] ⚠️ 거래원장 복원 실패: ' + ledgerUpdateResult.error);
-        // 거래원장 복원 실패해도 입출금 삭제는 진행
       }
     }
 
-    // 발주 연동: 결제 상태 재계산
+    // ========================================
+    // 4. 발주 연동 (기존 코드 유지)
+    // ========================================
     if (orderNumber && orderNumber !== '') {
       var syncResult = syncOrderPaymentStatus(orderNumber, paymentType);
       if (!syncResult.success) {
         Logger.log('[deletePaymentRecord] ⚠️ 발주 동기화 실패: ' + syncResult.error);
-        // 동기화 실패해도 입출금 삭제는 진행
       }
     }
 
-    var result = softDeleteRecord(sheet, params.paymentId, '결제ID');
+    // ========================================
+    // 5. 결제내역 Soft Delete
+    // ========================================
+    var result = softDeleteRecord(paymentSheet, params.paymentId, '결제ID');
 
     if (result.success) {
-      Logger.log('[deletePaymentRecord] ✅ 입출금 삭제: ' + params.paymentId);
+      Logger.log('[deletePaymentRecord] ✅ 결제 취소 완료: ' + params.paymentId);
     }
 
     return result;
@@ -611,7 +728,267 @@ function deletePaymentRecord(params) {
     Logger.log('[deletePaymentRecord] ❌ 오류: ' + error.message);
     return {
       success: false,
-      error: '입출금 삭제 중 오류 발생: ' + error.message
+      error: '결제 취소 중 오류 발생: ' + error.message
+    };
+  }
+}
+
+/**
+ * ============================================================
+ * 환불 처리 (SPEC_02)
+ * ============================================================
+ * 마이너스 결제 기록 생성
+ * @param {Object} params
+ *   - originalPaymentId: 원결제 ID
+ *   - refundAmount: 환불 금액
+ *   - refundDate: 환불일 (선택, 기본값: 오늘)
+ *   - refundReason: 환불 사유
+ * @return {Object} { success, refundId, message, error }
+ */
+function createRefund(params) {
+  try {
+    if (!params.originalPaymentId || !params.refundAmount) {
+      return {
+        success: false,
+        error: '원결제ID와 환불금액은 필수입니다.'
+      };
+    }
+
+    var refundAmount = Number(params.refundAmount);
+    if (isNaN(refundAmount) || refundAmount <= 0) {
+      return {
+        success: false,
+        error: '올바른 환불 금액을 입력해주세요.'
+      };
+    }
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var paymentSheet = ss.getSheetByName(PAYMENT_SHEET_NAME);
+    var invoiceSheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+
+    if (!paymentSheet) {
+      return {
+        success: false,
+        error: '결제내역 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    // ========================================
+    // 1. 원결제 정보 조회
+    // ========================================
+    var paymentData = paymentSheet.getDataRange().getValues();
+    var paymentHeader = paymentData[0];
+    var col = function(name) { return paymentHeader.indexOf(name); };
+
+    var originalPayment = null;
+
+    for (var i = 1; i < paymentData.length; i++) {
+      if (paymentData[i][col('결제ID')] === params.originalPaymentId) {
+        originalPayment = {
+          결제ID: paymentData[i][col('결제ID')],
+          결제일: paymentData[i][col('결제일')],
+          결제유형: paymentData[i][col('결제유형')],
+          거래처명: paymentData[i][col('거래처명')],
+          금액: Number(paymentData[i][col('금액')]) || 0,
+          결제수단: paymentData[i][col('결제수단')],
+          문서번호: paymentData[i][col('문서번호')],
+          발주번호: paymentData[i][col('발주번호')],
+          비고: paymentData[i][col('비고')]
+        };
+        break;
+      }
+    }
+
+    if (!originalPayment) {
+      return {
+        success: false,
+        error: '원결제 내역을 찾을 수 없습니다: ' + params.originalPaymentId
+      };
+    }
+
+    // 환불 금액 검증 (원결제 금액보다 클 수 없음)
+    if (refundAmount > originalPayment.금액) {
+      return {
+        success: false,
+        error: '환불 금액(' + refundAmount.toLocaleString() + '원)이 원결제 금액(' + originalPayment.금액.toLocaleString() + '원)을 초과할 수 없습니다.'
+      };
+    }
+
+    Logger.log('[createRefund] 환불 처리 시작');
+    Logger.log('[createRefund] 원결제ID: ' + params.originalPaymentId);
+    Logger.log('[createRefund] 환불금액: ' + refundAmount.toLocaleString() + '원');
+
+    // ========================================
+    // 2. 환불 결제 기록 생성 (마이너스 금액)
+    // ========================================
+    var now = new Date();
+    var refundDate = params.refundDate || now;
+    var refundId = generatePaymentId(); // 새로운 결제 ID 생성
+    var user = Session.getActiveUser().getEmail();
+
+    // 환불 결제유형 (원결제의 반대)
+    var 환불결제유형 = (originalPayment.결제유형 === '입금') ? '출금' : '입금';
+
+    var refundRow = [];
+    paymentHeader.forEach(function(h) {
+      switch(h) {
+        case '결제ID':
+          refundRow.push(refundId);
+          break;
+        case '결제일':
+          refundRow.push(refundDate);
+          break;
+        case '결제유형':
+          refundRow.push(환불결제유형);  // 반대 유형
+          break;
+        case '거래처명':
+          refundRow.push(originalPayment.거래처명);
+          break;
+        case '금액':
+          refundRow.push(-refundAmount);  // ⭐ 마이너스 금액
+          break;
+        case '결제수단':
+          refundRow.push(originalPayment.결제수단);
+          break;
+        case '문서번호':
+          refundRow.push(originalPayment.문서번호);
+          break;
+        case '발주번호':
+          refundRow.push(originalPayment.발주번호 || '');
+          break;
+        case '비고':
+          var refundNote = '환불: ' + (params.refundReason || '사유 미입력');
+          refundRow.push(refundNote);
+          break;
+        case '삭제여부':
+          refundRow.push(false);
+          break;
+        case '삭제일시':
+        case '삭제자':
+          refundRow.push('');
+          break;
+        case '입력일시':
+          refundRow.push(now);
+          break;
+        case '입력자':
+          refundRow.push(user);
+          break;
+        case '원결제ID':  // SPEC_02 추가 컬럼
+          refundRow.push(params.originalPaymentId);
+          break;
+        case '환불여부':  // SPEC_02 추가 컬럼
+          refundRow.push(true);
+          break;
+        default:
+          refundRow.push('');
+          break;
+      }
+    });
+
+    // 시트에 추가
+    var lastRow = paymentSheet.getLastRow();
+    var idColumn = paymentSheet.getRange(1, 1, lastRow, 1).getValues();
+    var lastDataRow = 1;
+
+    for (var i = idColumn.length - 1; i > 0; i--) {
+      if (idColumn[i][0] && idColumn[i][0] !== '') {
+        lastDataRow = i + 1;
+        break;
+      }
+    }
+
+    var nextRow = lastDataRow + 1;
+    paymentSheet.getRange(nextRow, 1, 1, refundRow.length).setValues([refundRow]);
+
+    Logger.log('[createRefund] ✅ 환불 기록 생성 완료 (' + nextRow + '행): ' + refundId);
+
+    // ========================================
+    // 3. 청구서 상태 업데이트 (결제완료금액 감소)
+    // ========================================
+    if (originalPayment.문서번호 && invoiceSheet) {
+      Logger.log('[createRefund] 청구서 업데이트 시작...');
+
+      try {
+        var invoiceIds = [];
+        try {
+          invoiceIds = JSON.parse(originalPayment.문서번호);
+          if (!Array.isArray(invoiceIds)) {
+            invoiceIds = [originalPayment.문서번호];
+          }
+        } catch (e) {
+          invoiceIds = [originalPayment.문서번호];
+        }
+
+        var invoiceData = invoiceSheet.getDataRange().getValues();
+        var invoiceHeader = invoiceData[0];
+
+        var colInvoiceId = invoiceHeader.indexOf('청구ID');
+        var colStatus = invoiceHeader.indexOf('청구상태');
+        var colAmount = invoiceHeader.indexOf('청구금액');
+        var colPaidAmount = invoiceHeader.indexOf('결제완료금액');
+        var colRemainingBalance = invoiceHeader.indexOf('미수금');
+
+        var supportsPartialPayment = (colPaidAmount !== -1 && colRemainingBalance !== -1);
+
+        if (supportsPartialPayment) {
+          for (var j = 0; j < invoiceIds.length; j++) {
+            var invoiceId = invoiceIds[j];
+
+            for (var k = 1; k < invoiceData.length; k++) {
+              if (invoiceData[k][colInvoiceId] === invoiceId) {
+                var invoice = invoiceData[k];
+                var invoiceRowIndex = k + 1;
+
+                var 청구금액 = Number(invoice[colAmount]) || 0;
+                var 현재결제완료금액 = Number(invoice[colPaidAmount]) || 0;
+                var 신규결제완료금액 = Math.max(0, 현재결제완료금액 - refundAmount);
+                var 신규미수금 = 청구금액 - 신규결제완료금액;
+
+                var 신규상태 = 'ISSUED';
+                if (신규미수금 === 0) {
+                  신규상태 = 'PAID';
+                } else if (신규결제완료금액 > 0) {
+                  신규상태 = 'PAID_PARTIAL';
+                }
+
+                Logger.log('[createRefund] 청구서 ' + invoiceId + ' 업데이트:');
+                Logger.log('   - 결제완료금액: ' + 현재결제완료금액.toLocaleString() + ' → ' + 신규결제완료금액.toLocaleString());
+                Logger.log('   - 미수금: ' + (청구금액 - 현재결제완료금액).toLocaleString() + ' → ' + 신규미수금.toLocaleString());
+                Logger.log('   - 상태: ' + invoice[colStatus] + ' → ' + 신규상태);
+
+                invoiceSheet.getRange(invoiceRowIndex, colStatus + 1).setValue(신규상태);
+                invoiceSheet.getRange(invoiceRowIndex, colPaidAmount + 1).setValue(신규결제완료금액);
+                invoiceSheet.getRange(invoiceRowIndex, colRemainingBalance + 1).setValue(신규미수금);
+
+                var ledgerStatus = (신규상태 === 'PAID') ? '결제완료' : (신규상태 === 'PAID_PARTIAL' ? '부분결제' : '미결제');
+                updateLedgerPaymentStatus(invoiceId, originalPayment.결제유형, ledgerStatus);
+
+                break;
+              }
+            }
+          }
+
+          Logger.log('[createRefund] ✅ 청구서 업데이트 완료');
+        }
+
+      } catch (error) {
+        Logger.log('[createRefund] ⚠️ 청구서 업데이트 실패: ' + error.message);
+      }
+    }
+
+    return {
+      success: true,
+      refundId: refundId,
+      originalPaymentId: params.originalPaymentId,
+      refundAmount: refundAmount,
+      message: '환불 처리가 완료되었습니다. (환불ID: ' + refundId + ')'
+    };
+
+  } catch (error) {
+    Logger.log('[createRefund] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '환불 처리 중 오류 발생: ' + error.message
     };
   }
 }
