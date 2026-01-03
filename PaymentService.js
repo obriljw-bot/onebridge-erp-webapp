@@ -2292,11 +2292,20 @@ function saveMultiplePayment(params) {
           // JSON 배열로 저장
           paymentRow.push(JSON.stringify(docNumbers));
           break;
+        case '발주번호':
+          paymentRow.push('');  // 다중 청구서 결제는 특정 발주번호 없음
+          break;
         case '비고':
           paymentRow.push(notes);
           break;
         case '삭제여부':
-          paymentRow.push('N');
+          paymentRow.push(false);  // boolean false (기존 방식과 동일)
+          break;
+        case '삭제일시':
+          paymentRow.push('');
+          break;
+        case '삭제자':
+          paymentRow.push('');
           break;
         case '입력일시':
           paymentRow.push(now);
