@@ -348,7 +348,7 @@ function generateExcelFileName(params, prefix) {
 }
 
 /**
- * doGet 엔드포인트 - CSV 파일 다운로드
+ * doGet 엔드포인트 - CSV 파일 다운로드 (HtmlService 방식)
  */
 function doGet(e) {
   try {
@@ -366,8 +366,7 @@ function doGet(e) {
       var result = exportPaymentRecordsToCSV(params);
 
       if (!result.success) {
-        return ContentService.createTextOutput('오류: ' + result.error)
-          .setMimeType(ContentService.MimeType.TEXT);
+        return HtmlService.createHtmlOutput('<h3>오류: ' + result.error + '</h3>');
       }
 
       var fileName = generateExcelFileName(params, 'payment_records');
@@ -376,9 +375,25 @@ function doGet(e) {
       var BOM = '\uFEFF';
       var csvWithBOM = BOM + result.csv;
 
-      return ContentService.createTextOutput(csvWithBOM)
-        .setMimeType(ContentService.MimeType.CSV)
-        .downloadAsFile(fileName);
+      // HTML로 자동 다운로드 트리거
+      var html = '<html><head><meta charset="utf-8"></head><body>' +
+        '<script>' +
+        'var csvData = ' + JSON.stringify(csvWithBOM) + ';' +
+        'var fileName = ' + JSON.stringify(fileName) + ';' +
+        'var blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });' +
+        'var link = document.createElement("a");' +
+        'link.href = URL.createObjectURL(blob);' +
+        'link.download = fileName;' +
+        'document.body.appendChild(link);' +
+        'link.click();' +
+        'document.body.removeChild(link);' +
+        'setTimeout(function() { window.close(); }, 1000);' +
+        '</script>' +
+        '<p>파일 다운로드 중... (' + fileName + ')</p>' +
+        '</body></html>';
+
+      return HtmlService.createHtmlOutput(html)
+        .setTitle('CSV 다운로드');
     }
 
     // 회사비용 다운로드
@@ -392,8 +407,7 @@ function doGet(e) {
       var result = exportExpenseRecordsToCSV(params);
 
       if (!result.success) {
-        return ContentService.createTextOutput('오류: ' + result.error)
-          .setMimeType(ContentService.MimeType.TEXT);
+        return HtmlService.createHtmlOutput('<h3>오류: ' + result.error + '</h3>');
       }
 
       var fileName = generateExcelFileName(params, 'company_expenses');
@@ -401,17 +415,31 @@ function doGet(e) {
       var BOM = '\uFEFF';
       var csvWithBOM = BOM + result.csv;
 
-      return ContentService.createTextOutput(csvWithBOM)
-        .setMimeType(ContentService.MimeType.CSV)
-        .downloadAsFile(fileName);
+      // HTML로 자동 다운로드 트리거
+      var html = '<html><head><meta charset="utf-8"></head><body>' +
+        '<script>' +
+        'var csvData = ' + JSON.stringify(csvWithBOM) + ';' +
+        'var fileName = ' + JSON.stringify(fileName) + ';' +
+        'var blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });' +
+        'var link = document.createElement("a");' +
+        'link.href = URL.createObjectURL(blob);' +
+        'link.download = fileName;' +
+        'document.body.appendChild(link);' +
+        'link.click();' +
+        'document.body.removeChild(link);' +
+        'setTimeout(function() { window.close(); }, 1000);' +
+        '</script>' +
+        '<p>파일 다운로드 중... (' + fileName + ')</p>' +
+        '</body></html>';
+
+      return HtmlService.createHtmlOutput(html)
+        .setTitle('CSV 다운로드');
     }
 
-    return ContentService.createTextOutput('잘못된 요청입니다. action 파라미터를 확인하세요.')
-      .setMimeType(ContentService.MimeType.TEXT);
+    return HtmlService.createHtmlOutput('<h3>잘못된 요청입니다. action 파라미터를 확인하세요.</h3>');
 
   } catch (error) {
     Logger.log('[doGet] ❌ 오류: ' + error.message);
-    return ContentService.createTextOutput('다운로드 중 오류 발생: ' + error.message)
-      .setMimeType(ContentService.MimeType.TEXT);
+    return HtmlService.createHtmlOutput('<h3>다운로드 중 오류 발생: ' + error.message + '</h3>');
   }
 }
