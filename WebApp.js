@@ -8,6 +8,8 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.action) {
     var action = e.parameter.action;
 
+    Logger.log('✅ [2026-01-03 NEW CODE] action=' + action);
+
     // 입출금 내역 다운로드
     if (action === 'downloadPayment') {
       var params = {
@@ -20,10 +22,11 @@ function doGet(e) {
       var result = exportPaymentRecordsToCSV(params);
 
       if (!result.success) {
-        return ContentService.createTextOutput('오류: ' + result.error).setMimeType(ContentService.MimeType.TEXT);
+        return ContentService.createTextOutput('[NEW-2026-01-03] 오류: ' + result.error).setMimeType(ContentService.MimeType.TEXT);
       }
 
       var fileName = generateExcelFileName(params, 'payment_records');
+      Logger.log('✅ [2026-01-03] 생성된 파일명: ' + fileName);
 
       var BOM = '\uFEFF';
       var csvWithBOM = BOM + result.csv;
