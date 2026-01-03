@@ -2335,15 +2335,22 @@ function saveMultiplePayment(params) {
     paymentSheet.getRange(nextRow, 1, 1, paymentRow.length).setValues([paymentRow]);
     Logger.log('[saveMultiplePayment] ✅ 결제내역 저장 완료 (' + nextRow + '행): ' + paymentId);
 
-    // 청구서 상태 업데이트 (PAID로 변경)
+    // ========================================
+    // 부분 결제 지원 로직 (SPEC_01)
+    // ========================================
+
     var invoiceData = invoiceSheet.getDataRange().getValues();
     var invoiceHeader = invoiceData[0];
 
     var colInvoiceId = invoiceHeader.indexOf('청구ID');
     var colStatus = invoiceHeader.indexOf('청구상태');
+    var colAmount = invoiceHeader.indexOf('청구금액');
+    var colPaidAmount = invoiceHeader.indexOf('결제완료금액');
+    var colRemainingBalance = invoiceHeader.indexOf('미수금');
+    var colLastPaymentDate = invoiceHeader.indexOf('최종결제일');
 
-    if (colInvoiceId === -1 || colStatus === -1) {
-      Logger.log('[saveMultiplePayment] ⚠️ 청구DB 컬럼 찾기 실패');
+    if (colInvoiceId === -1 || colStatus === -1 || colAmount === -1) {
+      Logger.log('[saveMultiplePayment] ⚠️ 청구DB 필수 컬럼 찾기 실패');
       return {
         success: true,
         paymentId: paymentId,
@@ -2351,35 +2358,139 @@ function saveMultiplePayment(params) {
       };
     }
 
-    var updatedCount = 0;
+    // 부분 결제 컬럼이 없으면 경고만 출력하고 기존 방식으로 동작
+    var supportsPartialPayment = (colPaidAmount !== -1 && colRemainingBalance !== -1 && colLastPaymentDate !== -1);
+    if (!supportsPartialPayment) {
+      Logger.log('[saveMultiplePayment] ⚠️ 부분 결제 컬럼 없음 - 기존 방식으로 동작 (모두 PAID 처리)');
+    }
+
+    // 1. 청구서 정보 수집 및 검증
+    var invoices = [];
+    var totalInvoiceAmount = 0;
+    var totalRemainingAmount = 0;
+
     for (var i = 1; i < invoiceData.length; i++) {
       var row = invoiceData[i];
       var invoiceId = row[colInvoiceId];
 
       if (docNumbers.indexOf(invoiceId) !== -1) {
-        // 청구서 상태를 PAID로 변경
-        invoiceSheet.getRange(i + 1, colStatus + 1).setValue('PAID');
-        updatedCount++;
-        Logger.log('[saveMultiplePayment] ✅ 청구서 상태 변경: ' + invoiceId + ' → PAID');
+        var 청구금액 = Number(row[colAmount]) || 0;
+        var 현재결제완료금액 = supportsPartialPayment ? (Number(row[colPaidAmount]) || 0) : 0;
+        var 현재미수금 = supportsPartialPayment ? (Number(row[colRemainingBalance]) || 청구금액) : 청구금액;
 
-        // 거래원장 결제 상태 업데이트
-        var ledgerUpdateResult = updateLedgerPaymentStatus(invoiceId, type, '결제완료');
+        invoices.push({
+          invoiceId: invoiceId,
+          rowIndex: i + 1,
+          청구금액: 청구금액,
+          현재결제완료금액: 현재결제완료금액,
+          현재미수금: 현재미수금,
+          현재상태: row[colStatus]
+        });
+
+        totalInvoiceAmount += 청구금액;
+        totalRemainingAmount += 현재미수금;
+
+        Logger.log('[saveMultiplePayment] 📋 청구서 ' + invoiceId + ': 청구 ' + 청구금액.toLocaleString() + '원, 미수금 ' + 현재미수금.toLocaleString() + '원');
+      }
+    }
+
+    if (invoices.length === 0) {
+      Logger.log('[saveMultiplePayment] ⚠️ 대상 청구서를 찾을 수 없습니다.');
+      return {
+        success: false,
+        error: '대상 청구서를 찾을 수 없습니다.'
+      };
+    }
+
+    Logger.log('[saveMultiplePayment] 💰 총 미수금: ' + totalRemainingAmount.toLocaleString() + '원');
+    Logger.log('[saveMultiplePayment] 💳 결제 금액: ' + amount.toLocaleString() + '원');
+
+    // 2. 금액 검증
+    if (amount > totalRemainingAmount) {
+      Logger.log('[saveMultiplePayment] ❌ 결제 금액이 미수금을 초과합니다.');
+      return {
+        success: false,
+        error: '결제 금액(' + amount.toLocaleString() + '원)이 총 미수금(' + totalRemainingAmount.toLocaleString() + '원)을 초과할 수 없습니다.'
+      };
+    }
+
+    // 3. 결제 금액 분배 (청구서별로 비례 배분)
+    var remainingPayment = amount;
+    var updatedCount = 0;
+    var fullyPaidCount = 0;
+    var partiallyPaidCount = 0;
+
+    for (var j = 0; j < invoices.length; j++) {
+      var invoice = invoices[j];
+
+      if (remainingPayment <= 0) {
+        break;
+      }
+
+      // 이 청구서에 배분할 금액 계산 (미수금과 남은 결제액 중 작은 값)
+      var 배분금액 = Math.min(invoice.현재미수금, remainingPayment);
+
+      if (배분금액 > 0) {
+        var 신규결제완료금액 = invoice.현재결제완료금액 + 배분금액;
+        var 신규미수금 = invoice.청구금액 - 신규결제완료금액;
+        var 신규상태 = (신규미수금 === 0) ? 'PAID' : 'PAID_PARTIAL';
+
+        Logger.log('[saveMultiplePayment] 📝 청구서 ' + invoice.invoiceId + ' 업데이트:');
+        Logger.log('   - 배분 금액: ' + 배분금액.toLocaleString() + '원');
+        Logger.log('   - 신규 결제완료금액: ' + 신규결제완료금액.toLocaleString() + '원');
+        Logger.log('   - 신규 미수금: ' + 신규미수금.toLocaleString() + '원');
+        Logger.log('   - 신규 상태: ' + 신규상태);
+
+        // 청구서 업데이트
+        invoiceSheet.getRange(invoice.rowIndex, colStatus + 1).setValue(신규상태);
+
+        if (supportsPartialPayment) {
+          invoiceSheet.getRange(invoice.rowIndex, colPaidAmount + 1).setValue(신규결제완료금액);
+          invoiceSheet.getRange(invoice.rowIndex, colRemainingBalance + 1).setValue(신규미수금);
+          invoiceSheet.getRange(invoice.rowIndex, colLastPaymentDate + 1).setValue(date);
+        }
+
+        // 거래원장 업데이트
+        var ledgerStatus = (신규상태 === 'PAID') ? '결제완료' : '부분결제';
+        var ledgerUpdateResult = updateLedgerPaymentStatus(invoice.invoiceId, type, ledgerStatus);
         if (ledgerUpdateResult.success) {
-          Logger.log('[saveMultiplePayment] ✅ 거래원장 업데이트 성공: ' + invoiceId);
+          Logger.log('[saveMultiplePayment] ✅ 거래원장 업데이트: ' + invoice.invoiceId + ' → ' + ledgerStatus);
         } else {
           Logger.log('[saveMultiplePayment] ⚠️ 거래원장 업데이트 실패: ' + ledgerUpdateResult.error);
+        }
+
+        remainingPayment -= 배분금액;
+        updatedCount++;
+
+        if (신규상태 === 'PAID') {
+          fullyPaidCount++;
+        } else {
+          partiallyPaidCount++;
         }
       }
     }
 
     Logger.log('[saveMultiplePayment] ✅ 완료: 결제 1건, 청구서 ' + updatedCount + '건 업데이트');
+    Logger.log('[saveMultiplePayment]    - 완납: ' + fullyPaidCount + '건');
+    Logger.log('[saveMultiplePayment]    - 부분결제: ' + partiallyPaidCount + '건');
+
+    var resultMessage = '결제가 저장되었습니다. ';
+    if (fullyPaidCount > 0) {
+      resultMessage += fullyPaidCount + '건 완납';
+    }
+    if (partiallyPaidCount > 0) {
+      if (fullyPaidCount > 0) resultMessage += ', ';
+      resultMessage += partiallyPaidCount + '건 부분결제';
+    }
 
     return {
       success: true,
       paymentId: paymentId,
       invoiceIds: docNumbers,
       updatedCount: updatedCount,
-      message: '결제가 저장되고 ' + updatedCount + '건의 청구서가 처리되었습니다.'
+      fullyPaidCount: fullyPaidCount,
+      partiallyPaidCount: partiallyPaidCount,
+      message: resultMessage
     };
 
   } catch (error) {
