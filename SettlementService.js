@@ -757,6 +757,57 @@ function aggregateBillingData(params) {
  */
 
 /**
+ * 마감 ID로부터 발주번호 목록 조회
+ * @param {string} settlementId - 마감ID
+ * @returns {Array} 발주번호 배열
+ */
+function getOrderNumbersFromSettlement(settlementId) {
+  try {
+    if (!settlementId || settlementId === '') {
+      return [];
+    }
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var detailSheet = ss.getSheetByName(OB_SETTLEMENT_DETAIL_SHEET);
+
+    if (!detailSheet) {
+      Logger.log('[getOrderNumbersFromSettlement] 마감상세DB 시트를 찾을 수 없습니다.');
+      return [];
+    }
+
+    var data = detailSheet.getDataRange().getValues();
+    var headers = data[0];
+
+    // 컬럼 인덱스 찾기
+    var settlementIdCol = headers.indexOf('마감ID');
+    var orderNumberCol = headers.indexOf('발주번호');
+
+    if (settlementIdCol === -1 || orderNumberCol === -1) {
+      Logger.log('[getOrderNumbersFromSettlement] 필요한 컬럼을 찾을 수 없습니다.');
+      return [];
+    }
+
+    // 해당 마감ID의 발주번호들 수집
+    var orderNumbers = [];
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][settlementIdCol] === settlementId) {
+        var orderNumber = data[i][orderNumberCol];
+        if (orderNumber && orderNumber !== '') {
+          orderNumbers.push(orderNumber);
+        }
+      }
+    }
+
+    Logger.log('[getOrderNumbersFromSettlement] 마감ID: ' + settlementId + ', 발주번호 개수: ' + orderNumbers.length);
+    return orderNumbers;
+
+  } catch (err) {
+    Logger.log('[getOrderNumbersFromSettlement Error] ' + err.message);
+    return [];
+  }
+}
+
+/**
  * 청구서 생성
  * @param {Object} params - { settlementId, type, company, billingDate, amount, notes }
  * @returns {Object} 생성 결과
@@ -770,54 +821,131 @@ function createBilling(params) {
     var amount = params.amount || 0;
     var notes = params.notes || '';
 
-    if (!settlementId || !type || !company) {
+    // 필수 정보 검증 (settlementId는 선택사항 - 직접 청구서인 경우 없을 수 있음)
+    if (!type || !company) {
       return {
         success: false,
-        error: '필수 정보를 입력해주세요.'
+        error: '필수 정보를 입력해주세요 (청구유형, 업체명).'
       };
     }
+
+    // 청구유형 값 검증 - SALES/PURCHASE만 허용
+    if (type !== 'SALES' && type !== 'PURCHASE') {
+      return {
+        success: false,
+        error: '청구유형은 "SALES" 또는 "PURCHASE"만 허용됩니다. 현재 값: "' + type + '"'
+      };
+    }
+
+    var standardizedType = type;
+
+    // billingType 결정 (마감ID 기반 청구서는 "SETTLEMENT", 직접 생성은 "DIRECT")
+    var billingType = (settlementId && settlementId !== '') ? 'SETTLEMENT' : 'DIRECT';
+
+    // 발주번호 목록 결정
+    var orderNumbers = [];
+    if (params.orderNumbers && params.orderNumbers.length > 0) {
+      // 1. 파라미터로 orderNumbers가 직접 전달된 경우 (직접 청구서)
+      orderNumbers = params.orderNumbers;
+      Logger.log('[createBilling] orderNumbers 직접 전달: ' + JSON.stringify(orderNumbers));
+    } else if (settlementId && settlementId !== '') {
+      // 2. settlementId로 orderNumbers 조회 (마감 기반 청구서)
+      orderNumbers = getOrderNumbersFromSettlement(settlementId);
+      Logger.log('[createBilling] settlementId로 orderNumbers 조회: ' + JSON.stringify(orderNumbers));
+    }
+    var orderNumbersJson = JSON.stringify(orderNumbers);
 
     var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
     var sheet = ss.getSheetByName(OB_BILLING_SHEET);
 
     if (!sheet) {
-      sheet = ss.insertSheet(OB_BILLING_SHEET);
-      sheet.appendRow([
-        '청구ID', '청구유형', '업체명', '마감ID', '청구일', '청구금액',
-        '청구상태', '비고', '생성일시', '생성자', '발행일시', '발행자', '결제일시'
-      ]);
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다. SetupPaymentSheets.js를 먼저 실행하세요.'
+      };
     }
 
-    // 청구 ID 생성: BL-YYYYMMDD-순번
+    // 기존 헤더 읽기
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    Logger.log('[createBilling] 청구DB 헤더: ' + headers.join(', '));
+
+    // 청구 ID 생성: INV-YYYYMMDD-순번
     var today = new Date();
-    var dateStr = formatYearMonth(today) + String(today.getDate()).padStart(2, '0');
+    var year = today.getFullYear();
+    var month = String(today.getMonth() + 1).padStart(2, '0');
+    var day = String(today.getDate()).padStart(2, '0');
+    var dateStr = year + month + day;
+
     var data = sheet.getDataRange().getValues();
     var count = 1;
     for (var i = 1; i < data.length; i++) {
-      if (data[i][0] && data[i][0].startsWith('BL-' + dateStr)) {
+      if (data[i][0] && data[i][0].startsWith('INV-' + dateStr)) {
         count++;
       }
     }
-    var billingId = 'BL-' + dateStr + '-' + String(count).padStart(3, '0');
+    var billingId = 'INV-' + dateStr + '-' + String(count).padStart(3, '0');
 
     var now = new Date();
     var user = Session.getActiveUser().getEmail();
 
-    var rowData = [
-      billingId,
-      type,
-      company,
-      settlementId,
-      billingDate,
-      amount,
-      'DRAFT',
-      notes,
-      now,
-      user,
-      '',
-      '',
-      ''
-    ];
+    // 헤더에 맞춰 rowData 동적 구성
+    var rowData = [];
+    for (var h = 0; h < headers.length; h++) {
+      var headerName = headers[h];
+
+      switch(headerName) {
+        case '청구ID':
+          rowData.push(billingId);
+          break;
+        case '청구유형':
+          rowData.push(standardizedType);
+          break;
+        case '업체명':
+          rowData.push(company);
+          break;
+        case '마감ID':
+          rowData.push(settlementId);
+          break;
+        case '청구일':
+          rowData.push(billingDate);
+          break;
+        case '청구금액':
+          rowData.push(amount);
+          break;
+        case '청구상태':
+          rowData.push('DRAFT');
+          break;
+        case '청구타입':
+          // H열 - 용도 불명, 일단 빈 값
+          rowData.push('');
+          break;
+        case '비고':
+          rowData.push(notes);
+          break;
+        case '발주번호':
+          // 레거시 컬럼 - orderNumbers와 동일한 값
+          rowData.push(orderNumbersJson);
+          break;
+        case '생성일시':
+          rowData.push(now);
+          break;
+        case '생성자':
+          rowData.push(user);
+          break;
+        case 'billingType':
+          rowData.push(billingType);
+          break;
+        case 'orderNumbers':
+          rowData.push(orderNumbersJson);
+          break;
+        default:
+          // 발행일시, 발행자, 결제일시, 대체청구서, 원본청구서 등
+          rowData.push('');
+          break;
+      }
+    }
+
+    Logger.log('[createBilling] rowData 길이: ' + rowData.length + ', 헤더 길이: ' + headers.length);
 
     sheet.appendRow(rowData);
     Logger.log('[createBilling] 청구서 생성: ' + billingId);
