@@ -6691,12 +6691,52 @@
     if (expenseDate) expenseDate.value = today;
 
     // 초기 데이터 로드
+    loadTodayUpcomingAlerts(); // SPEC_04: 오늘 결제 예정 알림 위젯
     loadPaymentList();
     loadPaymentSummary();
     loadExpenseSummary();
 
     console.log('✅ PaymentManagement Page 초기화 완료');
   };
+
+  /**
+   * SPEC_04: 오늘 결제 예정 알림 위젯 로드
+   */
+  function loadTodayUpcomingAlerts() {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success && result.data) {
+          var 매입 = result.data.매입;
+          var 매출 = result.data.매출;
+
+          // 매입 위젯 업데이트
+          document.getElementById('alert-purchase-count').textContent = 매입.count + '건';
+          document.getElementById('alert-purchase-amount').textContent = '₩' + 매입.amount.toLocaleString();
+
+          // 매출 위젯 업데이트
+          document.getElementById('alert-sales-count').textContent = 매출.count + '건';
+          document.getElementById('alert-sales-amount').textContent = '₩' + 매출.amount.toLocaleString();
+
+          // 위젯 표시 (데이터가 있을 때만)
+          if (매입.count > 0 || 매출.count > 0) {
+            document.getElementById('payment-alert-widget').style.display = 'grid';
+          }
+
+          console.log('✅ 오늘 결제 예정 알림 로드 완료: 매입 ' + 매입.count + '건, 매출 ' + 매출.count + '건');
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('❌ 알림 위젯 로드 실패:', error);
+      })
+      .api_getTodayUpcomingPayments();
+  }
+
+  /**
+   * SPEC_04: 결제 예정 상세보기 (추후 구현)
+   */
+  function viewUpcomingPayments(type) {
+    alert('📋 ' + type + ' 결제 예정 상세보기는 추후 구현 예정입니다.');
+  }
 
   /**
    * 탭 전환 함수

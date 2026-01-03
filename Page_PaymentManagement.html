@@ -63,12 +63,56 @@
   .payment-empty { text-align: center; padding: 40px 12px; color: #94a3b8; }
 
   .payment-btn-small { padding: 4px 8px; font-size: 11px; margin: 0 2px; }
+
+  /* SPEC_04: 결제 예정 알림 위젯 */
+  .payment-alert-widget { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .payment-alert-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 16px; border-left: 4px solid #2563eb; transition: all 0.2s; }
+  .payment-alert-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); transform: translateY(-2px); }
+  .payment-alert-card.purchase { border-left-color: #dc2626; }
+  .payment-alert-card.sales { border-left-color: #10b981; }
+  .payment-alert-icon { font-size: 36px; }
+  .payment-alert-content { flex: 1; }
+  .payment-alert-label { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+  .payment-alert-value { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .payment-alert-amount { font-size: 16px; font-weight: 600; color: #2563eb; }
+  .payment-alert-card.purchase .payment-alert-amount { color: #dc2626; }
+  .payment-alert-card.sales .payment-alert-amount { color: #10b981; }
+  .payment-alert-btn { padding: 8px 16px; background: #f1f5f9; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: #475569; transition: all 0.2s; }
+  .payment-alert-btn:hover { background: #e2e8f0; color: #1e293b; }
+
 </style>
 
 <div class="payment-wrap">
   <div class="payment-header">
     <h1>결제관리</h1>
     <p>입출금 내역 및 회사비용을 관리합니다.</p>
+  </div>
+
+  <!-- SPEC_04: 오늘 결제 예정 위젯 -->
+  <div class="payment-alert-widget" id="payment-alert-widget" style="display:none;">
+    <div class="payment-alert-card purchase">
+      <div class="payment-alert-icon">💳</div>
+      <div class="payment-alert-content">
+        <div class="payment-alert-label">오늘 결제 예정 (매입)</div>
+        <div class="payment-alert-value" id="alert-purchase-count">0건</div>
+        <div class="payment-alert-amount" id="alert-purchase-amount">₩0</div>
+      </div>
+      <button class="payment-alert-btn" id="alert-purchase-view-btn" onclick="viewUpcomingPayments('매입')">
+        상세보기 →
+      </button>
+    </div>
+
+    <div class="payment-alert-card sales">
+      <div class="payment-alert-icon">💰</div>
+      <div class="payment-alert-content">
+        <div class="payment-alert-label">오늘 입금 예정 (매출)</div>
+        <div class="payment-alert-value" id="alert-sales-count">0건</div>
+        <div class="payment-alert-amount" id="alert-sales-amount">₩0</div>
+      </div>
+      <button class="payment-alert-btn" id="alert-sales-view-btn" onclick="viewUpcomingPayments('매출')">
+        상세보기 →
+      </button>
+    </div>
   </div>
 
   <!-- 탭 네비게이션 -->
