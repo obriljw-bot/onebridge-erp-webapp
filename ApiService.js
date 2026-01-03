@@ -981,6 +981,14 @@ function getPaymentSummaryApi(params) {
 }
 
 /**
+ * 다중 청구서 결제 저장
+ */
+function saveMultiplePaymentApi(params) {
+  var result = saveMultiplePayment(params);
+  return safeReturn(result);
+}
+
+/**
  * 문서번호 자동완성 검색
  */
 function searchDocumentNumbersApi(params) {

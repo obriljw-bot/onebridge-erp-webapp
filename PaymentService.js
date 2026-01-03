@@ -2205,3 +2205,161 @@ function validateInvoiceForPayment(invoice) {
     };
   }
 }
+
+/**
+ * 다중 청구서 결제 저장
+ * @param {Object} params - { date, type, company, amount, method, docNumbers, notes }
+ * @return {Object} { success, paymentId, invoiceIds }
+ */
+function saveMultiplePayment(params) {
+  try {
+    var date = params.date || new Date();
+    var type = params.type;  // '입금' or '출금'
+    var company = params.company || '';
+    var amount = Number(params.amount) || 0;
+    var method = params.method || '계좌이체';
+    var docNumbers = params.docNumbers || [];  // 청구서 ID 배열
+    var notes = params.notes || '';
+
+    if (!type || !company || !amount || docNumbers.length === 0) {
+      return {
+        success: false,
+        error: '필수 정보를 입력해주세요.'
+      };
+    }
+
+    Logger.log('[saveMultiplePayment] 다중 청구서 결제 저장 시작: ' + docNumbers.length + '건');
+
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+
+    // 결제내역 시트
+    var paymentSheet = ss.getSheetByName(PAYMENT_SHEET_NAME);
+    if (!paymentSheet) {
+      return {
+        success: false,
+        error: '결제내역 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    // 청구DB 시트
+    var invoiceSheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+    if (!invoiceSheet) {
+      return {
+        success: false,
+        error: '청구DB 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    // 결제ID 생성
+    var now = new Date();
+    var dateStr = formatYearMonth(now) + String(now.getDate()).padStart(2, '0');
+    var seq = getNextSequence('PAYMENT', dateStr);
+    var paymentId = 'PAY-' + dateStr + '-' + String(seq).padStart(3, '0');
+
+    var user = Session.getActiveUser().getEmail();
+
+    // 결제내역 헤더
+    var paymentData = paymentSheet.getDataRange().getValues();
+    var paymentHeader = paymentData[0];
+
+    // 동적으로 헤더 인덱스 찾기
+    var colMap = {};
+    paymentHeader.forEach(function(h, idx) {
+      colMap[h] = idx;
+    });
+
+    // 결제내역 행 데이터 생성
+    var paymentRow = [];
+    paymentHeader.forEach(function(h) {
+      switch(h) {
+        case '결제ID':
+          paymentRow.push(paymentId);
+          break;
+        case '결제일':
+          paymentRow.push(date);
+          break;
+        case '결제유형':
+          paymentRow.push(type);
+          break;
+        case '거래처명':
+          paymentRow.push(company);
+          break;
+        case '금액':
+          paymentRow.push(amount);
+          break;
+        case '결제수단':
+          paymentRow.push(method);
+          break;
+        case '문서번호':
+          // JSON 배열로 저장
+          paymentRow.push(JSON.stringify(docNumbers));
+          break;
+        case '비고':
+          paymentRow.push(notes);
+          break;
+        case '삭제여부':
+          paymentRow.push('N');
+          break;
+        case '입력일시':
+          paymentRow.push(now);
+          break;
+        case '입력자':
+          paymentRow.push(user);
+          break;
+        default:
+          paymentRow.push('');
+          break;
+      }
+    });
+
+    // 결제내역 추가
+    paymentSheet.appendRow(paymentRow);
+    Logger.log('[saveMultiplePayment] ✅ 결제내역 저장 완료: ' + paymentId);
+
+    // 청구서 상태 업데이트 (PAID로 변경)
+    var invoiceData = invoiceSheet.getDataRange().getValues();
+    var invoiceHeader = invoiceData[0];
+
+    var colInvoiceId = invoiceHeader.indexOf('청구ID');
+    var colStatus = invoiceHeader.indexOf('청구상태');
+
+    if (colInvoiceId === -1 || colStatus === -1) {
+      Logger.log('[saveMultiplePayment] ⚠️ 청구DB 컬럼 찾기 실패');
+      return {
+        success: true,
+        paymentId: paymentId,
+        warning: '결제는 저장되었으나 청구서 상태 업데이트 실패'
+      };
+    }
+
+    var updatedCount = 0;
+    for (var i = 1; i < invoiceData.length; i++) {
+      var row = invoiceData[i];
+      var invoiceId = row[colInvoiceId];
+
+      if (docNumbers.indexOf(invoiceId) !== -1) {
+        // 청구서 상태를 PAID로 변경
+        invoiceSheet.getRange(i + 1, colStatus + 1).setValue('PAID');
+        updatedCount++;
+        Logger.log('[saveMultiplePayment] ✅ 청구서 상태 변경: ' + invoiceId + ' → PAID');
+      }
+    }
+
+    Logger.log('[saveMultiplePayment] ✅ 완료: 결제 1건, 청구서 ' + updatedCount + '건 업데이트');
+
+    return {
+      success: true,
+      paymentId: paymentId,
+      invoiceIds: docNumbers,
+      updatedCount: updatedCount,
+      message: '결제가 저장되고 ' + updatedCount + '건의 청구서가 처리되었습니다.'
+    };
+
+  } catch (error) {
+    Logger.log('[saveMultiplePayment] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: '결제 저장 중 오류: ' + error.message
+    };
+  }
+}
