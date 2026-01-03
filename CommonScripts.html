@@ -6113,7 +6113,7 @@
   }
 
   /**
-   * SPEC_03: 입출금 내역 엑셀 다운로드 (google.script.run 방식)
+   * SPEC_03: 입출금 내역 엑셀 다운로드
    */
   function downloadPaymentExcel() {
     try {
@@ -6125,36 +6125,22 @@
         companyName: document.getElementById('payment-filter-company').value || ''
       };
 
-      console.log('📥 입출금 내역 다운로드 시작:', params);
+      // Web App URL
+      var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxz6H9JGcPXPQJgEc06zkGT_2U-4MqwfFZyh4f5GZz-j5jkizEsT7_NJAdk5PvhaV-qvA/exec';
 
-      // 서버에서 CSV 데이터 가져오기
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (!result.success) {
-            alert('다운로드 실패: ' + result.error);
-            return;
-          }
+      // URL 파라미터 생성
+      var queryParams = 'action=downloadPayment';
+      if (params.startDate) queryParams += '&startDate=' + encodeURIComponent(params.startDate);
+      if (params.endDate) queryParams += '&endDate=' + encodeURIComponent(params.endDate);
+      if (params.paymentType) queryParams += '&paymentType=' + encodeURIComponent(params.paymentType);
+      if (params.companyName) queryParams += '&companyName=' + encodeURIComponent(params.companyName);
 
-          console.log('✅ CSV 데이터 수신 완료:', result.fileName);
+      var downloadUrl = WEB_APP_URL + '?' + queryParams;
 
-          // CSV 문자열을 Blob으로 변환
-          var blob = new Blob([result.csvData], { type: 'text/csv;charset=utf-8;' });
+      console.log('📥 입출금 내역 다운로드 URL:', downloadUrl);
 
-          // 다운로드 링크 생성 및 클릭
-          var link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = result.fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          console.log('✅ 다운로드 완료: ' + result.recordCount + '건, ' + result.totalAmount.toLocaleString() + '원');
-        })
-        .withFailureHandler(function(error) {
-          console.error('❌ 서버 오류:', error);
-          alert('다운로드 중 오류가 발생했습니다: ' + error.message);
-        })
-        .getPaymentCSVData(params);
+      // 새 창에서 다운로드 실행
+      window.open(downloadUrl, '_blank');
 
     } catch (error) {
       console.error('❌ 엑셀 다운로드 오류:', error);
@@ -6163,7 +6149,7 @@
   }
 
   /**
-   * SPEC_03: 회사비용 엑셀 다운로드 (google.script.run 방식)
+   * SPEC_03: 회사비용 엑셀 다운로드
    */
   function downloadExpenseExcel() {
     try {
@@ -6174,36 +6160,21 @@
         category: document.getElementById('expense-filter-category').value || ''
       };
 
-      console.log('📥 회사비용 다운로드 시작:', params);
+      // Web App URL
+      var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxz6H9JGcPXPQJgEc06zkGT_2U-4MqwfFZyh4f5GZz-j5jkizEsT7_NJAdk5PvhaV-qvA/exec';
 
-      // 서버에서 CSV 데이터 가져오기
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (!result.success) {
-            alert('다운로드 실패: ' + result.error);
-            return;
-          }
+      // URL 파라미터 생성
+      var queryParams = 'action=downloadExpense';
+      if (params.startDate) queryParams += '&startDate=' + encodeURIComponent(params.startDate);
+      if (params.endDate) queryParams += '&endDate=' + encodeURIComponent(params.endDate);
+      if (params.category) queryParams += '&category=' + encodeURIComponent(params.category);
 
-          console.log('✅ CSV 데이터 수신 완료:', result.fileName);
+      var downloadUrl = WEB_APP_URL + '?' + queryParams;
 
-          // CSV 문자열을 Blob으로 변환
-          var blob = new Blob([result.csvData], { type: 'text/csv;charset=utf-8;' });
+      console.log('📥 회사비용 다운로드 URL:', downloadUrl);
 
-          // 다운로드 링크 생성 및 클릭
-          var link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = result.fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          console.log('✅ 다운로드 완료: ' + result.recordCount + '건, ' + result.totalAmount.toLocaleString() + '원');
-        })
-        .withFailureHandler(function(error) {
-          console.error('❌ 서버 오류:', error);
-          alert('다운로드 중 오류가 발생했습니다: ' + error.message);
-        })
-        .getExpenseCSVData(params);
+      // 새 창에서 다운로드 실행
+      window.open(downloadUrl, '_blank');
 
     } catch (error) {
       console.error('❌ 엑셀 다운로드 오류:', error);

@@ -348,67 +348,67 @@ function generateExcelFileName(params, prefix) {
 }
 
 /**
- * 클라이언트에서 호출: 입출금 내역 CSV 데이터 반환
- * @param {Object} params - 필터 조건
- * @returns {Object} - { success, csvData, fileName, error }
+ * Web App 엔드포인트 - CSV 다운로드 (ContentService 방식)
  */
-function getPaymentCSVData(params) {
+function doGet(e) {
   try {
-    var result = exportPaymentRecordsToCSV(params);
+    var action = e.parameter.action;
 
-    if (!result.success) {
-      return { success: false, error: result.error };
+    // 입출금 내역 다운로드
+    if (action === 'downloadPayment') {
+      var params = {
+        startDate: e.parameter.startDate || '',
+        endDate: e.parameter.endDate || '',
+        paymentType: e.parameter.paymentType || '',
+        companyName: e.parameter.companyName || ''
+      };
+
+      var result = exportPaymentRecordsToCSV(params);
+
+      if (!result.success) {
+        return ContentService.createTextOutput('오류: ' + result.error).setMimeType(ContentService.MimeType.TEXT);
+      }
+
+      var fileName = generateExcelFileName(params, 'payment_records');
+
+      // UTF-8 BOM 추가
+      var BOM = '\uFEFF';
+      var csvWithBOM = BOM + result.csv;
+
+      // CSV로 다운로드
+      return ContentService.createTextOutput(csvWithBOM)
+        .setMimeType(ContentService.MimeType.CSV)
+        .downloadAsFile(fileName);
     }
 
-    var fileName = generateExcelFileName(params, 'payment_records');
+    // 회사비용 다운로드
+    if (action === 'downloadExpense') {
+      var params = {
+        startDate: e.parameter.startDate || '',
+        endDate: e.parameter.endDate || '',
+        category: e.parameter.category || ''
+      };
 
-    // UTF-8 BOM 추가
-    var BOM = '\uFEFF';
-    var csvWithBOM = BOM + result.csv;
+      var result = exportExpenseRecordsToCSV(params);
 
-    return {
-      success: true,
-      csvData: csvWithBOM,
-      fileName: fileName,
-      recordCount: result.recordCount,
-      totalAmount: result.totalAmount
-    };
+      if (!result.success) {
+        return ContentService.createTextOutput('오류: ' + result.error).setMimeType(ContentService.MimeType.TEXT);
+      }
 
-  } catch (error) {
-    Logger.log('[getPaymentCSVData] ❌ 오류: ' + error.message);
-    return { success: false, error: error.message };
-  }
-}
+      var fileName = generateExcelFileName(params, 'company_expenses');
 
-/**
- * 클라이언트에서 호출: 회사비용 CSV 데이터 반환
- * @param {Object} params - 필터 조건
- * @returns {Object} - { success, csvData, fileName, error }
- */
-function getExpenseCSVData(params) {
-  try {
-    var result = exportExpenseRecordsToCSV(params);
+      var BOM = '\uFEFF';
+      var csvWithBOM = BOM + result.csv;
 
-    if (!result.success) {
-      return { success: false, error: result.error };
+      return ContentService.createTextOutput(csvWithBOM)
+        .setMimeType(ContentService.MimeType.CSV)
+        .downloadAsFile(fileName);
     }
 
-    var fileName = generateExcelFileName(params, 'company_expenses');
-
-    // UTF-8 BOM 추가
-    var BOM = '\uFEFF';
-    var csvWithBOM = BOM + result.csv;
-
-    return {
-      success: true,
-      csvData: csvWithBOM,
-      fileName: fileName,
-      recordCount: result.recordCount,
-      totalAmount: result.totalAmount
-    };
+    return ContentService.createTextOutput('잘못된 요청입니다. action 파라미터를 확인하세요.').setMimeType(ContentService.MimeType.TEXT);
 
   } catch (error) {
-    Logger.log('[getExpenseCSVData] ❌ 오류: ' + error.message);
-    return { success: false, error: error.message };
+    Logger.log('[doGet] ❌ 오류: ' + error.message);
+    return ContentService.createTextOutput('다운로드 중 오류 발생: ' + error.message).setMimeType(ContentService.MimeType.TEXT);
   }
 }
