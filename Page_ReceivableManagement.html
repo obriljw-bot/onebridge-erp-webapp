@@ -1,0 +1,242 @@
+<style>
+.receivable-wrap{padding:20px;}
+
+/* 페이지 헤더 */
+.receivable-header{margin-bottom:20px;}
+.receivable-header h1{font-size:24px;font-weight:700;color:#1e293b;margin:0 0 8px 0;}
+.receivable-header p{color:#64748b;margin:0;font-size:14px;}
+
+/* 탭 */
+.receivable-tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:20px;
+  border-bottom:2px solid #e2e8f0;
+}
+.receivable-tab{
+  padding:12px 24px;
+  background:transparent;
+  border:none;
+  border-bottom:2px solid transparent;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  color:#64748b;
+  margin-bottom:-2px;
+  transition:all 0.2s;
+}
+.receivable-tab.active{
+  color:#2563eb;
+  border-bottom-color:#2563eb;
+}
+
+/* 요약 카드 */
+.receivable-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.receivable-summary-card{
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+.receivable-summary-card-label{font-size:12px;color:#64748b;margin-bottom:4px;}
+.receivable-summary-card-value{font-size:20px;font-weight:700;color:#1e293b;}
+.receivable-summary-card-value.primary{color:#2563eb;}
+.receivable-summary-card-value.danger{color:#dc2626;}
+
+/* 검색 바 */
+.receivable-search{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  background:white;
+  padding:16px;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+  align-items:flex-end;
+}
+.receivable-search-field{display:flex;flex-direction:column;gap:4px;}
+.receivable-search-field label{font-size:13px;font-weight:500;color:#475569;}
+.receivable-search-field input,
+.receivable-search-field select{
+  padding:8px 12px;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+  font-size:14px;
+  min-width:150px;
+}
+
+.receivable-btn{
+  padding:8px 16px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  transition:all 0.2s;
+}
+.receivable-btn.primary{background:#2563eb;color:white;}
+.receivable-btn.primary:hover{background:#1d4ed8;}
+.receivable-btn.secondary{background:#e5e7eb;color:#1e293b;}
+.receivable-btn.secondary:hover{background:#d1d5db;}
+.receivable-btn.success{background:#10b981;color:white;}
+.receivable-btn.success:hover{background:#059669;}
+.receivable-btn.small{
+  padding:4px 12px;
+  font-size:12px;
+}
+
+/* 테이블 */
+.receivable-table-wrap{
+  overflow:auto;
+  max-height:600px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom:16px;
+}
+.receivable-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.receivable-table th,
+.receivable-table td{
+  padding:10px;
+  border-bottom:1px solid #e2e8f0;
+  text-align:left;
+}
+.receivable-table th{
+  background:#f1f5f9;
+  font-weight:600;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.receivable-table td.num{text-align:right;}
+.receivable-table td.center{text-align:center;}
+
+.receivable-table tbody tr:hover{background:#f9fafb;cursor:pointer;}
+
+/* 확장된 청구서 목록 */
+.receivable-detail-row{background:#fafafa;}
+.receivable-detail-table{
+  width:100%;
+  margin:10px 0;
+  font-size:12px;
+}
+.receivable-detail-table th{background:#e5e7eb;padding:6px;font-size:11px;}
+.receivable-detail-table td{padding:6px;}
+
+/* 연체 표시 */
+.overdue-badge{
+  background:#fee2e2;
+  color:#dc2626;
+  padding:2px 6px;
+  border-radius:4px;
+  font-size:10px;
+  font-weight:600;
+}
+</style>
+
+<div class="receivable-wrap">
+  <!-- 페이지 헤더 -->
+  <div class="receivable-header">
+    <h1>📊 미수금/미지급금 관리</h1>
+    <p>거래처별 미수금 현황 및 에이징 리포트</p>
+  </div>
+
+  <!-- 탭 -->
+  <div class="receivable-tabs">
+    <button class="receivable-tab active" id="receivable-tab-receivable">
+      💰 미수금 (매출)
+    </button>
+    <button class="receivable-tab" id="receivable-tab-payable">
+      💳 미지급금 (매입)
+    </button>
+  </div>
+
+  <!-- 요약 카드 -->
+  <div class="receivable-summary" id="receivable-summary">
+    <div class="receivable-summary-card">
+      <div class="receivable-summary-card-label">총 미수금</div>
+      <div class="receivable-summary-card-value primary" id="summary-total">₩0</div>
+    </div>
+
+    <div class="receivable-summary-card">
+      <div class="receivable-summary-card-label">정상 (예정일 미도래)</div>
+      <div class="receivable-summary-card-value" id="summary-normal">0건</div>
+    </div>
+
+    <div class="receivable-summary-card">
+      <div class="receivable-summary-card-label">연체</div>
+      <div class="receivable-summary-card-value danger" id="summary-overdue">0건</div>
+    </div>
+
+    <div class="receivable-summary-card">
+      <div class="receivable-summary-card-label">에이징 (90일 초과)</div>
+      <div class="receivable-summary-card-value danger" id="summary-aging">₩0</div>
+    </div>
+  </div>
+
+  <!-- 검색 바 -->
+  <div class="receivable-search">
+    <div class="receivable-search-field">
+      <label>거래처</label>
+      <input type="text" id="receivable-company-filter" placeholder="거래처명 입력">
+    </div>
+
+    <div class="receivable-search-field">
+      <label>청구일 시작</label>
+      <input type="date" id="receivable-start-date">
+    </div>
+
+    <div class="receivable-search-field">
+      <label>청구일 종료</label>
+      <input type="date" id="receivable-end-date">
+    </div>
+
+    <button class="receivable-btn primary" id="receivable-search-btn">
+      🔍 조회
+    </button>
+
+    <button class="receivable-btn secondary" id="receivable-reset-btn">
+      초기화
+    </button>
+
+    <button class="receivable-btn success" id="receivable-excel-btn" style="margin-left: auto;">
+      📥 엑셀 다운로드
+    </button>
+  </div>
+
+  <!-- 거래처별 미수금 테이블 -->
+  <div class="receivable-table-wrap">
+    <table class="receivable-table">
+      <thead>
+        <tr>
+          <th>거래처</th>
+          <th class="num">총 청구액</th>
+          <th class="num">결제 완료</th>
+          <th class="num">미수금</th>
+          <th class="center">청구서 수</th>
+          <th class="center">정상</th>
+          <th class="center">연체</th>
+          <th>최종 결제일</th>
+          <th class="center">상세</th>
+        </tr>
+      </thead>
+      <tbody id="receivable-tbody">
+        <tr>
+          <td colspan="9" style="text-align:center;padding:60px 20px;color:#64748b;">
+            조회 버튼을 눌러 데이터를 확인하세요
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

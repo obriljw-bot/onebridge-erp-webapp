@@ -62,6 +62,9 @@
       case 'paymentManagement':
         initFuncName = 'initPaymentManagementPage';
         break;
+      case 'receivable':
+        initFuncName = 'initReceivablePage';
+        break;
       case 'settings':
         initFuncName = 'initSettingsPage';
         break;
@@ -7957,6 +7960,214 @@
       }
     });
   }
+
+  /**
+   * ============================================================
+   * SPEC_05: 미수금 관리 페이지 초기화
+   * ============================================================
+   */
+  OB.initReceivablePage = function() {
+    console.log('🚀 미수금 관리 페이지 초기화 시작');
+
+    var currentType = '매출'; // 현재 탭 (미수금/미지급금)
+
+    // 탭 전환 이벤트
+    var receivableTab = document.getElementById('receivable-tab-receivable');
+    var payableTab = document.getElementById('receivable-tab-payable');
+
+    if (receivableTab) {
+      receivableTab.addEventListener('click', function() {
+        currentType = '매출';
+        document.querySelectorAll('.receivable-tab').forEach(function(tab) {
+          tab.classList.remove('active');
+        });
+        this.classList.add('active');
+        loadReceivableData();
+      });
+    }
+
+    if (payableTab) {
+      payableTab.addEventListener('click', function() {
+        currentType = '매입';
+        document.querySelectorAll('.receivable-tab').forEach(function(tab) {
+          tab.classList.remove('active');
+        });
+        this.classList.add('active');
+        loadReceivableData();
+      });
+    }
+
+    // 조회 버튼
+    var searchBtn = document.getElementById('receivable-search-btn');
+    if (searchBtn) {
+      searchBtn.addEventListener('click', function() {
+        loadReceivableData();
+      });
+    }
+
+    // 초기화 버튼
+    var resetBtn = document.getElementById('receivable-reset-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function() {
+        document.getElementById('receivable-company-filter').value = '';
+        document.getElementById('receivable-start-date').value = '';
+        document.getElementById('receivable-end-date').value = '';
+      });
+    }
+
+    // 엑셀 다운로드 버튼
+    var excelBtn = document.getElementById('receivable-excel-btn');
+    if (excelBtn) {
+      excelBtn.addEventListener('click', function() {
+        // TODO: 엑셀 다운로드 로직 구현
+        showToast('📥 엑셀 다운로드 기능은 추후 구현됩니다.');
+      });
+    }
+
+    /**
+     * 미수금 데이터 로드
+     */
+    function loadReceivableData() {
+      var companyName = document.getElementById('receivable-company-filter').value;
+      var startDate = document.getElementById('receivable-start-date').value;
+      var endDate = document.getElementById('receivable-end-date').value;
+
+      // 요약 데이터 로드
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.success) {
+            var data = result.data;
+            document.getElementById('summary-total').textContent = '₩' + data.총미수금.toLocaleString();
+            document.getElementById('summary-normal').textContent = data.정상건수 + '건';
+            document.getElementById('summary-overdue').textContent = data.연체건수 + '건';
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ 요약 데이터 로드 실패:', error);
+        })
+        .api_getReceivableSummary({ type: currentType });
+
+      // 에이징 리포트 로드
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.success) {
+            var aging = result.data;
+            document.getElementById('summary-aging').textContent = '₩' + aging['90일 초과'].금액.toLocaleString();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ 에이징 리포트 로드 실패:', error);
+        })
+        .api_getAgingReport({ type: currentType });
+
+      // 거래처별 데이터 로드
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.success) {
+            renderReceivableTable(result.data);
+          } else {
+            showToast('❌ ' + (result.error || '조회 실패'));
+          }
+        })
+        .withFailureHandler(function(error) {
+          showToast('❌ 오류: ' + error.message);
+        })
+        .api_getReceivableByCompany({
+          type: currentType,
+          companyName: companyName,
+          startDate: startDate,
+          endDate: endDate
+        });
+    }
+
+    /**
+     * 거래처별 테이블 렌더링
+     */
+    function renderReceivableTable(companies) {
+      var tbody = document.getElementById('receivable-tbody');
+      tbody.innerHTML = '';
+
+      if (companies.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:60px 20px;color:#64748b;">조회된 데이터가 없습니다.</td></tr>';
+        return;
+      }
+
+      for (var i = 0; i < companies.length; i++) {
+        var company = companies[i];
+
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + company.거래처명 + '</td>' +
+          '<td class="num">₩' + company.총청구액.toLocaleString() + '</td>' +
+          '<td class="num">₩' + company.결제완료금액.toLocaleString() + '</td>' +
+          '<td class="num">₩' + company.미수금.toLocaleString() + '</td>' +
+          '<td class="center">' + company.청구서수 + '건</td>' +
+          '<td class="center">' + company.정상건수 + '건</td>' +
+          '<td class="center">' +
+            (company.연체건수 > 0 ? '<span class="overdue-badge">' + company.연체건수 + '건</span>' : '0건') +
+          '</td>' +
+          '<td>' + company.최종결제일 + '</td>' +
+          '<td class="center">' +
+            '<button class="receivable-btn small" onclick="toggleReceivableDetail(' + i + ')">펼치기</button>' +
+          '</td>';
+
+        tbody.appendChild(tr);
+
+        // 상세 행 추가 (숨김 상태)
+        var detailTr = document.createElement('tr');
+        detailTr.id = 'receivable-detail-' + i;
+        detailTr.className = 'receivable-detail-row';
+        detailTr.style.display = 'none';
+
+        var detailHtml = '<td colspan="9"><table class="receivable-detail-table">';
+        detailHtml += '<thead><tr><th>청구ID</th><th>청구일</th><th class="num">청구금액</th><th class="num">결제완료</th><th class="num">미수금</th><th>결제예정일</th><th class="center">상태</th></tr></thead>';
+        detailHtml += '<tbody>';
+
+        for (var j = 0; j < company.청구서목록.length; j++) {
+          var inv = company.청구서목록[j];
+          detailHtml += '<tr>';
+          detailHtml += '<td>' + inv.청구ID + '</td>';
+          detailHtml += '<td>' + inv.청구일 + '</td>';
+          detailHtml += '<td class="num">₩' + inv.청구금액.toLocaleString() + '</td>';
+          detailHtml += '<td class="num">₩' + inv.결제완료금액.toLocaleString() + '</td>';
+          detailHtml += '<td class="num">₩' + inv.미수금.toLocaleString() + '</td>';
+          detailHtml += '<td>' + (inv.결제예정일 || '-') + '</td>';
+          detailHtml += '<td class="center">';
+          if (inv.연체여부) {
+            detailHtml += '<span class="overdue-badge">연체</span>';
+          } else {
+            detailHtml += inv.청구상태;
+          }
+          detailHtml += '</td>';
+          detailHtml += '</tr>';
+        }
+
+        detailHtml += '</tbody></table></td>';
+        detailTr.innerHTML = detailHtml;
+
+        tbody.appendChild(detailTr);
+      }
+    }
+
+    // 페이지 로드 시 초기 데이터 로드
+    loadReceivableData();
+
+    console.log('✅ 미수금 관리 페이지 초기화 완료');
+  };
+
+  /**
+   * 거래처 상세 펼치기/접기
+   */
+  window.toggleReceivableDetail = function(index) {
+    var detailRow = document.getElementById('receivable-detail-' + index);
+    if (detailRow) {
+      if (detailRow.style.display === 'none') {
+        detailRow.style.display = 'table-row';
+      } else {
+        detailRow.style.display = 'none';
+      }
+    }
+  };
 
 </script>
 

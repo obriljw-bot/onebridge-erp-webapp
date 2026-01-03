@@ -1208,3 +1208,60 @@ function api_getUpcomingPaymentsByDays(params) {
     return safeReturn({ success: false, error: error.message });
   }
 }
+
+/**
+ * ============================================================
+ * SPEC_05: 미수금/미지급금 관리 API
+ * ============================================================
+ */
+
+/**
+ * API: 미수금 전체 현황 조회
+ * @param {Object} params - { type: "매입" | "매출" }
+ */
+function api_getReceivableSummary(params) {
+  try {
+    var type = params.type || '매출';
+    var result = getReceivableSummary(type);
+    return safeReturn(result);
+  } catch (error) {
+    Logger.log('[api_getReceivableSummary] ❌ 오류: ' + error.message);
+    return safeReturn({ success: false, error: error.message });
+  }
+}
+
+/**
+ * API: 거래처별 미수금 집계
+ * @param {Object} params - { type, companyName, startDate, endDate }
+ */
+function api_getReceivableByCompany(params) {
+  try {
+    var type = params.type || '매출';
+    var filters = {
+      companyName: params.companyName || '',
+      startDate: params.startDate || '',
+      endDate: params.endDate || ''
+    };
+
+    var result = getReceivableByCompany(type, filters);
+    return safeReturn(result);
+  } catch (error) {
+    Logger.log('[api_getReceivableByCompany] ❌ 오류: ' + error.message);
+    return safeReturn({ success: false, error: error.message });
+  }
+}
+
+/**
+ * API: 에이징 리포트 조회
+ * @param {Object} params - { type: "매입" | "매출" }
+ */
+function api_getAgingReport(params) {
+  try {
+    var type = params.type || '매출';
+    var result = getAgingReport(type);
+    return safeReturn(result);
+  } catch (error) {
+    Logger.log('[api_getAgingReport] ❌ 오류: ' + error.message);
+    return safeReturn({ success: false, error: error.message });
+  }
+}
