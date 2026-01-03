@@ -6113,6 +6113,76 @@
   }
 
   /**
+   * SPEC_03: 입출금 내역 엑셀 다운로드
+   */
+  function downloadPaymentExcel() {
+    try {
+      // 현재 필터 조건 수집
+      var params = {
+        startDate: document.getElementById('payment-filter-start').value || '',
+        endDate: document.getElementById('payment-filter-end').value || '',
+        paymentType: document.getElementById('payment-filter-type').value || '',
+        companyName: document.getElementById('payment-filter-company').value || ''
+      };
+
+      // Web App URL 생성 (배포 후 실제 URL로 교체 필요)
+      var WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';  // TODO: 배포 후 교체
+
+      // URL 파라미터 생성
+      var queryParams = 'action=downloadPayment';
+      if (params.startDate) queryParams += '&startDate=' + encodeURIComponent(params.startDate);
+      if (params.endDate) queryParams += '&endDate=' + encodeURIComponent(params.endDate);
+      if (params.paymentType) queryParams += '&paymentType=' + encodeURIComponent(params.paymentType);
+      if (params.companyName) queryParams += '&companyName=' + encodeURIComponent(params.companyName);
+
+      var downloadUrl = WEB_APP_URL + '?' + queryParams;
+
+      console.log('📥 입출금 내역 다운로드 URL:', downloadUrl);
+
+      // 새 창에서 다운로드 실행
+      window.open(downloadUrl, '_blank');
+
+    } catch (error) {
+      console.error('❌ 엑셀 다운로드 오류:', error);
+      alert('엑셀 다운로드 중 오류가 발생했습니다: ' + error.message);
+    }
+  }
+
+  /**
+   * SPEC_03: 회사비용 엑셀 다운로드
+   */
+  function downloadExpenseExcel() {
+    try {
+      // 현재 필터 조건 수집
+      var params = {
+        startDate: document.getElementById('expense-filter-start').value || '',
+        endDate: document.getElementById('expense-filter-end').value || '',
+        category: document.getElementById('expense-filter-category').value || ''
+      };
+
+      // Web App URL 생성 (배포 후 실제 URL로 교체 필요)
+      var WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';  // TODO: 배포 후 교체
+
+      // URL 파라미터 생성
+      var queryParams = 'action=downloadExpense';
+      if (params.startDate) queryParams += '&startDate=' + encodeURIComponent(params.startDate);
+      if (params.endDate) queryParams += '&endDate=' + encodeURIComponent(params.endDate);
+      if (params.category) queryParams += '&category=' + encodeURIComponent(params.category);
+
+      var downloadUrl = WEB_APP_URL + '?' + queryParams;
+
+      console.log('📥 회사비용 다운로드 URL:', downloadUrl);
+
+      // 새 창에서 다운로드 실행
+      window.open(downloadUrl, '_blank');
+
+    } catch (error) {
+      console.error('❌ 엑셀 다운로드 오류:', error);
+      alert('엑셀 다운로드 중 오류가 발생했습니다: ' + error.message);
+    }
+  }
+
+  /**
    * 회사비용 수정 - 인라인 편집 모드 활성화
    */
   function editExpense(expenseId) {
