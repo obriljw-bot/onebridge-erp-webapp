@@ -2252,9 +2252,7 @@ function saveMultiplePayment(params) {
 
     // 결제ID 생성
     var now = new Date();
-    var dateStr = formatYearMonth(now) + String(now.getDate()).padStart(2, '0');
-    var seq = getNextSequence('PAYMENT', dateStr);
-    var paymentId = 'PAY-' + dateStr + '-' + String(seq).padStart(3, '0');
+    var paymentId = generatePaymentId();
 
     var user = Session.getActiveUser().getEmail();
 
