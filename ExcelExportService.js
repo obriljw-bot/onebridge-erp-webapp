@@ -292,38 +292,56 @@ function exportExpenseRecordsToCSV(params) {
 }
 
 /**
- * 파일명 생성
+ * 파일명 생성 (영문 + 날짜)
  * @param {Object} params - 필터 조건
- * @param {string} prefix - 파일명 접두어
+ * @param {string} prefix - 파일명 접두어 (영문)
  * @returns {string} - 파일명
  */
 function generateExcelFileName(params, prefix) {
   var fileName = prefix;
 
-  // 날짜 추가
-  if (params.startDate) {
-    fileName += '_' + params.startDate.replace(/-/g, '');
-  }
-  if (params.endDate && params.endDate !== params.startDate) {
-    fileName += '_' + params.endDate.replace(/-/g, '');
+  // 타임스탬프 추가 (고유성 보장)
+  var now = new Date();
+  var timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+
+  // 날짜 범위 추가
+  if (params.startDate && params.endDate) {
+    fileName += '_' + params.startDate.replace(/-/g, '') + '_' + params.endDate.replace(/-/g, '');
+  } else if (params.startDate) {
+    fileName += '_from_' + params.startDate.replace(/-/g, '');
+  } else if (params.endDate) {
+    fileName += '_to_' + params.endDate.replace(/-/g, '');
+  } else {
+    fileName += '_all';
   }
 
-  // 조건 추가
+  // 필터 조건 영문 변환
   if (params.paymentType) {
-    fileName += '_' + params.paymentType;
-  } else if (params.category) {
-    fileName += '_' + params.category;
-  } else if (!params.startDate && !params.endDate) {
-    fileName += '_전체';
+    var typeMap = {
+      '입금': 'income',
+      '출금': 'expense'
+    };
+    fileName += '_' + (typeMap[params.paymentType] || params.paymentType);
   }
 
-  // 거래처명 추가 (최대 10자)
-  if (params.companyName) {
-    var companyShort = params.companyName.substring(0, 10);
-    companyShort = companyShort.replace(/[<>:"/\\|?*]/g, '');
-    fileName += '_' + companyShort;
+  if (params.category) {
+    // 한글 카테고리를 영문으로 매핑
+    var categoryMap = {
+      '인건비': 'labor',
+      '임차료': 'rent',
+      '통신비': 'telecom',
+      '교통비': 'transport',
+      '소모품비': 'supplies',
+      '접대비': 'entertainment',
+      '광고선전비': 'advertising',
+      '식비': 'meals',
+      '기타': 'etc'
+    };
+    fileName += '_' + (categoryMap[params.category] || params.category);
   }
 
+  // 타임스탬프 추가
+  fileName += '_' + timestamp;
   fileName += '.csv';
 
   return fileName;
@@ -352,7 +370,7 @@ function doGet(e) {
           .setMimeType(ContentService.MimeType.TEXT);
       }
 
-      var fileName = generateExcelFileName(params, '입출금내역');
+      var fileName = generateExcelFileName(params, 'payment_records');
 
       // UTF-8 BOM 추가 (엑셀 한글 인식)
       var BOM = '\uFEFF';
@@ -378,7 +396,7 @@ function doGet(e) {
           .setMimeType(ContentService.MimeType.TEXT);
       }
 
-      var fileName = generateExcelFileName(params, '회사비용');
+      var fileName = generateExcelFileName(params, 'company_expenses');
 
       var BOM = '\uFEFF';
       var csvWithBOM = BOM + result.csv;
