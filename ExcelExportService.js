@@ -348,7 +348,7 @@ function generateExcelFileName(params, prefix) {
 }
 
 /**
- * doGet 엔드포인트 - CSV 파일 다운로드 (HtmlService 방식)
+ * doGet 엔드포인트 - CSV 파일 다운로드 (Data URL 방식)
  */
 function doGet(e) {
   try {
@@ -371,29 +371,34 @@ function doGet(e) {
 
       var fileName = generateExcelFileName(params, 'payment_records');
 
-      // UTF-8 BOM 추가 (엑셀 한글 인식)
+      // UTF-8 BOM 추가
       var BOM = '\uFEFF';
       var csvWithBOM = BOM + result.csv;
 
-      // HTML로 자동 다운로드 트리거
+      // Base64 인코딩
+      var base64Data = Utilities.base64Encode(csvWithBOM, Utilities.Charset.UTF_8);
+
+      // Data URL로 다운로드
       var html = '<html><head><meta charset="utf-8"></head><body>' +
+        '<h3>파일 다운로드 중...</h3>' +
+        '<p>' + fileName + '</p>' +
         '<script>' +
-        'var csvData = ' + JSON.stringify(csvWithBOM) + ';' +
-        'var fileName = ' + JSON.stringify(fileName) + ';' +
-        'var blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });' +
-        'var link = document.createElement("a");' +
-        'link.href = URL.createObjectURL(blob);' +
-        'link.download = fileName;' +
-        'document.body.appendChild(link);' +
-        'link.click();' +
-        'document.body.removeChild(link);' +
-        'setTimeout(function() { window.close(); }, 1000);' +
+        'var base64 = "' + base64Data + '";' +
+        'var binary = atob(base64);' +
+        'var array = new Uint8Array(binary.length);' +
+        'for (var i = 0; i < binary.length; i++) { array[i] = binary.charCodeAt(i); }' +
+        'var blob = new Blob([array], { type: "text/csv;charset=utf-8;" });' +
+        'var url = URL.createObjectURL(blob);' +
+        'var a = document.createElement("a");' +
+        'a.href = url;' +
+        'a.download = "' + fileName + '";' +
+        'document.body.appendChild(a);' +
+        'a.click();' +
+        'setTimeout(function() { URL.revokeObjectURL(url); window.close(); }, 1000);' +
         '</script>' +
-        '<p>파일 다운로드 중... (' + fileName + ')</p>' +
         '</body></html>';
 
-      return HtmlService.createHtmlOutput(html)
-        .setTitle('CSV 다운로드');
+      return HtmlService.createHtmlOutput(html);
     }
 
     // 회사비용 다운로드
@@ -415,25 +420,28 @@ function doGet(e) {
       var BOM = '\uFEFF';
       var csvWithBOM = BOM + result.csv;
 
-      // HTML로 자동 다운로드 트리거
+      var base64Data = Utilities.base64Encode(csvWithBOM, Utilities.Charset.UTF_8);
+
       var html = '<html><head><meta charset="utf-8"></head><body>' +
+        '<h3>파일 다운로드 중...</h3>' +
+        '<p>' + fileName + '</p>' +
         '<script>' +
-        'var csvData = ' + JSON.stringify(csvWithBOM) + ';' +
-        'var fileName = ' + JSON.stringify(fileName) + ';' +
-        'var blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });' +
-        'var link = document.createElement("a");' +
-        'link.href = URL.createObjectURL(blob);' +
-        'link.download = fileName;' +
-        'document.body.appendChild(link);' +
-        'link.click();' +
-        'document.body.removeChild(link);' +
-        'setTimeout(function() { window.close(); }, 1000);' +
+        'var base64 = "' + base64Data + '";' +
+        'var binary = atob(base64);' +
+        'var array = new Uint8Array(binary.length);' +
+        'for (var i = 0; i < binary.length; i++) { array[i] = binary.charCodeAt(i); }' +
+        'var blob = new Blob([array], { type: "text/csv;charset=utf-8;" });' +
+        'var url = URL.createObjectURL(blob);' +
+        'var a = document.createElement("a");' +
+        'a.href = url;' +
+        'a.download = "' + fileName + '";' +
+        'document.body.appendChild(a);' +
+        'a.click();' +
+        'setTimeout(function() { URL.revokeObjectURL(url); window.close(); }, 1000);' +
         '</script>' +
-        '<p>파일 다운로드 중... (' + fileName + ')</p>' +
         '</body></html>';
 
-      return HtmlService.createHtmlOutput(html)
-        .setTitle('CSV 다운로드');
+      return HtmlService.createHtmlOutput(html);
     }
 
     return HtmlService.createHtmlOutput('<h3>잘못된 요청입니다. action 파라미터를 확인하세요.</h3>');
