@@ -1141,3 +1141,70 @@ function api_createRefund(params) {
   var result = createRefund(params);
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * SPEC_04: 결제 예정 알림 API
+ * ============================================================
+ */
+
+/**
+ * API: 오늘 결제 예정 청구서 조회 (웹 대시보드용)
+ */
+function api_getTodayUpcomingPayments() {
+  try {
+    var 매입청구서 = getUpcomingInvoices(0, '매입');
+    var 매출청구서 = getUpcomingInvoices(0, '매출');
+
+    var totalPurchaseAmount = 0;
+    for (var i = 0; i < 매입청구서.length; i++) {
+      totalPurchaseAmount += (Number(매입청구서[i].미수금) || 0);
+    }
+
+    var totalSalesAmount = 0;
+    for (var i = 0; i < 매출청구서.length; i++) {
+      totalSalesAmount += (Number(매출청구서[i].미수금) || 0);
+    }
+
+    return safeReturn({
+      success: true,
+      data: {
+        매입: {
+          count: 매입청구서.length,
+          amount: totalPurchaseAmount,
+          invoices: 매입청구서
+        },
+        매출: {
+          count: 매출청구서.length,
+          amount: totalSalesAmount,
+          invoices: 매출청구서
+        }
+      }
+    });
+
+  } catch (error) {
+    Logger.log('[api_getTodayUpcomingPayments] ❌ 오류: ' + error.message);
+    return safeReturn({ success: false, error: error.message });
+  }
+}
+
+/**
+ * API: D-7, D-3, D-day 결제 예정 청구서 조회 (페이지별)
+ */
+function api_getUpcomingPaymentsByDays(params) {
+  try {
+    var daysOffset = params.daysOffset || 0; // 0, 3, 7
+    var invoiceType = params.invoiceType || '매입'; // "매입" 또는 "매출"
+
+    var invoices = getUpcomingInvoices(daysOffset, invoiceType);
+
+    return safeReturn({
+      success: true,
+      data: invoices
+    });
+
+  } catch (error) {
+    Logger.log('[api_getUpcomingPaymentsByDays] ❌ 오류: ' + error.message);
+    return safeReturn({ success: false, error: error.message });
+  }
+}

@@ -362,3 +362,122 @@ function addSampleData() {
     Logger.log('[addSampleData] 오류: ' + error.message);
   }
 }
+
+/**
+ * ============================================================
+ * SPEC_04: 결제 예정 알림 기능
+ * ============================================================
+ */
+
+/**
+ * 청구DB에 결제예정일, 알림담당자 컬럼 추가
+ * SPEC_04 마이그레이션
+ */
+function migrateInvoiceSheetForAlerts() {
+  try {
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName('청구DB');
+
+    if (!sheet) {
+      Logger.log('[migrateInvoiceSheetForAlerts] ❌ 청구DB 시트를 찾을 수 없습니다.');
+      return { success: false, error: '청구DB 시트를 찾을 수 없습니다.' };
+    }
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var currentColCount = headers.length;
+
+    Logger.log('[migrateInvoiceSheetForAlerts] 현재 컬럼 수: ' + currentColCount);
+
+    // 이미 추가되어 있는지 확인
+    if (headers.indexOf('결제예정일') !== -1) {
+      Logger.log('[migrateInvoiceSheetForAlerts] ⚠️ 이미 "결제예정일" 컬럼이 존재합니다.');
+      return { success: false, error: '이미 결제예정일 컬럼이 존재합니다.' };
+    }
+
+    // 20번째 컬럼: 결제예정일
+    sheet.getRange(1, currentColCount + 1).setValue('결제예정일');
+    sheet.getRange(1, currentColCount + 1).setBackground('#fef3c7').setFontWeight('bold');
+
+    // 21번째 컬럼: 알림담당자
+    sheet.getRange(1, currentColCount + 2).setValue('알림담당자');
+    sheet.getRange(1, currentColCount + 2).setBackground('#fef3c7').setFontWeight('bold');
+
+    Logger.log('[migrateInvoiceSheetForAlerts] ✅ 청구DB 컬럼 추가 완료: ' + currentColCount + '개 → ' + (currentColCount + 2) + '개');
+
+    return { success: true, newColumnCount: currentColCount + 2 };
+
+  } catch (error) {
+    Logger.log('[migrateInvoiceSheetForAlerts] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 알림설정 시트 생성 및 초기 데이터 입력
+ * SPEC_04
+ */
+function setupAlertSettings() {
+  try {
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName('알림설정');
+
+    if (sheet) {
+      Logger.log('[setupAlertSettings] ⚠️ 알림설정 시트가 이미 존재합니다.');
+      return { success: false, error: '알림설정 시트가 이미 존재합니다.' };
+    }
+
+    sheet = ss.insertSheet('알림설정');
+
+    // 헤더
+    var headers = [
+      '알림ID',
+      '알림유형',
+      '대상유형',
+      '트리거일',
+      '활성여부',
+      '수신자이메일',
+      '생성일'
+    ];
+
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setBackground('#dbeafe')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center');
+
+    // 컬럼 너비 조정
+    sheet.setColumnWidth(1, 120); // 알림ID
+    sheet.setColumnWidth(2, 100); // 알림유형
+    sheet.setColumnWidth(3, 80);  // 대상유형
+    sheet.setColumnWidth(4, 80);  // 트리거일
+    sheet.setColumnWidth(5, 80);  // 활성여부
+    sheet.setColumnWidth(6, 200); // 수신자이메일
+    sheet.setColumnWidth(7, 120); // 생성일
+
+    // 초기 데이터
+    var initialData = [
+      ['ALERT-001', '매입결제', '매입', 'D-7', true, 'finance@company.com', new Date()],
+      ['ALERT-002', '매입결제', '매입', 'D-3', true, 'finance@company.com', new Date()],
+      ['ALERT-003', '매입결제', '매입', 'D-day', true, 'finance@company.com', new Date()],
+      ['ALERT-004', '매출입금', '매출', 'D-3', true, 'sales@company.com', new Date()],
+      ['ALERT-005', '매출입금', '매출', 'D-day', true, 'sales@company.com', new Date()]
+    ];
+
+    sheet.getRange(2, 1, initialData.length, headers.length).setValues(initialData);
+
+    // 데이터 포맷 설정
+    sheet.getRange(2, 5, initialData.length, 1).setHorizontalAlignment('center'); // 활성여부 중앙 정렬
+    sheet.getRange(2, 7, initialData.length, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss'); // 생성일 포맷
+
+    // 고정 행 설정
+    sheet.setFrozenRows(1);
+
+    Logger.log('[setupAlertSettings] ✅ 알림설정 시트 생성 완료 (5개 알림 설정)');
+
+    return { success: true, alertCount: initialData.length };
+
+  } catch (error) {
+    Logger.log('[setupAlertSettings] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
