@@ -7159,41 +7159,22 @@
       return;
     }
 
-    // 로딩 표시
-    var body = document.getElementById('payment-modal-body');
-    body.innerHTML = '<p class="payment-loading-msg">선택된 청구서 정보를 불러오는 중...</p>';
-
-    // 선택된 청구서들의 상세 정보 조회
-    var invoiceIds = PAYMENT_MODAL_STATE.selectedInvoices;
+    // SPEC_01: Step 2에서 저장한 완전한 청구서 데이터 사용 (API 재호출 불필요)
     var invoiceDetails = [];
-    var currentIndex = 0;
-
-    function loadNext() {
-      if (currentIndex >= invoiceIds.length) {
-        // 모두 로드 완료
-        PAYMENT_MODAL_STATE.invoiceDetailsMultiple = invoiceDetails;
-        renderStep3MultipleInvoices();
-        return;
+    PAYMENT_MODAL_STATE.selectedInvoices.forEach(function(invoiceId) {
+      var invoiceData = PAYMENT_MODAL_STATE.selectedInvoicesData[invoiceId];
+      if (invoiceData) {
+        invoiceDetails.push(invoiceData);
       }
+    });
 
-      var invoiceId = invoiceIds[currentIndex];
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            invoiceDetails.push(result.invoice);
-          }
-          currentIndex++;
-          loadNext();
-        })
-        .withFailureHandler(function(error) {
-          alert('❌ 청구서 조회 중 오류 (' + invoiceId + '): ' + error.message);
-          renderStep2InvoiceSearch();
-        })
-        .getInvoiceDetailApi(invoiceId);
+    if (invoiceDetails.length === 0) {
+      alert('❌ 청구서 데이터를 불러올 수 없습니다.');
+      return;
     }
 
-    loadNext();
+    PAYMENT_MODAL_STATE.invoiceDetailsMultiple = invoiceDetails;
+    renderStep3MultipleInvoices();
   }
 
   /**
@@ -7281,7 +7262,7 @@
           '</div>' +
           '<div style="font-size:13px;color:#64748b;">' +
             companyLabel + ': ' + invoice.company + ' | ' +
-            '발주: ' + invoice.orderNumbers.length + '건 | ' +
+            '발주: ' + (invoice.orderCount || (invoice.orderNumbers ? invoice.orderNumbers.length : 0)) + '건 | ' +
             '청구일: ' + invoice.date +
           '</div>' +
           amountDetailHTML +
