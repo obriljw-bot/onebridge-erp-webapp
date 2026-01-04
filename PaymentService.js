@@ -423,22 +423,22 @@ function getPaymentRecords(params) {
             var invoiceData = invoiceSheet.getDataRange().getValues();
             var invoiceHeader = invoiceData[0];
 
-            // 헤더 정보 출력 (첫 10개 컬럼)
+            // 헤더 정보 출력 (전체)
             var headerSample = [];
-            for (var h = 0; h < Math.min(10, invoiceHeader.length); h++) {
+            for (var h = 0; h < invoiceHeader.length; h++) {
               headerSample.push(h + ':"' + invoiceHeader[h] + '"');
             }
-            Logger.log('[getPaymentRecords] 청구서 헤더: ' + headerSample.join(', '));
+            Logger.log('[getPaymentRecords] 청구DB 전체 헤더 (' + invoiceHeader.length + '개): ' + headerSample.join(', '));
 
             var colInv = function(name) { return invoiceHeader.indexOf(name); };
 
-            var cInvId = colInv('청구서ID');
+            var cInvId = colInv('청구ID');  // 수정: '청구서ID' → '청구ID'
             var cInvAmount = colInv('청구금액');
             var cInvStatus = colInv('청구상태');
             var cInvPaidAmount = colInv('결제완료금액');
             var cInvRemaining = colInv('미수금');
 
-            Logger.log('[getPaymentRecords] 청구서 컬럼 - ID: ' + cInvId + ', 상태: ' + cInvStatus + ', 총 행: ' + invoiceData.length);
+            Logger.log('[getPaymentRecords] 청구서 컬럼 - ID: ' + cInvId + ', 금액: ' + cInvAmount + ', 상태: ' + cInvStatus + ', 기결제: ' + cInvPaidAmount + ', 미수금: ' + cInvRemaining);
 
             // 청구서 찾기
             var found = false;
