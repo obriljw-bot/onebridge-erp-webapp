@@ -398,7 +398,7 @@ function getPaymentRecords(params) {
         orderNumber: row[cOrderNumber] || '',
         notes: row[cNotes] || '',
         deleted: row[cDeleted] || false,
-        inputDate: formatDateString(row[cInputDate]),
+        createdAt: formatDateString(row[cInputDate]),  // 프론트엔드와 일치
         inputUser: row[cInputUser]
       };
 
@@ -414,6 +414,8 @@ function getPaymentRecords(params) {
               invoiceId = docs[0];
             }
           }
+
+          Logger.log('[getPaymentRecords] 청구서 조회 시도: ' + invoiceId + ' (원본: ' + docNumber + ')');
 
           // 청구서 정보 조회
           var invoiceSheet = SpreadsheetApp.openById(PAYMENT_SS_ID).getSheetByName(INVOICE_SHEET_NAME);
@@ -435,6 +437,7 @@ function getPaymentRecords(params) {
                 paymentRecord.invoiceStatus = invoiceData[j][cInvStatus] || '';
                 paymentRecord.invoicePaidAmount = (cInvPaidAmount !== -1) ? (Number(invoiceData[j][cInvPaidAmount]) || 0) : 0;
                 paymentRecord.invoiceRemainingBalance = (cInvRemaining !== -1) ? (Number(invoiceData[j][cInvRemaining]) || paymentRecord.invoiceAmount) : paymentRecord.invoiceAmount;
+                Logger.log('[getPaymentRecords] 청구서 발견: ' + invoiceId + ', 상태: ' + paymentRecord.invoiceStatus);
                 break;
               }
             }
