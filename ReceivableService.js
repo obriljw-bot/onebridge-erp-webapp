@@ -32,18 +32,12 @@ function getReceivableSummary(type) {
     var allData = sheet.getDataRange().getValues();
     var headers = allData[0];
 
-    // 디버깅: 헤더 구조 확인
-    Logger.log('[getReceivableSummary] 청구DB 헤더: ' + JSON.stringify(headers));
-    Logger.log('[getReceivableSummary] 총 데이터 행 수: ' + (allData.length - 1));
-
     var 청구유형Col = headers.indexOf('청구유형');
     var 청구금액Col = headers.indexOf('청구금액');
     var 청구상태Col = headers.indexOf('청구상태');
     var 미수금Col = headers.indexOf('미수금');
     var 결제예정일Col = headers.indexOf('결제예정일');
     var 삭제여부Col = headers.indexOf('삭제여부');
-
-    Logger.log('[getReceivableSummary] 컬럼 인덱스 - 청구유형:' + 청구유형Col + ', 청구금액:' + 청구금액Col + ', 청구상태:' + 청구상태Col + ', 미수금:' + 미수금Col);
 
     var 총청구액 = 0;
     var 총결제완료금액 = 0;
@@ -128,12 +122,9 @@ function getReceivableByCompany(type, filters) {
     var allData = sheet.getDataRange().getValues();
     var headers = allData[0];
 
-    // 디버깅: 헤더 구조 확인
-    Logger.log('[getReceivableByCompany] 청구DB 헤더: ' + JSON.stringify(headers));
-
     var 청구IDCol = headers.indexOf('청구ID');
     var 청구유형Col = headers.indexOf('청구유형');
-    var 거래처명Col = headers.indexOf('거래처명');
+    var 거래처명Col = headers.indexOf('업체명');  // 수정: '거래처명' → '업체명'
     var 청구일Col = headers.indexOf('청구일');
     var 청구금액Col = headers.indexOf('청구금액');
     var 청구상태Col = headers.indexOf('청구상태');
@@ -142,8 +133,6 @@ function getReceivableByCompany(type, filters) {
     var 최종결제일Col = headers.indexOf('최종결제일');
     var 결제예정일Col = headers.indexOf('결제예정일');
     var 삭제여부Col = headers.indexOf('삭제여부');
-
-    Logger.log('[getReceivableByCompany] 컬럼 인덱스 - 청구ID:' + 청구IDCol + ', 청구유형:' + 청구유형Col + ', 거래처명:' + 거래처명Col);
 
     var companyMap = {}; // 거래처별 집계 객체
 
