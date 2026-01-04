@@ -11,6 +11,9 @@
  * ============================================================
  */
 
+// ====== 상수 정의 ======
+var SS_ID = '1oz4M6nc_R0vORnV0bl6uPbw_z8EDomo2ko-NF-usyxs'; // 발주_통합DB
+
 /**
  * 결제 예정 청구서 조회
  * @param {number} daysOffset - 0: D-day, 3: D-3, 7: D-7
