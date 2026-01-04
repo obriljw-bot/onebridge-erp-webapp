@@ -430,16 +430,33 @@ function getPaymentRecords(params) {
             var cInvPaidAmount = colInv('결제완료금액');
             var cInvRemaining = colInv('미수금');
 
+            Logger.log('[getPaymentRecords] 청구서 컬럼 - ID: ' + cInvId + ', 상태: ' + cInvStatus + ', 총 행: ' + invoiceData.length);
+
             // 청구서 찾기
+            var found = false;
             for (var j = 1; j < invoiceData.length; j++) {
-              if (invoiceData[j][cInvId] === invoiceId) {
+              var currentInvoiceId = String(invoiceData[j][cInvId]).trim();
+              var searchInvoiceId = String(invoiceId).trim();
+
+              if (currentInvoiceId === searchInvoiceId) {
                 paymentRecord.invoiceAmount = Number(invoiceData[j][cInvAmount]) || 0;
                 paymentRecord.invoiceStatus = invoiceData[j][cInvStatus] || '';
                 paymentRecord.invoicePaidAmount = (cInvPaidAmount !== -1) ? (Number(invoiceData[j][cInvPaidAmount]) || 0) : 0;
                 paymentRecord.invoiceRemainingBalance = (cInvRemaining !== -1) ? (Number(invoiceData[j][cInvRemaining]) || paymentRecord.invoiceAmount) : paymentRecord.invoiceAmount;
-                Logger.log('[getPaymentRecords] 청구서 발견: ' + invoiceId + ', 상태: ' + paymentRecord.invoiceStatus);
+                Logger.log('[getPaymentRecords] ✅ 청구서 발견: ' + invoiceId + ', 상태: ' + paymentRecord.invoiceStatus + ', 미수금: ' + paymentRecord.invoiceRemainingBalance);
+                found = true;
                 break;
               }
+            }
+
+            if (!found) {
+              Logger.log('[getPaymentRecords] ❌ 청구서 미발견: "' + invoiceId + '" (총 ' + (invoiceData.length - 1) + '건 검색)');
+              // 첫 3개 청구서 ID 샘플 출력
+              var sampleIds = [];
+              for (var k = 1; k < Math.min(4, invoiceData.length); k++) {
+                sampleIds.push('"' + invoiceData[k][cInvId] + '"');
+              }
+              Logger.log('[getPaymentRecords] 청구서 샘플: ' + sampleIds.join(', '));
             }
           }
         } catch (e) {
