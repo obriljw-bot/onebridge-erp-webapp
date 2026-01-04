@@ -387,7 +387,7 @@ function getPaymentRecords(params) {
       }
 
       // 결과 추가
-      results.push({
+      var paymentRecord = {
         paymentId: row[cPaymentId],
         date: formatDateString(row[cDate]),
         type: row[cType],
@@ -400,7 +400,52 @@ function getPaymentRecords(params) {
         deleted: row[cDeleted] || false,
         inputDate: formatDateString(row[cInputDate]),
         inputUser: row[cInputUser]
-      });
+      };
+
+      // SPEC_01: 부분결제 - 청구서 정보 추가 (docNumber가 있는 경우)
+      var docNumber = row[cDocNumber] || '';
+      if (docNumber && docNumber !== '' && docNumber !== '-') {
+        try {
+          // 문서번호가 JSON 배열인 경우 첫 번째 항목 사용
+          var invoiceId = docNumber;
+          if (docNumber.startsWith('[')) {
+            var docs = JSON.parse(docNumber);
+            if (Array.isArray(docs) && docs.length > 0) {
+              invoiceId = docs[0];
+            }
+          }
+
+          // 청구서 정보 조회
+          var invoiceSheet = SpreadsheetApp.openById(CONFIG.INVOICE_DB_ID).getSheetByName(CONFIG.INVOICE_DB_SHEET_NAME);
+          if (invoiceSheet) {
+            var invoiceData = invoiceSheet.getDataRange().getValues();
+            var invoiceHeader = invoiceData[0];
+            var colInv = function(name) { return invoiceHeader.indexOf(name); };
+
+            var cInvId = colInv('청구서ID');
+            var cInvAmount = colInv('청구금액');
+            var cInvStatus = colInv('청구상태');
+            var cInvPaidAmount = colInv('결제완료금액');
+            var cInvRemaining = colInv('미수금');
+
+            // 청구서 찾기
+            for (var j = 1; j < invoiceData.length; j++) {
+              if (invoiceData[j][cInvId] === invoiceId) {
+                paymentRecord.invoiceAmount = Number(invoiceData[j][cInvAmount]) || 0;
+                paymentRecord.invoiceStatus = invoiceData[j][cInvStatus] || '';
+                paymentRecord.invoicePaidAmount = (cInvPaidAmount !== -1) ? (Number(invoiceData[j][cInvPaidAmount]) || 0) : 0;
+                paymentRecord.invoiceRemainingBalance = (cInvRemaining !== -1) ? (Number(invoiceData[j][cInvRemaining]) || paymentRecord.invoiceAmount) : paymentRecord.invoiceAmount;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // 청구서 조회 실패해도 결제 레코드는 유지
+          Logger.log('[getPaymentRecords] 청구서 조회 실패: ' + e.message);
+        }
+      }
+
+      results.push(paymentRecord);
     }
 
     Logger.log('[getPaymentRecords] 조회 완료: ' + results.length + '건');
@@ -2122,6 +2167,8 @@ function searchInvoices(params) {
     var cAmount = col('청구금액');
     var cStatus = col('청구상태');
     var cOrderNumbers = col('orderNumbers');
+    var cPaidAmount = col('결제완료금액');        // SPEC_01: 부분결제
+    var cRemainingBalance = col('미수금');       // SPEC_01: 부분결제
 
     var invoices = [];
 
@@ -2152,13 +2199,20 @@ function searchInvoices(params) {
       var orderNumbers = JSON.parse(row[cOrderNumbers] || '[]');
       var brands = getUniqueBrands(orderNumbers);
 
+      // 부분결제 정보 계산
+      var amount = Number(row[cAmount]) || 0;
+      var paidAmount = (cPaidAmount !== -1) ? (Number(row[cPaidAmount]) || 0) : 0;
+      var remainingBalance = (cRemainingBalance !== -1) ? (Number(row[cRemainingBalance]) || amount) : amount;
+
       invoices.push({
         invoiceId: invoiceId,
         type: row[cType],
         company: company,
         brands: brands.join(', '),
         date: formatDateString(row[cDate]),
-        amount: Number(row[cAmount]) || 0,
+        amount: amount,                           // 원래 청구금액
+        paidAmount: paidAmount,                   // 기결제금액
+        remainingBalance: remainingBalance,       // 미수금
         status: row[cStatus],
         orderCount: orderNumbers.length
       });
