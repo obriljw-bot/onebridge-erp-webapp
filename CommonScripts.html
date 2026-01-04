@@ -8126,7 +8126,7 @@
   OB.initReceivablePage = function() {
     console.log('🚀 미수금 관리 페이지 초기화 시작');
 
-    var currentType = '매출'; // 현재 탭 (미수금/미지급금)
+    var currentType = 'SALES'; // 현재 탭 (SALES=매출, PURCHASE=매입)
 
     // 탭 전환 이벤트
     var receivableTab = document.getElementById('receivable-tab-receivable');
@@ -8134,7 +8134,7 @@
 
     if (receivableTab) {
       receivableTab.addEventListener('click', function() {
-        currentType = '매출';
+        currentType = 'SALES';
         document.querySelectorAll('.receivable-tab').forEach(function(tab) {
           tab.classList.remove('active');
         });
@@ -8145,7 +8145,7 @@
 
     if (payableTab) {
       payableTab.addEventListener('click', function() {
-        currentType = '매입';
+        currentType = 'PURCHASE';
         document.querySelectorAll('.receivable-tab').forEach(function(tab) {
           tab.classList.remove('active');
         });
