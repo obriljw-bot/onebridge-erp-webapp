@@ -416,7 +416,7 @@ function getPaymentRecords(params) {
           }
 
           // 청구서 정보 조회
-          var invoiceSheet = SpreadsheetApp.openById(CONFIG.INVOICE_DB_ID).getSheetByName(CONFIG.INVOICE_DB_SHEET_NAME);
+          var invoiceSheet = SpreadsheetApp.openById(PAYMENT_SS_ID).getSheetByName(INVOICE_SHEET_NAME);
           if (invoiceSheet) {
             var invoiceData = invoiceSheet.getDataRange().getValues();
             var invoiceHeader = invoiceData[0];
