@@ -45,6 +45,12 @@ function getReceivableSummary(type) {
     var 정상건수 = 0;
     var 연체건수 = 0;
 
+    // 디버깅 카운터
+    var 총행수 = allData.length - 1;
+    var 삭제건수 = 0;
+    var 유형불일치 = 0;
+    var 완납건수 = 0;
+
     var today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -52,14 +58,27 @@ function getReceivableSummary(type) {
       var row = allData[i];
 
       // 삭제된 데이터 제외
-      if (row[삭제여부Col] === true) continue;
+      if (row[삭제여부Col] === true) {
+        삭제건수++;
+        continue;
+      }
 
       // 유형 필터
-      if (row[청구유형Col] !== type) continue;
+      var 현재유형 = row[청구유형Col];
+      if (현재유형 !== type) {
+        유형불일치++;
+        if (i <= 3) { // 처음 3개만 로그
+          Logger.log('[getReceivableSummary] 행' + i + ' 유형 불일치: "' + 현재유형 + '" !== "' + type + '"');
+        }
+        continue;
+      }
 
       // 완납된 건 제외
       var 상태 = row[청구상태Col];
-      if (상태 === 'PAID') continue;
+      if (상태 === 'PAID') {
+        완납건수++;
+        continue;
+      }
 
       var 청구금액 = Number(row[청구금액Col]) || 0;
       var 미수금 = Number(row[미수금Col]) || 청구금액;
@@ -84,6 +103,7 @@ function getReceivableSummary(type) {
       }
     }
 
+    Logger.log('[getReceivableSummary] ' + type + ' - 총행수:' + 총행수 + ', 삭제:' + 삭제건수 + ', 유형불일치:' + 유형불일치 + ', 완납:' + 완납건수 + ', 집계대상:' + (정상건수 + 연체건수));
     Logger.log('[getReceivableSummary] ' + type + ' - 총미수금: ' + 총미수금.toLocaleString() + ', 정상: ' + 정상건수 + '건, 연체: ' + 연체건수 + '건');
 
     return {
