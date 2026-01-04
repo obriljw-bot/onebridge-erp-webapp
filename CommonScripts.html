@@ -7298,7 +7298,7 @@
   }
 
   /**
-   * 다중 청구서 금액 검증
+   * 다중 청구서 금액 검증 (부분결제 지원)
    */
   function validatePaymentAmountMultiple() {
     var invoices = PAYMENT_MODAL_STATE.invoiceDetailsMultiple;
@@ -7312,12 +7312,46 @@
     var resultDiv = document.getElementById('amount-validation-result-multi');
     var saveBtn = document.getElementById('final-save-btn-multi');
 
+    // 금액이 0 이하인 경우
+    if (inputAmount <= 0) {
+      resultDiv.innerHTML =
+        '<div class="amount-validation error">' +
+          '<div class="validation-icon">❌</div>' +
+          '<div class="validation-details">' +
+            '<div class="validation-title">결제금액을 입력해주세요.</div>' +
+          '</div>' +
+        '</div>';
+      saveBtn.disabled = true;
+      saveBtn.classList.add('disabled');
+      return;
+    }
+
+    // 금액이 총 청구금액을 초과하는 경우
+    if (inputAmount > totalInvoiceAmount) {
+      var diff = inputAmount - totalInvoiceAmount;
+      resultDiv.innerHTML =
+        '<div class="amount-validation error">' +
+          '<div class="validation-icon">❌</div>' +
+          '<div class="validation-details">' +
+            '<div class="validation-title">결제금액이 총 청구금액을 초과합니다.</div>' +
+            '<div class="validation-row">총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + ' (' + invoices.length + '건)</div>' +
+            '<div class="validation-row">결제금액: ₩' + inputAmount.toLocaleString() + '</div>' +
+            '<div class="validation-row">초과 금액: ₩' + diff.toLocaleString() + '</div>' +
+            '<div class="validation-message">💡 결제금액은 총 청구금액을 초과할 수 없습니다.</div>' +
+          '</div>' +
+        '</div>';
+      saveBtn.disabled = true;
+      saveBtn.classList.add('disabled');
+      return;
+    }
+
+    // 금액이 정확히 일치하는 경우 (완납)
     if (inputAmount === totalInvoiceAmount) {
       resultDiv.innerHTML =
         '<div class="amount-validation success">' +
           '<div class="validation-icon">✅</div>' +
           '<div class="validation-details">' +
-            '<div class="validation-title">결제금액과 총 청구금액이 일치합니다.</div>' +
+            '<div class="validation-title">완납 처리됩니다.</div>' +
             '<div class="validation-row">총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + ' (' + invoices.length + '건)</div>' +
             '<div class="validation-row">결제금액: ₩' + inputAmount.toLocaleString() + '</div>' +
             '<div class="validation-row">차액: ₩0</div>' +
@@ -7325,22 +7359,24 @@
         '</div>';
       saveBtn.disabled = false;
       saveBtn.classList.remove('disabled');
-    } else {
-      var diff = inputAmount - totalInvoiceAmount;
-      resultDiv.innerHTML =
-        '<div class="amount-validation error">' +
-          '<div class="validation-icon">❌</div>' +
-          '<div class="validation-details">' +
-            '<div class="validation-title">결제금액과 총 청구금액이 일치하지 않습니다.</div>' +
-            '<div class="validation-row">총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + ' (' + invoices.length + '건)</div>' +
-            '<div class="validation-row">결제금액: ₩' + inputAmount.toLocaleString() + '</div>' +
-            '<div class="validation-row">차액: ' + (diff > 0 ? '+' : '') + '₩' + Math.abs(diff).toLocaleString() + ' (' + (diff > 0 ? '초과' : '부족') + ')</div>' +
-            '<div class="validation-message">💡 금액을 수정해주세요. 선택된 청구서의 총 금액과 일치해야 합니다.</div>' +
-          '</div>' +
-        '</div>';
-      saveBtn.disabled = true;
-      saveBtn.classList.add('disabled');
+      return;
     }
+
+    // 금액이 총 청구금액보다 적은 경우 (부분결제)
+    var remaining = totalInvoiceAmount - inputAmount;
+    resultDiv.innerHTML =
+      '<div class="amount-validation warning">' +
+        '<div class="validation-icon">🔸</div>' +
+        '<div class="validation-details">' +
+          '<div class="validation-title">부분결제 처리됩니다.</div>' +
+          '<div class="validation-row">총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + ' (' + invoices.length + '건)</div>' +
+          '<div class="validation-row">결제금액: ₩' + inputAmount.toLocaleString() + '</div>' +
+          '<div class="validation-row">미수금: ₩' + remaining.toLocaleString() + '</div>' +
+          '<div class="validation-message">💡 부분결제로 처리되며, 추가 결제가 가능합니다.</div>' +
+        '</div>' +
+      '</div>';
+    saveBtn.disabled = false;
+    saveBtn.classList.remove('disabled');
   }
 
   /**
@@ -7372,9 +7408,11 @@
       totalInvoiceAmount += Number(invoice.amount) || 0;
     });
 
-    // 금액 일치 검증
-    if (amount !== totalInvoiceAmount) {
-      alert('❌ 결제금액과 총 청구금액이 일치하지 않습니다.\n금액을 확인해주세요.');
+    // 금액 검증 (부분결제 허용)
+    if (amount > totalInvoiceAmount) {
+      alert('❌ 결제금액이 총 청구금액을 초과합니다.\n' +
+            '총 청구금액: ₩' + totalInvoiceAmount.toLocaleString() + '\n' +
+            '입력 금액: ₩' + amount.toLocaleString());
       return;
     }
 
