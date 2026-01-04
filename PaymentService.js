@@ -422,6 +422,14 @@ function getPaymentRecords(params) {
           if (invoiceSheet) {
             var invoiceData = invoiceSheet.getDataRange().getValues();
             var invoiceHeader = invoiceData[0];
+
+            // 헤더 정보 출력 (첫 10개 컬럼)
+            var headerSample = [];
+            for (var h = 0; h < Math.min(10, invoiceHeader.length); h++) {
+              headerSample.push(h + ':"' + invoiceHeader[h] + '"');
+            }
+            Logger.log('[getPaymentRecords] 청구서 헤더: ' + headerSample.join(', '));
+
             var colInv = function(name) { return invoiceHeader.indexOf(name); };
 
             var cInvId = colInv('청구서ID');
