@@ -38,6 +38,8 @@ function getPageTemplateName_(page) {
       return 'Page_InvoiceManagement';
     case 'paymentManagement':
       return 'Page_PaymentManagement';
+    case 'receivable':
+      return 'Page_ReceivableManagement';
     case 'settings':
       return 'Page_Settings';
     default:
