@@ -1125,7 +1125,56 @@
           return;
         }
 
-        alert('PDF 청구서 생성은 기존 명세서 출력 기능을 활용합니다.\n발주번호별 출력 탭에서 해당 거래처의 발주서를 선택하여 "거래명세서" 유형으로 출력하세요.');
+        // 발주번호 목록 추출 (중복 제거)
+        var orderCodes = [];
+        var orderCodeSet = {};
+        billingState.currentData.items.forEach(function(item) {
+          if (item.orderCode && !orderCodeSet[item.orderCode]) {
+            orderCodes.push(item.orderCode);
+            orderCodeSet[item.orderCode] = true;
+          }
+        });
+
+        if (orderCodes.length === 0) {
+          alert('발주번호를 찾을 수 없습니다.');
+          return;
+        }
+
+        if (!confirm('총 ' + orderCodes.length + '개 발주번호에 대한 거래명세서를 생성하시겠습니까?')) {
+          return;
+        }
+
+        OB.showLoading('PDF 생성 중...');
+
+        var params = {
+          orderCodes: orderCodes,
+          docType: '거래명세서(영세)',
+          printMode: 'auto',
+          modesByOrder: {},
+          mergeBySupplier: false
+        };
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            OB.hideLoading();
+
+            if (!res || !res.success) {
+              alert(res ? res.error : "PDF 생성 중 오류가 발생했습니다.");
+              return;
+            }
+
+            // ZIP 다운로드 URL 오픈
+            var url = "https://drive.google.com/uc?export=download&id=" + res.fileId;
+            window.open(url, "_blank");
+
+            alert('✅ PDF 생성 완료!\n파일: ' + res.fileName);
+          })
+          .withFailureHandler(function(err) {
+            OB.hideLoading();
+            console.error('❌ PDF 생성 실패:', err);
+            alert("PDF 생성 실패: " + (err.message || err));
+          })
+          .generateInvoiceZipApi(params);
       });
     }
 
