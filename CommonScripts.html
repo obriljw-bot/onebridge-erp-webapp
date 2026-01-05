@@ -1191,13 +1191,24 @@
           return;
         }
 
+        // 발주번호 목록 추출 (중복 제거)
+        var orderCodes = [];
+        var orderCodeSet = {};
+        billingState.currentData.items.forEach(function(item) {
+          if (item.orderCode && !orderCodeSet[item.orderCode]) {
+            orderCodes.push(item.orderCode);
+            orderCodeSet[item.orderCode] = true;
+          }
+        });
+
         var params = {
           settlementId: '',
           type: 'SALES',
           company: billingState.company,
           billingDate: new Date(),
           amount: billingState.currentData.totalAmount,
-          notes: billingState.startDate + ' ~ ' + billingState.endDate + ' 청구'
+          notes: billingState.startDate + ' ~ ' + billingState.endDate + ' 청구',
+          orderNumbers: orderCodes  // 발주번호 목록 추가
         };
 
         OB.showLoading('청구서 저장 중...');
