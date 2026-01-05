@@ -1381,3 +1381,133 @@ function getMonthlyClosings() {
     };
   }
 }
+
+/**
+ * 일괄 청구서 데이터 집계
+ * @param {Object} params - { company, startDate, endDate }
+ * @returns {Object} - 집계 결과
+ */
+function aggregateInvoiceData(params) {
+  try {
+    var company = params.company || '';
+    var startDate = params.startDate || '';
+    var endDate = params.endDate || '';
+
+    Logger.log('[aggregateInvoiceData] 시작 - 거래처:' + company + ', 기간:' + startDate + '~' + endDate);
+
+    if (!company) {
+      return {
+        success: false,
+        error: '거래처를 입력해주세요.'
+      };
+    }
+
+    // 거래원장 데이터 로드
+    var sheet = getOrderMergedSheet();
+    if (!sheet) {
+      return {
+        success: false,
+        error: '거래원장 시트를 찾을 수 없습니다.'
+      };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) {
+      return {
+        success: false,
+        error: '거래원장에 데이터가 없습니다.'
+      };
+    }
+
+    var headers = data[0];
+    var rows = data.slice(1);
+
+    // 컬럼 인덱스 찾기
+    var idx발주번호 = headers.indexOf('발주번호');
+    var idx발주일 = headers.indexOf('발주일');
+    var idx발주처 = headers.indexOf('발주처');
+    var idx매입처 = headers.indexOf('매입처');
+    var idx브랜드 = headers.indexOf('브랜드');
+    var idx제품명 = headers.indexOf('제품명');
+    var idx품목코드 = headers.indexOf('품목코드');
+    var idx발주수량 = headers.indexOf('발주수량');
+    var idx확정수량 = headers.indexOf('확정수량');
+    var idx공급가 = headers.indexOf('공급가');
+
+    Logger.log('[aggregateInvoiceData] 컬럼 인덱스 - 발주처:' + idx발주처 + ', 발주일:' + idx발주일);
+
+    // 날짜 필터링을 위한 Date 객체 생성
+    var filterStartDate = startDate ? new Date(startDate) : null;
+    var filterEndDate = endDate ? new Date(endDate) : null;
+
+    if (filterEndDate) {
+      filterEndDate.setHours(23, 59, 59, 999); // 종료일 23:59:59까지 포함
+    }
+
+    // 필터링 및 집계
+    var items = [];
+    var totalItems = 0;
+    var totalOrderQty = 0;
+    var totalConfirmedQty = 0;
+    var totalAmount = 0;
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+
+      // 발주처 필터
+      var 발주처 = String(row[idx발주처] || '');
+      if (발주처.indexOf(company) === -1) continue;
+
+      // 기간 필터
+      var 발주일 = row[idx발주일];
+      if (발주일) {
+        var 발주일Date = 발주일 instanceof Date ? 발주일 : new Date(발주일);
+        
+        if (filterStartDate && 발주일Date < filterStartDate) continue;
+        if (filterEndDate && 발주일Date > filterEndDate) continue;
+      }
+
+      // 데이터 추출
+      var 발주수량 = Number(row[idx발주수량]) || 0;
+      var 확정수량 = Number(row[idx확정수량]) || 0;
+      var 공급가 = Number(row[idx공급가]) || 0;
+      var 공급액 = 확정수량 * 공급가;
+
+      items.push({
+        orderCode: String(row[idx발주번호] || ''),
+        orderDate: formatDateString(발주일),
+        supplier: String(row[idx매입처] || ''),
+        brand: String(row[idx브랜드] || ''),
+        productName: String(row[idx제품명] || ''),
+        productCode: String(row[idx품목코드] || ''),
+        orderQty: 발주수량,
+        confirmedQty: 확정수량,
+        supplyPrice: 공급가,
+        supplyAmount: 공급액
+      });
+
+      totalItems++;
+      totalOrderQty += 발주수량;
+      totalConfirmedQty += 확정수량;
+      totalAmount += 공급액;
+    }
+
+    Logger.log('[aggregateInvoiceData] 완료 - 품목수:' + totalItems + ', 총 금액:' + totalAmount);
+
+    return {
+      success: true,
+      items: items,
+      totalItems: totalItems,
+      totalOrderQty: totalOrderQty,
+      totalConfirmedQty: totalConfirmedQty,
+      totalAmount: totalAmount
+    };
+
+  } catch (error) {
+    Logger.log('[aggregateInvoiceData] ❌ 오류: ' + error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
