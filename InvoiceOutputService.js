@@ -13,7 +13,7 @@
  * 메인 엔드포인트
  * @param {Object} params
  *   - orderCodes: string[]   발주번호 배열
- *   - docType:    string     문서 유형 (예: 'INVOICE_VAT')
+ *   - docType:    string     문서 유형 (예: 'INVOICE_VAT', 'ORDER_PURCHASE', 'INVOICE_NVAT')
  *   - printMode:  string     기본 출력 모드 ('full' | 'short' | 'auto')
  *   - modesByOrder: Object   발주번호별 개별 출력 모드 { orderCode: mode }
  *   - mergeBySupplier: boolean  매입처별 통합 출력 여부
@@ -25,6 +25,8 @@ function generateInvoiceZip(params) {
   var printMode   = params.printMode   || 'auto';
   var modesByOrder = params.modesByOrder || {};
   var mergeBySupplier = params.mergeBySupplier || false;
+
+  Logger.log('[generateInvoiceZip] 시작 - docType: ' + docType + ', orderCodes: ' + orderCodes.length + '건');
 
   if (!orderCodes.length) {
     return {
@@ -118,17 +120,36 @@ function generateInvoiceZip(params) {
 
         var pdfBlob;
         var dateStr = formatDateYmd_(group.orderDate).replace(/-/g, '');
+        var fileName = '';
 
         switch (docType) {
           case 'INVOICE_VAT':
-          default:
-            // 통합 PDF 생성 (브랜드별 출력방식 적용)
+            // 거래명세서(부포) - VAT 포함
             pdfBlob = buildInvoiceVatPdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
+            fileName = '원브릿지_' + supplier + '_거래명세서(부포)_' + dateStr + '.pdf';
+            break;
+
+          case 'INVOICE_NVAT':
+            // 거래명세서(영세) - VAT 제외
+            pdfBlob = buildInvoiceNvatPdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
+            fileName = '원브릿지_' + supplier + '_거래명세서(영세)_' + dateStr + '.pdf';
+            break;
+
+          case 'ORDER_PURCHASE':
+            // 발주서(매입) - 부별/부포
+            pdfBlob = buildOrderPurchasePdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
+            fileName = '원브릿지_' + supplier + '_발주서(매입)_' + dateStr + '.pdf';
+            break;
+
+          default:
+            Logger.log('[generateInvoiceZip] 알 수 없는 문서 유형: ' + docType);
+            pdfBlob = buildInvoiceVatPdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
+            fileName = '원브릿지_' + supplier + '_문서_' + dateStr + '.pdf';
             break;
         }
 
         if (pdfBlob) {
-          pdfBlob.setName('거래명세서_VAT_' + supplier + '_' + dateStr + '.pdf');
+          pdfBlob.setName(fileName);
           pdfBlobs.push(pdfBlob);
           Logger.log('[generateInvoiceZip] 통합 PDF 생성 완료: ' + supplier + ' (' + groupOrderCodes.length + '개 발주)');
         }
@@ -158,16 +179,40 @@ function generateInvoiceZip(params) {
         var mode = modesByOrder[orderCode] || printMode || 'auto';
 
         var pdfBlob;
+        var fileName = '';
+        var firstRow = orderRows[0];
+        var brandName = header.indexOf('브랜드') >= 0 ? (firstRow[header.indexOf('브랜드')] || '') : '';
+        var orderDate = header.indexOf('발주일') >= 0 ? firstRow[header.indexOf('발주일')] : new Date();
+        var dateStr = formatDateYmd_(orderDate).replace(/-/g, '');
+        var partner = header.indexOf('매입처') >= 0 ? (firstRow[header.indexOf('매입처')] || '') : '';
 
         switch (docType) {
           case 'INVOICE_VAT':
+            // 거래명세서(부포) - VAT 포함
+            pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode);
+            fileName = '원브릿지_' + partner + '_거래명세서(부포)_' + brandName + '_' + dateStr + '.pdf';
+            break;
+
+          case 'INVOICE_NVAT':
+            // 거래명세서(영세) - VAT 제외
+            pdfBlob = buildInvoiceNvatPdf(orderCode, orderRows, header, mode);
+            fileName = '원브릿지_' + partner + '_거래명세서(영세)_' + brandName + '_' + dateStr + '.pdf';
+            break;
+
+          case 'ORDER_PURCHASE':
+            // 발주서(매입) - 부별/부포
+            pdfBlob = buildOrderPurchasePdf(orderCode, orderRows, header, mode);
+            fileName = '원브릿지_' + partner + '_발주서(매입)_' + brandName + '_' + dateStr + '.pdf';
+            break;
+
           default:
             pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode);
+            fileName = '원브릿지_' + partner + '_문서_' + brandName + '_' + dateStr + '.pdf';
             break;
         }
 
         if (pdfBlob) {
-          pdfBlob.setName('거래명세서_VAT_' + orderCode + '.pdf');
+          pdfBlob.setName(fileName);
           pdfBlobs.push(pdfBlob);
         }
       } catch (err) {
@@ -359,6 +404,498 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
 }
 
 /**
+ * 발주서 (매입) PDF 1건 생성
+ * - 거래원장 행 배열(orderRows)과 헤더를 기반으로 템플릿에 매핑
+ * - 수량 기준: 발주수량
+ * - 가격 기준: 매입가/매입액 (unitPrice/amount)
+ * - VAT 계산: 부가세구분에 따라 부별/부포 처리
+ */
+function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
+  // 거래원장 인덱스 정의
+  var idxDate          = header.indexOf('발주일');
+  var idxBrand         = header.indexOf('브랜드');
+  var idxSupplierName  = header.indexOf('매입처');
+  var idxBuyerName     = header.indexOf('발주처');
+  var idxVatType       = header.indexOf('부가세구분');
+  var idxProductName   = header.indexOf('제품명');
+  var idxProductCode   = header.indexOf('품목코드');
+  var idxQtyOrder      = header.indexOf('발주수량');
+  var idxUnitPrice     = header.indexOf('매입가');
+  var idxAmount        = header.indexOf('매입액');
+
+  if (idxDate === -1 || idxSupplierName === -1 || idxBuyerName === -1 || idxProductName === -1) {
+    throw new Error('거래원장 헤더 구성이 예상과 다릅니다. (발주일/매입처/발주처/제품명 확인 필요)');
+  }
+
+  // 발주 기준 정보
+  var firstRow   = orderRows[0];
+  var orderDate  = firstRow[idxDate];
+  var supplierNm = firstRow[idxSupplierName];
+  var buyerNm    = firstRow[idxBuyerName];
+  var vatType    = idxVatType >= 0 ? String(firstRow[idxVatType] || '부포') : '부포';
+
+  // 거래처 상세 정보(거래처DB) 조회
+  var supplierInfo = findPartnerByName_(supplierNm);
+  var buyerInfo    = findPartnerByName_(buyerNm);
+
+  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
+  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
+  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
+  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
+  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+
+  // 행 단위 품목 구성 (발주서는 발주수량 기준)
+  var qtyCol = idxQtyOrder >= 0 ? idxQtyOrder : header.indexOf('확정수량');
+
+  var items        = [];
+  var totalAmount  = 0;
+  var itemCount    = 0;
+  var brandName    = firstRow[idxBrand] || '';
+
+  for (var i = 0; i < orderRows.length; i++) {
+    var r   = orderRows[i];
+    var qty = Number(r[qtyCol] || 0);
+    if (!qty) continue;  // 수량 0은 출력 제외
+
+    // 발주서는 매입가/매입액 사용
+    var unitPrice = Number(idxUnitPrice >= 0 ? (r[idxUnitPrice] || 0) : 0);
+    var amount    = Number(idxAmount >= 0 ? (r[idxAmount] || 0) : (qty * unitPrice));
+
+    totalAmount += amount;
+    itemCount++;
+
+    var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
+    var name = r[idxProductName] || '';
+    var spec = '';
+
+    items.push({
+      code:   String(code),
+      name:   String(name),
+      spec:   String(spec),
+      qty:    formatNumber_(qty),
+      price:  formatNumber_(unitPrice),
+      amount: formatNumber_(amount),
+      note:   ''
+    });
+  }
+
+  // ========================================
+  // 출력방식 로직 적용
+  // ========================================
+  var actualMode = printMode;
+
+  // auto 모드: 품목수에 따라 자동 결정
+  if (printMode === 'auto') {
+    actualMode = itemCount <= 5 ? 'full' : 'short';
+  }
+
+  // short 모드: 품목 리스트를 축약
+  if (actualMode === 'short' && itemCount > 0) {
+    var summaryText = brandName + ' 총 ' + itemCount + '건';
+    items = [{
+      code:   '',
+      name:   summaryText,
+      spec:   '',
+      qty:    formatNumber_(itemCount),
+      price:  '',
+      amount: formatNumber_(totalAmount),
+      note:   '(단축 출력)'
+    }];
+  }
+
+  if (!items.length) {
+    items.push({
+      code: '', name: '', spec: '',
+      qty: '', price: '', amount: '', note: ''
+    });
+  }
+
+  // ========================================
+  // VAT 계산 (부별/부포 분기)
+  // ========================================
+  var totalSupply = 0;
+  var totalVat    = 0;
+
+  if (vatType === '부별') {
+    // 부별 (VAT separate): 총액을 1.1로 나누어 공급가액 계산
+    totalSupply = Math.round(totalAmount / 1.1);
+    totalVat = totalAmount - totalSupply;
+  } else {
+    // 부포 (VAT included): 총액 그대로, VAT는 10%
+    totalSupply = totalAmount;
+    totalVat = Math.round(totalSupply * 0.1);
+    totalAmount = totalSupply + totalVat;
+  }
+
+  var ctx = {
+    stampBase64:    getStampBase64_(),
+    logoBase64:     getLogoBase64_(),
+
+    supplierName:   supplierNm,
+    supplierBizNo:  supplierBizNo,
+    supplierManager:supplierManager,
+
+    buyerName:      buyerNm,
+    buyerBizNo:     buyerBizNo,
+    buyerPhone:     buyerPhone,
+    buyerAddress:   buyerAddress,
+
+    dueDate:        formatDateYmd_(orderDate),
+    orderCode:      orderCode,
+
+    totalSupply:    formatNumber_(totalSupply),
+    totalVat:       formatNumber_(totalVat),
+    totalAmount:    formatNumber_(totalAmount),
+    amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
+
+    items:          items,
+    buyerOrderCode: '',
+    remark:         vatType === '부별' ? '(부가세별도)' : '(부가세포함)'
+  };
+
+  // 발주서도 동일한 템플릿 사용 (Templates_Invoice_VAT)
+  var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
+
+  // 템플릿 변수 주입
+  Object.keys(ctx).forEach(function(k) {
+    tmpl[k] = ctx[k];
+  });
+
+  var html = tmpl.evaluate().getContent();
+  var blob = Utilities.newBlob(html, 'text/html', 'order_purchase_' + orderCode + '.html')
+    .getAs('application/pdf');
+
+  return blob;
+}
+
+/**
+ * 거래명세서 (영세/해외) PDF 1건 생성
+ * - 거래원장 행 배열(orderRows)과 헤더를 기반으로 템플릿에 매핑
+ * - 수량 기준: 확정수량
+ * - VAT 없음 (totalVat = 0)
+ */
+function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
+  // 거래원장 인덱스 정의
+  var idxDate          = header.indexOf('발주일');
+  var idxBrand         = header.indexOf('브랜드');
+  var idxSupplierName  = header.indexOf('매입처');
+  var idxBuyerName     = header.indexOf('발주처');
+  var idxProductName   = header.indexOf('제품명');
+  var idxProductCode   = header.indexOf('품목코드');
+  var idxQtyOrder      = header.indexOf('발주수량');
+  var idxQtyConfirmed  = header.indexOf('확정수량');
+  var idxSupplyPrice   = header.indexOf('공급가');
+  var idxSupplyAmount  = header.indexOf('공급액');
+
+  if (idxDate === -1 || idxSupplierName === -1 || idxBuyerName === -1 || idxProductName === -1) {
+    throw new Error('거래원장 헤더 구성이 예상과 다릅니다. (발주일/매입처/발주처/제품명 확인 필요)');
+  }
+
+  // 발주 기준 정보
+  var firstRow   = orderRows[0];
+  var orderDate  = firstRow[idxDate];
+  var supplierNm = firstRow[idxSupplierName];
+  var buyerNm    = firstRow[idxBuyerName];
+
+  // 거래처 상세 정보(거래처DB) 조회
+  var supplierInfo = findPartnerByName_(supplierNm);
+  var buyerInfo    = findPartnerByName_(buyerNm);
+
+  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
+  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
+  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
+  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
+  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+
+  // 행 단위 품목 구성
+  var qtyCol = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder; // 거래명세서 → 확정수량 우선
+
+  var items        = [];
+  var totalSupply  = 0;
+  var itemCount    = 0;
+  var brandName    = firstRow[idxBrand] || '';
+
+  for (var i = 0; i < orderRows.length; i++) {
+    var r   = orderRows[i];
+    var qty = Number(r[qtyCol] || 0);
+    if (!qty) continue;  // 수량 0은 출력 제외
+
+    var supplyPrice = Number(idxSupplyPrice >= 0 ? (r[idxSupplyPrice] || 0) : 0);
+    var supply = Number(idxSupplyAmount >= 0 ? (r[idxSupplyAmount] || 0) : (qty * supplyPrice));
+
+    totalSupply += supply;
+    itemCount++;
+
+    var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
+    var name = r[idxProductName] || '';
+    var spec = '';
+
+    items.push({
+      code:   String(code),
+      name:   String(name),
+      spec:   String(spec),
+      qty:    formatNumber_(qty),
+      price:  formatNumber_(supplyPrice),
+      amount: formatNumber_(supply),
+      note:   ''
+    });
+  }
+
+  // ========================================
+  // 출력방식 로직 적용
+  // ========================================
+  var actualMode = printMode;
+
+  // auto 모드: 품목수에 따라 자동 결정
+  if (printMode === 'auto') {
+    actualMode = itemCount <= 5 ? 'full' : 'short';
+  }
+
+  // short 모드: 품목 리스트를 축약
+  if (actualMode === 'short' && itemCount > 0) {
+    var summaryText = brandName + ' 총 ' + itemCount + '건';
+    items = [{
+      code:   '',
+      name:   summaryText,
+      spec:   '',
+      qty:    formatNumber_(itemCount),
+      price:  '',
+      amount: formatNumber_(totalSupply),
+      note:   '(단축 출력)'
+    }];
+  }
+
+  if (!items.length) {
+    items.push({
+      code: '', name: '', spec: '',
+      qty: '', price: '', amount: '', note: ''
+    });
+  }
+
+  // 영세율: VAT = 0
+  var totalVat = 0;
+  var totalAmount = totalSupply;
+
+  var ctx = {
+    stampBase64:    getStampBase64_(),
+    logoBase64:     getLogoBase64_(),
+
+    supplierName:   supplierNm,
+    supplierBizNo:  supplierBizNo,
+    supplierManager:supplierManager,
+
+    buyerName:      buyerNm,
+    buyerBizNo:     buyerBizNo,
+    buyerPhone:     buyerPhone,
+    buyerAddress:   buyerAddress,
+
+    dueDate:        formatDateYmd_(orderDate),
+    orderCode:      orderCode,
+
+    totalSupply:    formatNumber_(totalSupply),
+    totalVat:       formatNumber_(totalVat),
+    totalAmount:    formatNumber_(totalAmount),
+    amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
+
+    items:          items,
+    buyerOrderCode: '',
+    remark:         '(영세율)'
+  };
+
+  var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
+
+  // 템플릿 변수 주입
+  Object.keys(ctx).forEach(function(k) {
+    tmpl[k] = ctx[k];
+  });
+
+  var html = tmpl.evaluate().getContent();
+  var blob = Utilities.newBlob(html, 'text/html', 'invoice_nvat_' + orderCode + '.html')
+    .getAs('application/pdf');
+
+  return blob;
+}
+
+/**
+ * 통합 거래명세서 (영세/해외) PDF 생성
+ * - 여러 발주번호(브랜드)의 데이터를 하나의 PDF로 통합
+ * - 브랜드별 출력방식 개별 적용
+ * - VAT 없음 (totalVat = 0)
+ * @param {string[]} orderCodes 통합할 발주번호 배열
+ * @param {Array} allOrderRows 모든 발주의 행 데이터
+ * @param {Array} header 거래원장 헤더
+ * @param {Object} modesByOrder 발주번호별 출력방식
+ * @param {string} defaultMode 기본 출력방식
+ */
+function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrder, defaultMode) {
+  // 거래원장 인덱스 정의
+  var idxDate          = header.indexOf('발주일');
+  var idxOrderNo       = header.indexOf('발주번호');
+  var idxBrand         = header.indexOf('브랜드');
+  var idxSupplierName  = header.indexOf('매입처');
+  var idxBuyerName     = header.indexOf('발주처');
+  var idxProductName   = header.indexOf('제품명');
+  var idxProductCode   = header.indexOf('품목코드');
+  var idxQtyOrder      = header.indexOf('발주수량');
+  var idxQtyConfirmed  = header.indexOf('확정수량');
+  var idxSupplyPrice   = header.indexOf('공급가');
+  var idxSupplyAmount  = header.indexOf('공급액');
+
+  if (idxDate === -1 || idxSupplierName === -1 || idxBuyerName === -1 || idxProductName === -1) {
+    throw new Error('거래원장 헤더 구성이 예상과 다릅니다. (발주일/매입처/발주처/제품명 확인 필요)');
+  }
+
+  // 발주 기준 정보 (첫 번째 행 기준)
+  var firstRow   = allOrderRows[0];
+  var orderDate  = firstRow[idxDate];
+  var supplierNm = firstRow[idxSupplierName];
+  var buyerNm    = firstRow[idxBuyerName];
+
+  // 거래처 상세 정보(거래처DB) 조회
+  var supplierInfo = findPartnerByName_(supplierNm);
+  var buyerInfo    = findPartnerByName_(buyerNm);
+
+  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
+  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
+  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
+  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
+  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+
+  // ========================================
+  // 발주번호(브랜드)별로 품목 그룹핑
+  // ========================================
+  var qtyCol = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder;
+
+  var orderGroups = {};  // { orderCode: { brandName, items: [], mode, itemCount, totalSupply } }
+
+  for (var i = 0; i < allOrderRows.length; i++) {
+    var r = allOrderRows[i];
+    var orderCode = String(r[idxOrderNo]);
+    var brandName = String(r[idxBrand] || '');
+    var qty = Number(r[qtyCol] || 0);
+
+    if (!qty) continue;  // 수량 0은 제외
+
+    if (!orderGroups[orderCode]) {
+      orderGroups[orderCode] = {
+        brandName: brandName,
+        items: [],
+        itemCount: 0,
+        totalSupply: 0
+      };
+    }
+
+    var supplyPrice = Number(idxSupplyPrice >= 0 ? (r[idxSupplyPrice] || 0) : 0);
+    var supply = Number(idxSupplyAmount >= 0 ? (r[idxSupplyAmount] || 0) : (qty * supplyPrice));
+
+    orderGroups[orderCode].totalSupply += supply;
+    orderGroups[orderCode].itemCount++;
+
+    var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
+    var name = r[idxProductName] || '';
+
+    orderGroups[orderCode].items.push({
+      code:   String(code),
+      name:   String(name),
+      spec:   '',
+      qty:    formatNumber_(qty),
+      price:  formatNumber_(supplyPrice),
+      amount: formatNumber_(supply),
+      note:   ''
+    });
+  }
+
+  // ========================================
+  // 브랜드별 출력방식 적용 + 전체 품목 리스트 생성
+  // ========================================
+  var allItems = [];
+  var grandTotalSupply = 0;
+
+  for (var orderCode in orderGroups) {
+    var group = orderGroups[orderCode];
+    var mode = modesByOrder[orderCode] || defaultMode || 'auto';
+
+    // auto 모드: 품목수에 따라 결정
+    var actualMode = mode;
+    if (mode === 'auto') {
+      actualMode = group.itemCount <= 5 ? 'full' : 'short';
+    }
+
+    // short 모드: 축약
+    if (actualMode === 'short' && group.itemCount > 0) {
+      var summaryText = group.brandName + ' 총 ' + group.itemCount + '건';
+      allItems.push({
+        code:   '',
+        name:   summaryText,
+        spec:   '',
+        qty:    formatNumber_(group.itemCount),
+        price:  '',
+        amount: formatNumber_(group.totalSupply),
+        note:   '(단축 출력)'
+      });
+    } else {
+      // full 모드: 전체 품목 추가
+      allItems = allItems.concat(group.items);
+    }
+
+    grandTotalSupply += group.totalSupply;
+  }
+
+  if (!allItems.length) {
+    allItems.push({
+      code: '', name: '', spec: '',
+      qty: '', price: '', amount: '', note: ''
+    });
+  }
+
+  // 영세율: VAT = 0
+  var totalVat = 0;
+  var totalAmount = grandTotalSupply;
+
+  // ========================================
+  // 템플릿 컨텍스트 생성
+  // ========================================
+  var ctx = {
+    stampBase64:    getStampBase64_(),
+    logoBase64:     getLogoBase64_(),
+
+    supplierName:   supplierNm,
+    supplierBizNo:  supplierBizNo,
+    supplierManager:supplierManager,
+
+    buyerName:      buyerNm,
+    buyerBizNo:     buyerBizNo,
+    buyerPhone:     buyerPhone,
+    buyerAddress:   buyerAddress,
+
+    dueDate:        formatDateYmd_(orderDate),
+    orderCode:      orderCodes.join(', '),  // 여러 발주번호 표시
+
+    totalSupply:    formatNumber_(grandTotalSupply),
+    totalVat:       formatNumber_(totalVat),
+    totalAmount:    formatNumber_(totalAmount),
+    amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
+
+    items:          allItems,
+    buyerOrderCode: '',
+    remark:         '(영세율)'
+  };
+
+  var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
+
+  // 템플릿 변수 주입
+  Object.keys(ctx).forEach(function(k) {
+    tmpl[k] = ctx[k];
+  });
+
+  var html = tmpl.evaluate().getContent();
+  var blob = Utilities.newBlob(html, 'text/html', 'invoice_nvat_merged.html')
+    .getAs('application/pdf');
+
+  return blob;
+}
+
+/**
  * 거래처DB에서 거래처명으로 1건 조회
  * @param {string} name
  * @return {Object|null}
@@ -484,6 +1021,199 @@ function numberToHangulKor_(num) {
   }
 
   return result + ' 원';
+}
+
+/**
+ * 통합 발주서 (매입) PDF 생성
+ * - 여러 발주번호(브랜드)의 데이터를 하나의 PDF로 통합
+ * - 브랜드별 출력방식 개별 적용
+ * - VAT 계산: 부가세구분에 따라 부별/부포 처리
+ * @param {string[]} orderCodes 통합할 발주번호 배열
+ * @param {Array} allOrderRows 모든 발주의 행 데이터
+ * @param {Array} header 거래원장 헤더
+ * @param {Object} modesByOrder 발주번호별 출력방식
+ * @param {string} defaultMode 기본 출력방식
+ */
+function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOrder, defaultMode) {
+  // 거래원장 인덱스 정의
+  var idxDate          = header.indexOf('발주일');
+  var idxOrderNo       = header.indexOf('발주번호');
+  var idxBrand         = header.indexOf('브랜드');
+  var idxSupplierName  = header.indexOf('매입처');
+  var idxBuyerName     = header.indexOf('발주처');
+  var idxVatType       = header.indexOf('부가세구분');
+  var idxProductName   = header.indexOf('제품명');
+  var idxProductCode   = header.indexOf('품목코드');
+  var idxQtyOrder      = header.indexOf('발주수량');
+  var idxUnitPrice     = header.indexOf('매입가');
+  var idxAmount        = header.indexOf('매입액');
+
+  if (idxDate === -1 || idxSupplierName === -1 || idxBuyerName === -1 || idxProductName === -1) {
+    throw new Error('거래원장 헤더 구성이 예상과 다릅니다. (발주일/매입처/발주처/제품명 확인 필요)');
+  }
+
+  // 발주 기준 정보 (첫 번째 행 기준)
+  var firstRow   = allOrderRows[0];
+  var orderDate  = firstRow[idxDate];
+  var supplierNm = firstRow[idxSupplierName];
+  var buyerNm    = firstRow[idxBuyerName];
+  var vatType    = idxVatType >= 0 ? String(firstRow[idxVatType] || '부포') : '부포';
+
+  // 거래처 상세 정보(거래처DB) 조회
+  var supplierInfo = findPartnerByName_(supplierNm);
+  var buyerInfo    = findPartnerByName_(buyerNm);
+
+  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
+  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
+  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
+  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
+  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+
+  // ========================================
+  // 발주번호(브랜드)별로 품목 그룹핑
+  // ========================================
+  var qtyCol = idxQtyOrder >= 0 ? idxQtyOrder : header.indexOf('확정수량');
+
+  var orderGroups = {};  // { orderCode: { brandName, items: [], mode, itemCount, totalAmount } }
+
+  for (var i = 0; i < allOrderRows.length; i++) {
+    var r = allOrderRows[i];
+    var orderCode = String(r[idxOrderNo]);
+    var brandName = String(r[idxBrand] || '');
+    var qty = Number(r[qtyCol] || 0);
+
+    if (!qty) continue;  // 수량 0은 제외
+
+    if (!orderGroups[orderCode]) {
+      orderGroups[orderCode] = {
+        brandName: brandName,
+        items: [],
+        itemCount: 0,
+        totalAmount: 0
+      };
+    }
+
+    var unitPrice = Number(idxUnitPrice >= 0 ? (r[idxUnitPrice] || 0) : 0);
+    var amount    = Number(idxAmount >= 0 ? (r[idxAmount] || 0) : (qty * unitPrice));
+
+    orderGroups[orderCode].totalAmount += amount;
+    orderGroups[orderCode].itemCount++;
+
+    var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
+    var name = r[idxProductName] || '';
+
+    orderGroups[orderCode].items.push({
+      code:   String(code),
+      name:   String(name),
+      spec:   '',
+      qty:    formatNumber_(qty),
+      price:  formatNumber_(unitPrice),
+      amount: formatNumber_(amount),
+      note:   ''
+    });
+  }
+
+  // ========================================
+  // 브랜드별 출력방식 적용 + 전체 품목 리스트 생성
+  // ========================================
+  var allItems = [];
+  var grandTotalAmount = 0;
+
+  for (var orderCode in orderGroups) {
+    var group = orderGroups[orderCode];
+    var mode = modesByOrder[orderCode] || defaultMode || 'auto';
+
+    // auto 모드: 품목수에 따라 결정
+    var actualMode = mode;
+    if (mode === 'auto') {
+      actualMode = group.itemCount <= 5 ? 'full' : 'short';
+    }
+
+    // short 모드: 축약
+    if (actualMode === 'short' && group.itemCount > 0) {
+      var summaryText = group.brandName + ' 총 ' + group.itemCount + '건';
+      allItems.push({
+        code:   '',
+        name:   summaryText,
+        spec:   '',
+        qty:    formatNumber_(group.itemCount),
+        price:  '',
+        amount: formatNumber_(group.totalAmount),
+        note:   '(단축 출력)'
+      });
+    } else {
+      // full 모드: 전체 품목 추가
+      allItems = allItems.concat(group.items);
+    }
+
+    grandTotalAmount += group.totalAmount;
+  }
+
+  if (!allItems.length) {
+    allItems.push({
+      code: '', name: '', spec: '',
+      qty: '', price: '', amount: '', note: ''
+    });
+  }
+
+  // ========================================
+  // VAT 계산 (부별/부포 분기)
+  // ========================================
+  var totalSupply = 0;
+  var totalVat    = 0;
+
+  if (vatType === '부별') {
+    // 부별 (VAT separate): 총액을 1.1로 나누어 공급가액 계산
+    totalSupply = Math.round(grandTotalAmount / 1.1);
+    totalVat = grandTotalAmount - totalSupply;
+  } else {
+    // 부포 (VAT included): 총액 그대로, VAT는 10%
+    totalSupply = grandTotalAmount;
+    totalVat = Math.round(totalSupply * 0.1);
+    grandTotalAmount = totalSupply + totalVat;
+  }
+
+  // ========================================
+  // 템플릿 컨텍스트 생성
+  // ========================================
+  var ctx = {
+    stampBase64:    getStampBase64_(),
+    logoBase64:     getLogoBase64_(),
+
+    supplierName:   supplierNm,
+    supplierBizNo:  supplierBizNo,
+    supplierManager:supplierManager,
+
+    buyerName:      buyerNm,
+    buyerBizNo:     buyerBizNo,
+    buyerPhone:     buyerPhone,
+    buyerAddress:   buyerAddress,
+
+    dueDate:        formatDateYmd_(orderDate),
+    orderCode:      orderCodes.join(', '),  // 여러 발주번호 표시
+
+    totalSupply:    formatNumber_(totalSupply),
+    totalVat:       formatNumber_(totalVat),
+    totalAmount:    formatNumber_(grandTotalAmount),
+    amountHangul:   numberToHangulKor_(Math.round(grandTotalAmount)),
+
+    items:          allItems,
+    buyerOrderCode: '',
+    remark:         vatType === '부별' ? '(부가세별도)' : '(부가세포함)'
+  };
+
+  var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
+
+  // 템플릿 변수 주입
+  Object.keys(ctx).forEach(function(k) {
+    tmpl[k] = ctx[k];
+  });
+
+  var html = tmpl.evaluate().getContent();
+  var blob = Utilities.newBlob(html, 'text/html', 'order_purchase_merged.html')
+    .getAs('application/pdf');
+
+  return blob;
 }
 
 /**
