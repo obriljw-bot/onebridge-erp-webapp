@@ -320,6 +320,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
 
   var ctx = {
     stampBase64:    getStampBase64_(),
+    logoBase64:     getLogoBase64_(),
 
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
@@ -403,6 +404,21 @@ function getStampBase64_() {
   try {
     var props = PropertiesService.getScriptProperties();
     var v = props.getProperty('STAMP_BASE64') || '';
+    return v;
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * 로고 이미지 Base64 조회
+ * - 우선 Script Properties에서 LOGO_BASE64 값을 읽고,
+ *   없으면 빈 문자열 반환
+ */
+function getLogoBase64_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var v = props.getProperty('LOGO_BASE64') || '';
     return v;
   } catch (e) {
     return '';
@@ -621,6 +637,7 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
   // ========================================
   var ctx = {
     stampBase64:    getStampBase64_(),
+    logoBase64:     getLogoBase64_(),
 
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,

@@ -5,286 +5,562 @@
 <style>
   * {
     box-sizing: border-box;
-  }
-  body {
     margin: 0;
     padding: 0;
-    font-family: 'Malgun Gothic', sans-serif;
-    font-size: 11px;
-    color: #000;
   }
+
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    font-size: 11px;
+    color: #1e293b;
+    background: #ffffff;
+  }
+
   .page {
     position: relative;
     width: 210mm;
     min-height: 297mm;
-    padding: 15mm 15mm 20mm 15mm;
+    padding: 0;
+    background: #ffffff;
   }
 
-  .title {
+  /* ===== 헤더 영역 ===== */
+  .header {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: #ffffff;
+    padding: 20px 30px;
+    display: grid;
+    grid-template-columns: 140px 1fr 140px;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 4px solid #f97316;
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+  }
+
+  .logo-area img {
+    max-width: 120px;
+    max-height: 50px;
+    object-fit: contain;
+  }
+
+  .logo-placeholder {
+    width: 120px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .title-area {
     text-align: center;
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 10mm;
   }
 
-  /* 인감 */
-  .stamp {
+  .doc-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .doc-subtitle {
+    font-size: 11px;
+    color: #cbd5e1;
+    letter-spacing: 0.05em;
+  }
+
+  .header-info {
+    text-align: right;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .header-info-label {
+    color: #94a3b8;
+    font-size: 10px;
+  }
+
+  .header-info-value {
+    font-weight: 600;
+    color: #f1f5f9;
+  }
+
+  /* ===== 인감 워터마크 ===== */
+  .stamp-watermark {
     position: absolute;
-    top: 52mm;
+    top: 90mm;
     left: 50%;
     transform: translateX(-50%);
-    width: 32mm;
-    opacity: 0.7;
+    width: 35mm;
+    opacity: 0.15;
+    z-index: 1;
   }
 
-  table {
+  /* ===== 컨텐츠 영역 ===== */
+  .content {
+    padding: 25px 30px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ===== 거래처 정보 영역 (대칭) ===== */
+  .partners-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 25px;
+  }
+
+  .partner-box {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  }
+
+  .partner-header {
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .partner-header::before {
+    content: '';
+    width: 4px;
+    height: 16px;
+    background: #f97316;
+    border-radius: 2px;
+  }
+
+  .partner-body {
+    padding: 14px 16px;
+  }
+
+  .partner-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .partner-row:last-child {
+    border-bottom: none;
+  }
+
+  .partner-label {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+
+  .partner-value {
+    font-size: 11px;
+    color: #1e293b;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+  }
+
+  /* ===== 금액 요약 박스 ===== */
+  .summary-box {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+
+  .summary-item {
+    text-align: center;
+    padding: 10px;
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .summary-label {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .summary-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    font-family: 'Courier New', monospace;
+  }
+
+  .summary-total {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: #ffffff;
+    padding: 14px 20px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .summary-total-label {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .summary-total-amount {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+
+  .summary-hangul {
+    text-align: right;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #475569;
+    font-style: italic;
+  }
+
+  /* ===== 품목 테이블 ===== */
+  .items-section {
+    margin-bottom: 25px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    background: #f97316;
+    border-radius: 2px;
+  }
+
+  .items-table {
     width: 100%;
     border-collapse: collapse;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
   }
 
-  .bordered td, .bordered th {
-    border: 1px solid #000;
+  .items-table thead {
+    background: linear-gradient(135deg, #334155 0%, #475569 100%);
+    color: #ffffff;
   }
 
-  .header-table {
-    margin-bottom: 4mm;
-  }
-  .header-table td {
-    padding: 2px 4px;
-  }
-  .header-label {
-    width: 12mm;
+  .items-table th {
+    padding: 10px 8px;
+    font-size: 10px;
+    font-weight: 700;
     text-align: center;
-    font-weight: bold;
-  }
-  .header-subtitle {
-    width: 15mm;
-    text-align: center;
-    font-weight: bold;
-    background: #e5e5e5;
-  }
-  .header-cell-label {
-    width: 18mm;
-    text-align: center;
-    font-weight: bold;
-    background: #f5f5f5;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  /* 총액 줄 */
-  .total-line {
-    margin-bottom: 2mm;
+  .items-table th:last-child {
+    border-right: none;
   }
-  .total-line td {
-    border: 1px solid #000;
-    padding: 4px 6px;
+
+  .items-table td {
+    padding: 8px;
+    font-size: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #f1f5f9;
+  }
+
+  .items-table td:last-child {
+    border-right: none;
+  }
+
+  .items-table tbody tr:nth-child(odd) {
+    background: #ffffff;
+  }
+
+  .items-table tbody tr:nth-child(even) {
+    background: #f8fafc;
+  }
+
+  .items-table tbody tr:hover {
+    background: #fef3c7;
+  }
+
+  .col-no { width: 8mm; text-align: center; }
+  .col-code { width: 24mm; text-align: center; font-family: 'Courier New', monospace; }
+  .col-name { width: auto; text-align: left; padding-left: 10px; }
+  .col-spec { width: 18mm; text-align: center; }
+  .col-qty { width: 18mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; }
+  .col-price { width: 24mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; }
+  .col-amt { width: 28mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; font-weight: 600; }
+  .col-note { width: 18mm; text-align: left; font-size: 9px; color: #64748b; }
+
+  /* ===== 비고 영역 ===== */
+  .remark-section {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  .remark-header {
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 8px 16px;
+    font-weight: 700;
     font-size: 11px;
-  }
-  .total-caption {
-    width: 35mm;
-    text-align: center;
-    font-weight: bold;
-    background: #f5f5f5;
-  }
-  .total-number {
-    width: 40mm;
-    text-align: left;
-    font-weight: bold;
-  }
-  .total-kor-label {
-    width: 25mm;
-    text-align: center;
-    font-weight: bold;
-    background: #f5f5f5;
-  }
-  .total-kor-text {
-    text-align: left;
+    color: #334155;
   }
 
-  /* 품목 테이블 */
-  .item-table th, .item-table td {
-    border: 1px solid #000;
-    padding: 4px 3px;
-  }
-  .item-table th {
-    background: #f5f5f5;
-    text-align: center;
-    font-weight: bold;
-  }
-  .col-no    { width: 10mm; text-align:center; }
-  .col-code  { width: 25mm; text-align:center; }
-  .col-name  { width: auto; text-align:left; }
-  .col-spec  { width: 18mm; text-align:center; }
-  .col-qty   { width: 20mm; text-align:right; }
-  .col-price { width: 25mm; text-align:right; }
-  .col-amt   { width: 30mm; text-align:right; }
-  .col-note  { width: 20mm; text-align:left; }
-
-  /* 합계 영역 */
-  .summary-block {
-    margin-top: 4mm;
-    margin-bottom: 6mm;
-  }
-  .summary-block td {
-    padding: 4px 6px;
-    font-size: 11px;
-  }
-  .summary-label {
-    width: 25mm;
-    font-weight: bold;
-    text-align: right;
-    padding-right: 8mm;
-  }
-  .summary-value {
-    border-bottom: 1px solid #000;
-    text-align: right;
-    padding-right: 4mm;
-    width: 35mm;
-  }
-
-  /* 비고 영역 */
-  .remark-table td {
-    border: 1px solid #000;
-  }
-  .remark-label {
-    width: 15mm;
-    background: #e5e5e5;
-    text-align: center;
-    font-weight: bold;
-  }
   .remark-body {
-    height: 45mm;
-    padding: 5px;
-    vertical-align: top;
+    padding: 14px 16px;
+    min-height: 50mm;
+    font-size: 10px;
+    line-height: 1.6;
+    color: #475569;
   }
 
+  .remark-label {
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+
+  /* ===== 푸터 ===== */
+  .footer {
+    position: absolute;
+    bottom: 15mm;
+    left: 30px;
+    right: 30px;
+    text-align: center;
+    font-size: 9px;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+  }
+
+  /* ===== 인쇄 최적화 ===== */
+  @media print {
+    .page {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #ffffff;
+    }
+  }
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- 인감 (설정에서 base64 넘기면 자동 표시, 없으면 빈 문자열) -->
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="logo-area">
+      <? if (logoBase64) { ?>
+        <img src="data:image/png;base64,<?= logoBase64 ?>" alt="Company Logo">
+      <? } else { ?>
+        <div class="logo-placeholder">LOGO</div>
+      <? } ?>
+    </div>
+
+    <div class="title-area">
+      <div class="doc-title">거래명세서</div>
+      <div class="doc-subtitle">TRANSACTION STATEMENT</div>
+    </div>
+
+    <div class="header-info">
+      <div><span class="header-info-label">발주번호</span> <span class="header-info-value"><?= orderCode ?></span></div>
+      <div><span class="header-info-label">발주일자</span> <span class="header-info-value"><?= dueDate ?></span></div>
+    </div>
+  </div>
+
+  <!-- 인감 워터마크 -->
   <? if (stampBase64) { ?>
-    <img class="stamp" src="data:image/png;base64,<?= stampBase64 ?>" alt="stamp">
+    <img class="stamp-watermark" src="data:image/png;base64,<?= stampBase64 ?>" alt="stamp">
   <? } ?>
 
-  <!-- 제목 -->
-  <div class="title">(주)원브릿지 거래명세서</div>
+  <!-- 컨텐츠 -->
+  <div class="content">
 
-  <!-- 상단 공급자 / 발주처 테이블 -->
-  <table class="header-table bordered">
-    <tr>
-      <td class="header-subtitle" rowspan="4">공<br>급<br>처</td>
-      <td class="header-cell-label">상&nbsp;&nbsp;&nbsp;&nbsp;호</td>
-      <td><?= supplierName ?></td>
-      <td class="header-subtitle" rowspan="4">발<br>주<br>처</td>
-      <td class="header-cell-label">상&nbsp;&nbsp;&nbsp;&nbsp;호</td>
-      <td><?= buyerName ?></td>
-    </tr>
-    <tr>
-      <td class="header-cell-label">등록번호</td>
-      <td><?= supplierBizNo ?></td>
-      <td class="header-cell-label">등록번호</td>
-      <td><?= buyerBizNo ?></td>
-    </tr>
-    <tr>
-      <td class="header-cell-label">담당자</td>
-      <td><?= supplierManager ?></td>
-      <td class="header-cell-label">전화번호</td>
-      <td><?= buyerPhone ?></td>
-    </tr>
-    <tr>
-      <td class="header-cell-label">납기일자</td>
-      <td><?= dueDate ?></td>
-      <td class="header-cell-label">주&nbsp;&nbsp;&nbsp;&nbsp;소</td>
-      <td><?= buyerAddress ?></td>
-    </tr>
-  </table>
+    <!-- 거래처 정보 (대칭) -->
+    <div class="partners-section">
+      <!-- 공급처 -->
+      <div class="partner-box">
+        <div class="partner-header">공급자 정보</div>
+        <div class="partner-body">
+          <div class="partner-row">
+            <div class="partner-label">상호</div>
+            <div class="partner-value"><?= supplierName ?></div>
+          </div>
+          <div class="partner-row">
+            <div class="partner-label">사업자등록번호</div>
+            <div class="partner-value"><?= supplierBizNo ?></div>
+          </div>
+          <div class="partner-row">
+            <div class="partner-label">담당자</div>
+            <div class="partner-value"><?= supplierManager ?></div>
+          </div>
+          <div class="partner-row">
+            <div class="partner-label">납기일자</div>
+            <div class="partner-value"><?= dueDate ?></div>
+          </div>
+        </div>
+      </div>
 
-  <!-- 총액 (VAT포함) 줄 -->
-  <table class="total-line">
-    <tr>
-      <td class="total-caption">총 액 (VAT포함)</td>
-      <td class="total-number">₩<?= totalAmount ?></td>
-      <td class="total-kor-label">구십구만&nbsp;원</td>
-      <td class="total-kor-text"><?= amountHangul ?></td>
-    </tr>
-  </table>
+      <!-- 발주처 -->
+      <div class="partner-box">
+        <div class="partner-header">발주자 정보</div>
+        <div class="partner-body">
+          <div class="partner-row">
+            <div class="partner-label">상호</div>
+            <div class="partner-value"><?= buyerName ?></div>
+          </div>
+          <div class="partner-row">
+            <div class="partner-label">사업자등록번호</div>
+            <div class="partner-value"><?= buyerBizNo ?></div>
+          </div>
+          <div class="partner-row">
+            <div class="partner-label">연락처</div>
+            <div class="partner-value"><?= buyerPhone ?></div>
+          </div>
+          <div class="partner-row">
+            <div class="partner-label">주소</div>
+            <div class="partner-value"><?= buyerAddress ?></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <!-- 품목 테이블 -->
-  <table class="item-table">
-    <thead>
-      <tr>
-        <th class="col-no">No</th>
-        <th class="col-code">코드</th>
-        <th class="col-name">품명</th>
-        <th class="col-spec">규격</th>
-        <th class="col-qty">수량</th>
-        <th class="col-price">단가</th>
-        <th class="col-amt">합계 금액</th>
-        <th class="col-note">비고</th>
-      </tr>
-    </thead>
-    <tbody>
-      <? var rowCount = items && items.length ? items.length : 0; ?>
-      <? for (var i = 0; i < rowCount; i++) {
-           var it = items[i]; ?>
-        <tr>
-          <td class="col-no"><?= i + 1 ?></td>
-          <td class="col-code"><?= it.code || '' ?></td>
-          <td class="col-name"><?= it.name || '' ?></td>
-          <td class="col-spec"><?= it.spec || '' ?></td>
-          <td class="col-qty"><?= it.qty || '' ?></td>
-          <td class="col-price"><?= it.price || '' ?></td>
-          <td class="col-amt"><?= it.amount || '' ?></td>
-          <td class="col-note"><?= it.note || '' ?></td>
-        </tr>
-      <? } ?>
+    <!-- 금액 요약 -->
+    <div class="summary-box">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-label">공급가액</div>
+          <div class="summary-amount">₩<?= totalSupply ?></div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">부가세</div>
+          <div class="summary-amount">₩<?= totalVat ?></div>
+        </div>
+        <div class="summary-item" style="background: #fef3c7; border-color: #fbbf24;">
+          <div class="summary-label" style="color: #92400e;">VAT 포함</div>
+          <div class="summary-amount" style="color: #92400e;">₩<?= totalAmount ?></div>
+        </div>
+      </div>
 
-      <!-- 빈 행 채우기 (최소 5행 보장) -->
-      <? for (var j = rowCount; j < 5; j++) { ?>
-        <tr>
-          <td class="col-no">&nbsp;</td>
-          <td class="col-code">&nbsp;</td>
-          <td class="col-name">&nbsp;</td>
-          <td class="col-spec">&nbsp;</td>
-          <td class="col-qty">&nbsp;</td>
-          <td class="col-price">&nbsp;</td>
-          <td class="col-amt">&nbsp;</td>
-          <td class="col-note">&nbsp;</td>
-        </tr>
-      <? } ?>
-    </tbody>
-  </table>
+      <div class="summary-total">
+        <div class="summary-total-label">총 금액 (VAT 포함)</div>
+        <div class="summary-total-amount">₩<?= totalAmount ?></div>
+      </div>
 
-  <!-- 합계 영역 (공급가/부가세/총합계) -->
-  <table class="summary-block">
-    <tr>
-      <td class="summary-label">합 계 금 액</td>
-      <td class="summary-value"><?= totalSupply ?></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="summary-label">부&nbsp;&nbsp;&nbsp;&nbsp;가&nbsp;&nbsp;&nbsp;&nbsp;세</td>
-      <td class="summary-value"><?= totalVat ?></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td class="summary-label">총 합계금액(VAT포함)</td>
-      <td class="summary-value"><?= totalAmount ?></td>
-      <td></td>
-    </tr>
-  </table>
+      <div class="summary-hangul"><?= amountHangul ?></div>
+    </div>
 
-  <!-- 비고 영역 -->
-  <table class="remark-table" style="margin-top: 2mm;">
-    <tr>
-      <td class="remark-label">비<br>고</td>
-      <td class="remark-body">
-        발주처 발주코드 : <?= buyerOrderCode || '' ?><br><br>
+    <!-- 품목 리스트 -->
+    <div class="items-section">
+      <div class="section-title">품목 내역</div>
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-code">품목코드</th>
+            <th class="col-name">품명</th>
+            <th class="col-spec">규격</th>
+            <th class="col-qty">수량</th>
+            <th class="col-price">단가</th>
+            <th class="col-amt">금액</th>
+            <th class="col-note">비고</th>
+          </tr>
+        </thead>
+        <tbody>
+          <? var rowCount = items && items.length ? items.length : 0; ?>
+          <? for (var i = 0; i < rowCount; i++) {
+               var it = items[i]; ?>
+            <tr>
+              <td class="col-no"><?= i + 1 ?></td>
+              <td class="col-code"><?= it.code || '' ?></td>
+              <td class="col-name"><?= it.name || '' ?></td>
+              <td class="col-spec"><?= it.spec || '' ?></td>
+              <td class="col-qty"><?= it.qty || '' ?></td>
+              <td class="col-price"><?= it.price || '' ?></td>
+              <td class="col-amt"><?= it.amount || '' ?></td>
+              <td class="col-note"><?= it.note || '' ?></td>
+            </tr>
+          <? } ?>
+
+          <!-- 최소 5행 보장 -->
+          <? for (var j = rowCount; j < 5; j++) { ?>
+            <tr>
+              <td class="col-no">&nbsp;</td>
+              <td class="col-code">&nbsp;</td>
+              <td class="col-name">&nbsp;</td>
+              <td class="col-spec">&nbsp;</td>
+              <td class="col-qty">&nbsp;</td>
+              <td class="col-price">&nbsp;</td>
+              <td class="col-amt">&nbsp;</td>
+              <td class="col-note">&nbsp;</td>
+            </tr>
+          <? } ?>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 비고 -->
+    <div class="remark-section">
+      <div class="remark-header">특이사항 및 비고</div>
+      <div class="remark-body">
+        <? if (buyerOrderCode) { ?>
+          <div class="remark-label">발주처 발주코드:</div>
+          <div><?= buyerOrderCode ?></div>
+          <br>
+        <? } ?>
         <?= remark || '' ?>
-      </td>
-    </tr>
-  </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 푸터 -->
+  <div class="footer">
+    본 문서는 (주)원브릿지 ERP 시스템에서 자동 생성되었습니다. | OneBridge ERP v2.1
+  </div>
 
 </div>
 </body>

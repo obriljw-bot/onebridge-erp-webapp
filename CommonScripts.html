@@ -392,8 +392,24 @@
     // 1. Excel 다운로드
     // ========================================
     function downloadExcel() {
-      if (!state.filteredOrders || state.filteredOrders.length === 0) {
-        alert('다운로드할 데이터가 없습니다.');
+      // 체크된 발주번호 수집
+      var selectedOrderCodes = [];
+      document.querySelectorAll(".inv-row-check:checked").forEach(function(c) {
+        selectedOrderCodes.push(c.dataset.oc);
+      });
+
+      if (selectedOrderCodes.length === 0) {
+        alert('다운로드할 발주를 선택해주세요.');
+        return;
+      }
+
+      // 선택된 발주만 필터링
+      var selectedOrders = state.filteredOrders.filter(function(order) {
+        return selectedOrderCodes.indexOf(order.orderCode) !== -1;
+      });
+
+      if (selectedOrders.length === 0) {
+        alert('선택된 발주 데이터를 찾을 수 없습니다.');
         return;
       }
 
@@ -403,7 +419,7 @@
       csv.push(['발주일', '발주번호', '발주처', '브랜드', '매입처', '품목수', '매입액', '공급액'].join(','));
 
       // 데이터
-      state.filteredOrders.forEach(function(order) {
+      selectedOrders.forEach(function(order) {
         var row = [
           OB.formatDate(order.orderDate),
           order.orderCode || '',
@@ -430,7 +446,7 @@
       link.click();
       document.body.removeChild(link);
 
-      console.log('✅ Excel 다운로드 완료: ' + state.filteredOrders.length + '건');
+      console.log('✅ Excel 다운로드 완료: ' + selectedOrders.length + '건');
     }
 
     // ========================================
