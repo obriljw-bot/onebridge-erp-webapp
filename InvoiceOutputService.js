@@ -121,30 +121,61 @@ function generateInvoiceZip(params) {
         var pdfBlob;
         var dateStr = formatDateYmd_(group.orderDate).replace(/-/g, '');
         var fileName = '';
+        var docTypeLabel = '';
+        var needsExcel = false;
+
+        // 통합 문서에서 Short 모드가 하나라도 있는지 확인
+        for (var k = 0; k < groupOrderCodes.length; k++) {
+          var oc = groupOrderCodes[k];
+          var mode = modesByOrder[oc] || printMode || 'auto';
+          var ocRows = rows.filter(function(r) { return String(r[idxOrderNo]) === String(oc); });
+
+          var idxQtyConfirmedTemp = header.indexOf('확정수량');
+          var idxQtyOrderTemp = header.indexOf('발주수량');
+          var qtyColTemp = idxQtyConfirmedTemp >= 0 ? idxQtyConfirmedTemp : idxQtyOrderTemp;
+          var itemCountTemp = 0;
+          for (var m = 0; m < ocRows.length; m++) {
+            if (Number(ocRows[m][qtyColTemp] || 0) > 0) itemCountTemp++;
+          }
+
+          var actualModeTemp = mode;
+          if (mode === 'auto') {
+            actualModeTemp = itemCountTemp <= 5 ? 'full' : 'short';
+          }
+
+          if (actualModeTemp === 'short' && itemCountTemp > 5) {
+            needsExcel = true;
+            break;
+          }
+        }
 
         switch (docType) {
           case 'INVOICE_VAT':
             // 거래명세서(부포) - VAT 포함
             pdfBlob = buildInvoiceVatPdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
             fileName = '원브릿지_' + supplier + '_거래명세서(부포)_' + dateStr + '.pdf';
+            docTypeLabel = '거래명세서(부포)';
             break;
 
           case 'INVOICE_NVAT':
             // 거래명세서(영세) - VAT 제외
             pdfBlob = buildInvoiceNvatPdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
             fileName = '원브릿지_' + supplier + '_거래명세서(영세)_' + dateStr + '.pdf';
+            docTypeLabel = '거래명세서(영세)';
             break;
 
           case 'ORDER_PURCHASE':
             // 발주서(매입) - 부별/부포
             pdfBlob = buildOrderPurchasePdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
             fileName = '원브릿지_' + supplier + '_발주서(매입)_' + dateStr + '.pdf';
+            docTypeLabel = '발주서(매입)';
             break;
 
           default:
             Logger.log('[generateInvoiceZip] 알 수 없는 문서 유형: ' + docType);
             pdfBlob = buildInvoiceVatPdfMerged(groupOrderCodes, allOrderRows, header, modesByOrder, printMode);
             fileName = '원브릿지_' + supplier + '_문서_' + dateStr + '.pdf';
+            docTypeLabel = '문서';
             break;
         }
 
@@ -152,6 +183,18 @@ function generateInvoiceZip(params) {
           pdfBlob.setName(fileName);
           pdfBlobs.push(pdfBlob);
           Logger.log('[generateInvoiceZip] 통합 PDF 생성 완료: ' + supplier + ' (' + groupOrderCodes.length + '개 발주)');
+
+          // Short 모드가 하나라도 있으면 통합 세부목록 엑셀 생성
+          if (needsExcel) {
+            try {
+              var excelFileName = '원브릿지_' + supplier + '_' + docTypeLabel + '_세부목록_' + dateStr;
+              var excelBlob = generateDetailExcel_(allOrderRows, header, groupOrderCodes.join('_'), excelFileName);
+              pdfBlobs.push(excelBlob);
+              Logger.log('[generateInvoiceZip] 통합 세부목록 엑셀 생성 완료: ' + supplier);
+            } catch (excelErr) {
+              Logger.log('[generateInvoiceZip] 통합 세부목록 엑셀 생성 실패 - ' + supplier + ': ' + excelErr.message);
+            }
+          }
         }
       } catch (err) {
         Logger.log('[generateInvoiceZip] 통합 PDF 생성 실패 - ' + supplier + ': ' + err.message);
@@ -186,34 +229,67 @@ function generateInvoiceZip(params) {
         var dateStr = formatDateYmd_(orderDate).replace(/-/g, '');
         var partner = header.indexOf('매입처') >= 0 ? (firstRow[header.indexOf('매입처')] || '') : '';
 
+        // 품목 수 계산 (Short 모드 판단용)
+        var idxQtyConfirmed = header.indexOf('확정수량');
+        var idxQtyOrder = header.indexOf('발주수량');
+        var qtyCol = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder;
+        var itemCount = 0;
+        for (var j = 0; j < orderRows.length; j++) {
+          if (Number(orderRows[j][qtyCol] || 0) > 0) itemCount++;
+        }
+
+        // 실제 출력 모드 결정
+        var actualMode = mode;
+        if (mode === 'auto') {
+          actualMode = itemCount <= 5 ? 'full' : 'short';
+        }
+
+        var docTypeLabel = '';
+
         switch (docType) {
           case 'INVOICE_VAT':
             // 거래명세서(부포) - VAT 포함
             pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode);
             fileName = '원브릿지_' + partner + '_거래명세서(부포)_' + brandName + '_' + dateStr + '.pdf';
+            docTypeLabel = '거래명세서(부포)';
             break;
 
           case 'INVOICE_NVAT':
             // 거래명세서(영세) - VAT 제외
             pdfBlob = buildInvoiceNvatPdf(orderCode, orderRows, header, mode);
             fileName = '원브릿지_' + partner + '_거래명세서(영세)_' + brandName + '_' + dateStr + '.pdf';
+            docTypeLabel = '거래명세서(영세)';
             break;
 
           case 'ORDER_PURCHASE':
             // 발주서(매입) - 부별/부포
             pdfBlob = buildOrderPurchasePdf(orderCode, orderRows, header, mode);
             fileName = '원브릿지_' + partner + '_발주서(매입)_' + brandName + '_' + dateStr + '.pdf';
+            docTypeLabel = '발주서(매입)';
             break;
 
           default:
             pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode);
             fileName = '원브릿지_' + partner + '_문서_' + brandName + '_' + dateStr + '.pdf';
+            docTypeLabel = '문서';
             break;
         }
 
         if (pdfBlob) {
           pdfBlob.setName(fileName);
           pdfBlobs.push(pdfBlob);
+
+          // Short 모드인 경우 세부목록 엑셀도 생성
+          if (actualMode === 'short' && itemCount > 5) {
+            try {
+              var excelFileName = '원브릿지_' + partner + '_' + docTypeLabel + '_세부목록_' + brandName + '_' + dateStr;
+              var excelBlob = generateDetailExcel_(orderRows, header, orderCode, excelFileName);
+              pdfBlobs.push(excelBlob);
+              Logger.log('[generateInvoiceZip] 세부목록 엑셀 생성 완료: ' + orderCode);
+            } catch (excelErr) {
+              Logger.log('[generateInvoiceZip] 세부목록 엑셀 생성 실패 - ' + orderCode + ': ' + excelErr.message);
+            }
+          }
         }
       } catch (err) {
         Logger.log('[generateInvoiceZip] PDF 생성 실패 - ' + orderCode + ': ' + err.message);
@@ -1021,6 +1097,105 @@ function numberToHangulKor_(num) {
   }
 
   return result + ' 원';
+}
+
+/**
+ * 세부목록 엑셀 생성 (Short 모드용)
+ * - 품목 수가 많을 때 (>5개) PDF에는 요약만 표시하고 상세 내역은 엑셀로 출력
+ * @param {Array} orderRows 발주 데이터 행 배열
+ * @param {Array} header 거래원장 헤더
+ * @param {string} orderCode 발주번호
+ * @param {string} fileName 엑셀 파일명
+ * @return {Blob} Excel 파일 Blob
+ */
+function generateDetailExcel_(orderRows, header, orderCode, fileName) {
+  // 새로운 스프레드시트 생성
+  var ss = SpreadsheetApp.create('세부목록_' + orderCode);
+  var sheet = ss.getSheets()[0];
+  sheet.setName('세부목록');
+
+  // 거래원장 인덱스 정의
+  var idxDate         = header.indexOf('발주일');
+  var idxProductCode  = header.indexOf('품목코드');
+  var idxBrand        = header.indexOf('브랜드');
+  var idxProductName  = header.indexOf('제품명');
+  var idxQtyConfirmed = header.indexOf('확정수량');
+  var idxQtyOrder     = header.indexOf('발주수량');
+  var idxSupplyPrice  = header.indexOf('공급가');
+  var idxSupplyAmount = header.indexOf('공급액');
+  var idxUnitPrice    = header.indexOf('매입가');
+  var idxAmount       = header.indexOf('매입액');
+
+  // 엑셀 헤더 작성
+  var excelHeader = ['순번', '발주일', '품목코드', '브랜드', '품명', '수량', '단가', '금액'];
+  sheet.getRange(1, 1, 1, excelHeader.length).setValues([excelHeader]);
+
+  // 헤더 스타일 적용
+  var headerRange = sheet.getRange(1, 1, 1, excelHeader.length);
+  headerRange.setBackground('#4a5568');
+  headerRange.setFontColor('#ffffff');
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+
+  // 데이터 행 작성
+  var qtyCol = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder;
+  var priceCol = idxSupplyPrice >= 0 ? idxSupplyPrice : idxUnitPrice;
+  var amountCol = idxSupplyAmount >= 0 ? idxSupplyAmount : idxAmount;
+
+  var dataRows = [];
+  var rowNum = 1;
+
+  for (var i = 0; i < orderRows.length; i++) {
+    var r = orderRows[i];
+    var qty = Number(r[qtyCol] || 0);
+    if (!qty) continue;  // 수량 0은 제외
+
+    var orderDate = r[idxDate] ? formatDateYmd_(r[idxDate]) : '';
+    var productCode = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
+    var brand = r[idxBrand] || '';
+    var productName = r[idxProductName] || '';
+    var price = Number(r[priceCol] || 0);
+    var amount = Number(r[amountCol] || 0);
+
+    dataRows.push([
+      rowNum,
+      orderDate,
+      productCode,
+      brand,
+      productName,
+      qty,
+      price,
+      amount
+    ]);
+
+    rowNum++;
+  }
+
+  // 데이터 입력
+  if (dataRows.length > 0) {
+    sheet.getRange(2, 1, dataRows.length, excelHeader.length).setValues(dataRows);
+
+    // 숫자 컬럼 포맷 적용
+    sheet.getRange(2, 6, dataRows.length, 1).setNumberFormat('#,##0');  // 수량
+    sheet.getRange(2, 7, dataRows.length, 1).setNumberFormat('#,##0');  // 단가
+    sheet.getRange(2, 8, dataRows.length, 1).setNumberFormat('#,##0');  // 금액
+  }
+
+  // 열 너비 자동 조정
+  for (var col = 1; col <= excelHeader.length; col++) {
+    sheet.autoResizeColumn(col);
+  }
+
+  // Excel 파일로 내보내기
+  var fileId = ss.getId();
+  var file = DriveApp.getFileById(fileId);
+  var blob = file.getAs('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  blob.setName(fileName + '.xlsx');
+
+  // 임시 스프레드시트 삭제
+  DriveApp.getFileById(fileId).setTrashed(true);
+
+  return blob;
 }
 
 /**
