@@ -348,14 +348,15 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
   var buyerNm    = firstRow[idxBuyerName];
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 거래명세서(부포): 원브릿지 = 공급자(상단 좌측), 발주처 = 거래처(상단 우측)
+  var companyInfo = findPartnerByName_('원브릿지');
+  var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo   = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager = companyInfo ? (companyInfo.manager || '')   : '';
+  var buyerBizNo      = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone      = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress    = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // 납기일자: 일단 발주일 기반으로 사용 (추후 별도 컬럼 매핑 가능)
   var dueDate = orderDate;
@@ -443,7 +444,9 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    supplierName:   supplierNm,
+    docTitle:       '(주)원브릿지 거래명세서',
+
+    supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
 
@@ -511,14 +514,22 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
   var vatType    = idxVatType >= 0 ? String(firstRow[idxVatType] || '부포') : '부포';
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 발주서(매입): 매입처 = 공급자(상단 좌측), 원브릿지 = 발주처(상단 우측)
+  var partnerInfo = findPartnerByName_(supplierNm);
+  var companyInfo = findPartnerByName_('원브릿지');
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo   = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var supplierManager = partnerInfo ? (partnerInfo.manager || '')   : '';
+  var supplierPhone   = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var supplierAddress = partnerInfo ? (partnerInfo.address || '')   : '';
+
+  var buyerBizNo      = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var buyerPhone      = companyInfo ? (companyInfo.phone || '')     : '';
+  var buyerAddress    = companyInfo ? (companyInfo.address || '')   : '';
+
+  // 입고지 및 요청사항 정보
+  var deliveryAddr    = partnerInfo ? (partnerInfo.deliveryAddr || '')   : '';
+  var specialRequest  = partnerInfo ? (partnerInfo.specialRequest || '') : '';
 
   // 행 단위 품목 구성 (발주서는 발주수량 기준)
   var qtyCol = idxQtyOrder >= 0 ? idxQtyOrder : header.indexOf('확정수량');
@@ -603,9 +614,30 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     totalAmount = totalSupply + totalVat;
   }
 
+  // 비고란 구성: 입고지, 담당자, 요청사항
+  var remarkLines = [];
+  if (vatType === '부별') {
+    remarkLines.push('※ 부가세별도');
+  } else {
+    remarkLines.push('※ 부가세포함');
+  }
+  if (deliveryAddr) {
+    remarkLines.push('입고지: ' + deliveryAddr);
+  }
+  if (supplierManager || supplierPhone) {
+    var managerInfo = '담당자: ' + supplierManager;
+    if (supplierPhone) managerInfo += ' (' + supplierPhone + ')';
+    remarkLines.push(managerInfo);
+  }
+  if (specialRequest) {
+    remarkLines.push('요청사항: ' + specialRequest);
+  }
+
   var ctx = {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
+
+    docTitle:       '(주)원브릿지 매입발주서',
 
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
@@ -626,7 +658,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
 
     items:          items,
     buyerOrderCode: '',
-    remark:         vatType === '부별' ? '(부가세별도)' : '(부가세포함)'
+    remark:         remarkLines.join('\n')
   };
 
   // 발주서도 동일한 템플릿 사용 (Templates_Invoice_VAT)
@@ -674,14 +706,15 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
   var buyerNm    = firstRow[idxBuyerName];
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 거래명세서(영세): 원브릿지 = 공급자(상단 좌측), 발주처 = 거래처(상단 우측)
+  var companyInfo = findPartnerByName_('원브릿지');
+  var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo   = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager = companyInfo ? (companyInfo.manager || '')   : '';
+  var buyerBizNo      = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone      = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress    = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // 행 단위 품목 구성
   var qtyCol = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder; // 거래명세서 → 확정수량 우선
@@ -756,7 +789,9 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    supplierName:   supplierNm,
+    docTitle:       '(주)원브릿지 거래명세서',
+
+    supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
 
@@ -775,7 +810,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
 
     items:          items,
     buyerOrderCode: '',
-    remark:         '(영세율)'
+    remark:         '※ 영세율 적용'
   };
 
   var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
@@ -985,11 +1020,13 @@ function findPartnerByName_(name) {
   var header = data.header;
   var rows   = data.rows;
 
-  var idxName    = header.indexOf('거래처명');
-  var idxBizNo   = header.indexOf('사업자번호');
-  var idxManager = header.indexOf('담당자');
-  var idxPhone   = header.indexOf('연락처');
-  var idxAddress = header.indexOf('주소');
+  var idxName           = header.indexOf('거래처명');
+  var idxBizNo          = header.indexOf('사업자번호');
+  var idxManager        = header.indexOf('담당자');
+  var idxPhone          = header.indexOf('연락처');
+  var idxAddress        = header.indexOf('주소');
+  var idxDeliveryAddr   = header.indexOf('입고지');
+  var idxSpecialRequest = header.indexOf('요청사항');
 
   if (idxName === -1) return null;
 
@@ -997,11 +1034,13 @@ function findPartnerByName_(name) {
     var r = rows[i];
     if (String(r[idxName]).trim() === String(name).trim()) {
       return {
-        name:    r[idxName],
-        bizNo:   idxBizNo   >= 0 ? r[idxBizNo]   : '',
-        manager: idxManager >= 0 ? r[idxManager] : '',
-        phone:   idxPhone   >= 0 ? r[idxPhone]   : '',
-        address: idxAddress >= 0 ? r[idxAddress] : ''
+        name:           r[idxName],
+        bizNo:          idxBizNo          >= 0 ? r[idxBizNo]          : '',
+        manager:        idxManager        >= 0 ? r[idxManager]        : '',
+        phone:          idxPhone          >= 0 ? r[idxPhone]          : '',
+        address:        idxAddress        >= 0 ? r[idxAddress]        : '',
+        deliveryAddr:   idxDeliveryAddr   >= 0 ? r[idxDeliveryAddr]   : '',
+        specialRequest: idxSpecialRequest >= 0 ? r[idxSpecialRequest] : ''
       };
     }
   }
@@ -1235,14 +1274,22 @@ function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOr
   var vatType    = idxVatType >= 0 ? String(firstRow[idxVatType] || '부포') : '부포';
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 발주서(매입): 매입처 = 공급자(상단 좌측), 원브릿지 = 발주처(상단 우측)
+  var partnerInfo = findPartnerByName_(supplierNm);
+  var companyInfo = findPartnerByName_('원브릿지');
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo   = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var supplierManager = partnerInfo ? (partnerInfo.manager || '')   : '';
+  var supplierPhone   = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var supplierAddress = partnerInfo ? (partnerInfo.address || '')   : '';
+
+  var buyerBizNo      = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var buyerPhone      = companyInfo ? (companyInfo.phone || '')     : '';
+  var buyerAddress    = companyInfo ? (companyInfo.address || '')   : '';
+
+  // 입고지 및 요청사항 정보
+  var deliveryAddr    = partnerInfo ? (partnerInfo.deliveryAddr || '')   : '';
+  var specialRequest  = partnerInfo ? (partnerInfo.specialRequest || '') : '';
 
   // ========================================
   // 발주번호(브랜드)별로 품목 그룹핑
@@ -1351,9 +1398,30 @@ function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOr
   // ========================================
   // 템플릿 컨텍스트 생성
   // ========================================
+  // 비고란 구성: 입고지, 담당자, 요청사항
+  var remarkLines = [];
+  if (vatType === '부별') {
+    remarkLines.push('※ 부가세별도');
+  } else {
+    remarkLines.push('※ 부가세포함');
+  }
+  if (deliveryAddr) {
+    remarkLines.push('입고지: ' + deliveryAddr);
+  }
+  if (supplierManager || supplierPhone) {
+    var managerInfo = '담당자: ' + supplierManager;
+    if (supplierPhone) managerInfo += ' (' + supplierPhone + ')';
+    remarkLines.push(managerInfo);
+  }
+  if (specialRequest) {
+    remarkLines.push('요청사항: ' + specialRequest);
+  }
+
   var ctx = {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
+
+    docTitle:       '(주)원브릿지 매입발주서',
 
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
@@ -1374,7 +1442,7 @@ function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOr
 
     items:          allItems,
     buyerOrderCode: '',
-    remark:         vatType === '부별' ? '(부가세별도)' : '(부가세포함)'
+    remark:         remarkLines.join('\n')
   };
 
   var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
@@ -1429,14 +1497,15 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
   var buyerNm    = firstRow[idxBuyerName];
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 거래명세서(부포): 원브릿지 = 공급자(상단 좌측), 발주처 = 거래처(상단 우측)
+  var companyInfo = findPartnerByName_('원브릿지');
+  var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo   = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager = companyInfo ? (companyInfo.manager || '')   : '';
+  var buyerBizNo      = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone      = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress    = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // 납기일자
   var dueDate = orderDate;
