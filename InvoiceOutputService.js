@@ -863,14 +863,15 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
   var buyerNm    = firstRow[idxBuyerName];
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 거래명세서(영세): 원브릿지 = 공급자(상단 좌측), 발주처 = 거래처(상단 우측)
+  var companyInfo = findPartnerByName_('원브릿지');
+  var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo   = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager = companyInfo ? (companyInfo.manager || '')   : '';
+  var buyerBizNo      = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone      = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress    = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // ========================================
   // 발주번호(브랜드)별로 품목 그룹핑
@@ -970,7 +971,9 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    supplierName:   supplierNm,
+    docTitle:       '(주)원브릿지 거래명세서',
+
+    supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
 
@@ -989,7 +992,7 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
 
     items:          allItems,
     buyerOrderCode: '',
-    remark:         '(영세율)'
+    remark:         '※ 영세율 적용'
   };
 
   var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
@@ -1613,7 +1616,9 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    supplierName:   supplierNm,
+    docTitle:       '(주)원브릿지 거래명세서',
+
+    supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
 
