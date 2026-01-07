@@ -242,56 +242,64 @@
   <div id="tab-order-output" class="tab-content active">
 
     <!-- 상단 옵션바 -->
-    <div class="ob-topbar">
-      <label>문서 유형</label>
-      <select id="inv-doc-type">
-        <option value="발주서(매입)">발주서(매입)</option>
-        <option value="발주서(매입)_롬앤">발주서(매입)_롬앤</option>
-        <option value="발주서(매입)_종근당">발주서(매입)_종근당</option>
-        <option value="발주서(매입)_삐아계열">발주서(매입)_삐아계열</option>
-        <option value="거래명세서(영세)">거래명세서(영세)</option>
-        <option value="거래명세서(부포)">거래명세서(부포)</option>
-        <option value="거래명세서(해외)">거래명세서(해외)</option>
-      </select>
+    <div class="ob-topbar" style="flex-direction:column;gap:16px;">
 
-      <label>출력 방식</label>
-      <select id="inv-default-mode">
-        <option value="auto">자동(5행 기준)</option>
-        <option value="full">전체내역</option>
-        <option value="short">단축내역</option>
-      </select>
+      <!-- 첫 번째 줄: 기본 검색 옵션 -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <label>발주번호</label>
+        <input id="inv-order-code" placeholder="OB2025-..." style="min-width:150px;">
 
-      <label>발주번호</label>
-      <input id="inv-order-code" placeholder="OB2025-...">
+        <label>기간</label>
+        <input id="inv-start-date" type="date">
+        <input id="inv-end-date" type="date">
 
-      <label>기간</label>
-      <input id="inv-start-date" type="date">
-      <input id="inv-end-date" type="date">
+        <label>매입처</label>
+        <input id="inv-supplier" placeholder="업체명" style="min-width:120px;">
 
-      <label>매입처</label>
-      <input id="inv-supplier" placeholder="업체명">
-
-      <button id="inv-search-btn" class="ob-btn primary">조회</button>
-      <button id="inv-export-xlsx" class="ob-btn secondary">Excel 출력</button>
-      <button id="inv-export-pdf" class="ob-btn success">PDF 출력</button>
-
-      <div style="display:flex;gap:8px;align-items:center;margin-left:auto;padding:6px 12px;background:#f0f9ff;border-radius:6px;border:1px solid #bfdbfe;">
-        <input type="checkbox" id="inv-merge-by-supplier" style="width:16px;height:16px;cursor:pointer;">
-        <label for="inv-merge-by-supplier" style="margin:0;font-size:13px;font-weight:500;color:#1e40af;cursor:pointer;">매입처별 통합 출력</label>
+        <button id="inv-search-btn" class="ob-btn primary">🔍 조회</button>
       </div>
-    </div>
 
-    <!-- 일괄 선택 버튼 그룹 -->
-    <div class="bulk-select-group" id="inv-bulk-select" style="display:none;">
-      <span style="font-size:12px;font-weight:bold;color:#6b7280;">빠른 선택:</span>
-      <button class="bulk-select-btn" id="inv-select-all">전체 선택</button>
-      <button class="bulk-select-btn" id="inv-deselect-all">전체 해제</button>
-      <span style="border-left:1px solid #d1d5db;height:20px;"></span>
-      <span style="font-size:12px;color:#6b7280;">브랜드별:</span>
-      <div id="inv-brand-btns"></div>
-      <span style="border-left:1px solid #d1d5db;height:20px;"></span>
-      <span style="font-size:12px;color:#6b7280;">매입처별:</span>
-      <div id="inv-supplier-btns"></div>
+      <!-- 두 번째 줄: 출력 옵션 -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e5e7eb;">
+
+        <label style="font-weight:600;color:#1e293b;">📄 출력 설정</label>
+        <span style="border-left:1px solid #cbd5e1;height:20px;"></span>
+
+        <label>문서 유형</label>
+        <select id="inv-doc-type">
+          <option value="ORDER_PURCHASE">발주서(매입)</option>
+          <option value="INVOICE_VAT">거래명세서(부포)</option>
+          <option value="INVOICE_NVAT">거래명세서(영세)</option>
+        </select>
+
+        <label>출력 형식</label>
+        <select id="inv-output-format">
+          <option value="PDF">PDF</option>
+          <option value="EXCEL">Excel</option>
+        </select>
+
+        <span style="border-left:1px solid #cbd5e1;height:20px;"></span>
+
+        <label>문서 날짜</label>
+        <input id="inv-doc-date" type="date" title="발주서: 발주일 / 거래명세서: 출고일">
+
+        <label>비고란 입력</label>
+        <input type="checkbox" id="inv-manual-remark" style="width:16px;height:16px;cursor:pointer;" title="체크 시 비고란 내용을 직접 입력할 수 있습니다">
+        <label for="inv-manual-remark" style="margin:0;font-size:12px;color:#64748b;cursor:pointer;">수동입력</label>
+
+        <span style="border-left:1px solid #cbd5e1;height:20px;"></span>
+
+        <div style="display:flex;gap:8px;align-items:center;margin-left:auto;padding:6px 12px;background:#f0f9ff;border-radius:6px;border:1px solid #bfdbfe;">
+          <input type="checkbox" id="inv-merge-by-supplier" style="width:16px;height:16px;cursor:pointer;">
+          <label for="inv-merge-by-supplier" style="margin:0;font-size:13px;font-weight:500;color:#1e40af;cursor:pointer;">매입처별 통합 출력</label>
+        </div>
+      </div>
+
+      <!-- 세 번째 줄: 출력 버튼 -->
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="inv-export-selected" class="ob-btn success" style="font-size:14px;padding:10px 20px;">✅ 선택항목 출력</button>
+      </div>
+
     </div>
 
     <!-- 테이블 -->
@@ -308,11 +316,10 @@
             <th class="sortable num" data-sort="itemCount">품목수</th>
             <th class="sortable num" data-sort="totalPurchaseAmount">매입액합계</th>
             <th class="sortable num" data-sort="totalAmount">공급액합계</th>
-            <th>출력방식</th>
           </tr>
         </thead>
         <tbody id="inv-result-tbody">
-          <tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
+          <tr><td colspan="9" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>
         </tbody>
       </table>
     </div>
