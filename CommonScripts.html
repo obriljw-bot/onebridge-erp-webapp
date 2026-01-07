@@ -357,8 +357,7 @@
     currentSort: {
       column: 'orderDate',
       direction: 'desc'
-    },
-    modesByOrder: {}
+    }
   };
 
   OB.initInvoiceOutputPage = function() {
@@ -382,10 +381,10 @@
     function renderEmpty() {
       var tbody = document.getElementById("inv-result-tbody");
       if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>';
       }
-      document.getElementById('inv-pagination').style.display = 'none';
-      document.getElementById('inv-bulk-select').style.display = 'none';
+      var pagination = document.getElementById('inv-pagination');
+      if (pagination) pagination.style.display = 'none';
     }
 
     // ========================================
@@ -557,84 +556,6 @@
       btnLast.onclick = function() { state.currentPage = totalPages; renderOrders(); };
     }
 
-    // ========================================
-    // 4. 브랜드/매입처별 일괄 선택
-    // ========================================
-    function renderBulkSelectButtons() {
-      var bulkSelectContainer = document.getElementById('inv-bulk-select');
-      var brandBtnsContainer = document.getElementById('inv-brand-btns');
-      var supplierBtnsContainer = document.getElementById('inv-supplier-btns');
-
-      if (state.filteredOrders.length === 0) {
-        bulkSelectContainer.style.display = 'none';
-        return;
-      }
-
-      bulkSelectContainer.style.display = 'flex';
-
-      // 브랜드 목록 추출
-      var brands = {};
-      var suppliers = {};
-      state.filteredOrders.forEach(function(order) {
-        if (order.brand) brands[order.brand] = true;
-        if (order.supplier) suppliers[order.supplier] = true;
-      });
-
-      var brandList = Object.keys(brands).sort();
-      var supplierList = Object.keys(suppliers).sort();
-
-      // 브랜드 버튼 생성
-      brandBtnsContainer.innerHTML = '';
-      brandList.forEach(function(brand) {
-        var btn = document.createElement('button');
-        btn.className = 'bulk-select-btn';
-        btn.textContent = brand;
-        btn.addEventListener('click', function() {
-          selectByBrand(brand);
-        });
-        brandBtnsContainer.appendChild(btn);
-      });
-
-      // 매입처 버튼 생성
-      supplierBtnsContainer.innerHTML = '';
-      supplierList.forEach(function(supplier) {
-        var btn = document.createElement('button');
-        btn.className = 'bulk-select-btn';
-        btn.textContent = supplier;
-        btn.addEventListener('click', function() {
-          selectBySupplier(supplier);
-        });
-        supplierBtnsContainer.appendChild(btn);
-      });
-    }
-
-    function selectByBrand(brand) {
-      var checkboxes = document.querySelectorAll('.inv-row-check');
-      var startIdx = (state.currentPage - 1) * state.itemsPerPage;
-      var endIdx = Math.min(startIdx + state.itemsPerPage, state.filteredOrders.length);
-
-      for (var i = startIdx; i < endIdx; i++) {
-        var order = state.filteredOrders[i];
-        if (order.brand === brand) {
-          var checkbox = checkboxes[i - startIdx];
-          if (checkbox) checkbox.checked = true;
-        }
-      }
-    }
-
-    function selectBySupplier(supplier) {
-      var checkboxes = document.querySelectorAll('.inv-row-check');
-      var startIdx = (state.currentPage - 1) * state.itemsPerPage;
-      var endIdx = Math.min(startIdx + state.itemsPerPage, state.filteredOrders.length);
-
-      for (var i = startIdx; i < endIdx; i++) {
-        var order = state.filteredOrders[i];
-        if (order.supplier === supplier) {
-          var checkbox = checkboxes[i - startIdx];
-          if (checkbox) checkbox.checked = true;
-        }
-      }
-    }
 
     // ========================================
     // 테이블 렌더링
@@ -660,7 +581,6 @@
       // 테이블 렌더링
       tbody.innerHTML = '';
       pageOrders.forEach(function(o) {
-        var mode = state.modesByOrder[o.orderCode] || document.getElementById('inv-default-mode').value || 'auto';
         var dateStr = OB.formatDate(o.orderDate);
 
         var tr = document.createElement('tr');
@@ -673,30 +593,13 @@
           '<td>' + (o.buyer || '') + '</td>' +
           '<td class="num">' + (o.itemCount || 0) + '</td>' +
           '<td class="num">' + OB.formatNumber(o.totalPurchaseAmount) + '</td>' +
-          '<td class="num">' + OB.formatNumber(o.totalAmount) + '</td>' +
-          '<td>' +
-            '<select class="inv-mode" data-oc="' + o.orderCode + '">' +
-              '<option value="auto"' + (mode === 'auto' ? ' selected' : '') + '>자동</option>' +
-              '<option value="full"' + (mode === 'full' ? ' selected' : '') + '>전체</option>' +
-              '<option value="short"' + (mode === 'short' ? ' selected' : '') + '>단축</option>' +
-            '</select>' +
-          '</td>';
+          '<td class="num">' + OB.formatNumber(o.totalAmount) + '</td>';
 
         tbody.appendChild(tr);
       });
 
-      // 출력방식 변경 이벤트
-      document.querySelectorAll('.inv-mode').forEach(function(sel) {
-        sel.addEventListener('change', function() {
-          state.modesByOrder[this.dataset.oc] = this.value;
-        });
-      });
-
       // 페이지네이션 렌더링
       renderPagination(totalPages);
-
-      // 일괄 선택 버튼 렌더링
-      renderBulkSelectButtons();
 
       console.log('✅ 테이블 렌더링 완료: ' + pageOrders.length + '/' + state.filteredOrders.length + '건');
     }
@@ -761,10 +664,20 @@
     }
 
     // ========================================
-    // PDF 출력 기능
+    // 비고란 수동입력 팝업 기능
     // ========================================
-    function exportPDF() {
-      console.log('📄 PDF 출력 버튼 클릭');
+    function showRemarkPopup(callback) {
+      var remark = prompt("비고란에 표시할 내용을 입력하세요:", "");
+      if (remark !== null) {
+        callback(remark);
+      }
+    }
+
+    // ========================================
+    // 통합 출력 기능 (PDF/Excel)
+    // ========================================
+    function exportSelected() {
+      console.log('📄 출력 버튼 클릭');
 
       // 체크된 발주번호 수집
       var selected = [];
@@ -777,39 +690,53 @@
         return;
       }
 
-      // 문서 유형 매핑
-      var docTypeName = document.getElementById("inv-doc-type").value;
-      var docTypeMap = {
-        "거래명세서(부포)": "INVOICE_VAT",
-        "거래명세서(영세)": "INVOICE_NVAT",
-        "거래명세서(해외)": "INVOICE_EN",
-        "발주서(매입)": "ORDER_BASIC",
-        "발주서(매입)_롬앤": "ORDER_ROMAND",
-        "발주서(매입)_종근당": "ORDER_JONGGEUN",
-        "발주서(매입)_삐아계열": "ORDER_BBIA"
-      };
-      var docType = docTypeMap[docTypeName] || "INVOICE_VAT";
+      // 출력 형식 확인
+      var outputFormat = document.getElementById("inv-output-format").value;
 
-      // 출력방식 수집
-      var modes = {};
-      document.querySelectorAll(".inv-mode").forEach(function(sel) {
-        modes[sel.dataset.oc] = sel.value || "auto";
-      });
+      // Excel 형식인 경우 간단 CSV 다운로드
+      if (outputFormat === "EXCEL") {
+        downloadExcel();
+        return;
+      }
+
+      // PDF 출력 처리
+      // 문서 유형 (간소화된 3가지)
+      var docType = document.getElementById("inv-doc-type").value;
+
+      // 문서 날짜
+      var docDate = document.getElementById("inv-doc-date").value;
 
       // 매입처별 통합 출력 체크 여부
       var mergeBySupplier = document.getElementById("inv-merge-by-supplier").checked;
 
+      // 비고란 수동입력 체크 여부
+      var useManualRemark = document.getElementById("inv-manual-remark").checked;
+
+      // 비고란 수동입력이 체크되어 있으면 팝업 표시
+      if (useManualRemark) {
+        showRemarkPopup(function(remark) {
+          executePdfExport(selected, docType, docDate, mergeBySupplier, remark);
+        });
+      } else {
+        executePdfExport(selected, docType, docDate, mergeBySupplier, null);
+      }
+    }
+
+    function executePdfExport(selected, docType, docDate, mergeBySupplier, manualRemark) {
       var params = {
         orderCodes: selected,
         docType: docType,
-        printMode: "auto",
-        modesByOrder: modes,
-        mergeBySupplier: mergeBySupplier
+        docDate: docDate || null,
+        mergeBySupplier: mergeBySupplier,
+        manualRemark: manualRemark || null
       };
 
       console.log('📄 PDF 생성 파라미터:', params);
       if (mergeBySupplier) {
         console.log('🔗 매입처별 통합 출력 모드 활성화');
+      }
+      if (manualRemark) {
+        console.log('📝 비고란 수동입력:', manualRemark);
       }
 
       OB.showLoading('PDF 생성 중... (' + selected.length + '건)');
@@ -847,16 +774,10 @@
       searchBtn.addEventListener('click', searchOrders);
     }
 
-    // Excel 출력 버튼
-    var excelBtn = document.getElementById('inv-export-xlsx');
-    if (excelBtn) {
-      excelBtn.addEventListener('click', downloadExcel);
-    }
-
-    // PDF 출력 버튼
-    var pdfBtn = document.getElementById('inv-export-pdf');
-    if (pdfBtn) {
-      pdfBtn.addEventListener('click', exportPDF);
+    // 선택항목 출력 버튼 (통합)
+    var exportBtn = document.getElementById('inv-export-selected');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', exportSelected);
     }
 
     // 전체 체크박스
@@ -887,28 +808,6 @@
         renderOrders();
       });
     });
-
-    // 일괄 선택 버튼
-    var selectAllBtn = document.getElementById('inv-select-all');
-    if (selectAllBtn) {
-      selectAllBtn.addEventListener('click', function() {
-        var checkboxes = document.querySelectorAll('.inv-row-check');
-        checkboxes.forEach(function(c) {
-          c.checked = true;
-        });
-      });
-    }
-
-    var deselectAllBtn = document.getElementById('inv-deselect-all');
-    if (deselectAllBtn) {
-      deselectAllBtn.addEventListener('click', function() {
-        var checkboxes = document.querySelectorAll('.inv-row-check');
-        checkboxes.forEach(function(c) {
-          c.checked = false;
-        });
-        document.getElementById('inv-check-all').checked = false;
-      });
-    }
 
     // ========================================
     // 탭 전환 로직
