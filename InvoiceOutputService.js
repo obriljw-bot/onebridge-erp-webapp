@@ -356,32 +356,37 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     }
 
   // ========================================
-  // 출력방식 로직 적용
+  // 멀티페이지 분할 로직
   // ========================================
-  var actualMode = printMode;
+  var firstPageItems = [];
+  var additionalPages = [];
+  var FIRST_PAGE_LIMIT = 10;
+  var ADDITIONAL_PAGE_LIMIT = 30;
 
-  // auto 모드: 품목수에 따라 자동 결정
-  if (printMode === 'auto') {
-    actualMode = itemCount <= 10 ? 'full' : 'short';
+  if (itemCount <= FIRST_PAGE_LIMIT) {
+    // 10개 이하: 첫 페이지에 모두 표시
+    firstPageItems = items;
+  } else {
+    // 10개 초과: 멀티페이지 분할
+    firstPageItems = items.slice(0, FIRST_PAGE_LIMIT);
+    var remainingItems = items.slice(FIRST_PAGE_LIMIT);
+
+    // 추가 페이지들 생성 (페이지당 30개씩)
+    for (var pageStart = 0; pageStart < remainingItems.length; pageStart += ADDITIONAL_PAGE_LIMIT) {
+      var pageItems = remainingItems.slice(pageStart, pageStart + ADDITIONAL_PAGE_LIMIT);
+
+      // rowNumber 추가 (첫 페이지 이후부터 번호 계속 이어짐)
+      for (var k = 0; k < pageItems.length; k++) {
+        pageItems[k].rowNumber = FIRST_PAGE_LIMIT + pageStart + k + 1;
+      }
+
+      additionalPages.push({ items: pageItems });
+    }
   }
 
-  // short 모드: 품목 리스트를 축약
-  if (actualMode === 'short' && itemCount > 0) {
-    var summaryText = brandName + ' 외 ' + (itemCount - 1) + '건';
-    items = [{
-      code:   '',
-      name:   summaryText,
-      spec:   '',
-      qty:    formatNumber_(itemCount),
-      price:  '',
-      amount: formatNumber_(totalSupply),
-      note:   '(단축 출력)'
-    }];
-  }
-
-  if (!items.length) {
+  if (!firstPageItems.length) {
     // 품목이 하나도 없으면 형식상 1행 빈 행만 생성
-    items.push({
+    firstPageItems.push({
       code: '', name: '', spec: '',
       qty: '', price: '', amount: '', note: ''
     });
@@ -413,7 +418,8 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
-    items:          items,
+    items:          firstPageItems,
+    additionalPages: additionalPages,
     buyerOrderCode: '',
     remark:         ''
   };
@@ -517,31 +523,37 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
   }
 
   // ========================================
-  // 출력방식 로직 적용
+  // 멀티페이지 분할 로직
   // ========================================
-  var actualMode = printMode;
+  var firstPageItems = [];
+  var additionalPages = [];
+  var FIRST_PAGE_LIMIT = 10;
+  var ADDITIONAL_PAGE_LIMIT = 30;
 
-  // auto 모드: 품목수에 따라 자동 결정
-  if (printMode === 'auto') {
-    actualMode = itemCount <= 10 ? 'full' : 'short';
+  if (itemCount <= FIRST_PAGE_LIMIT) {
+    // 10개 이하: 첫 페이지에 모두 표시
+    firstPageItems = items;
+  } else {
+    // 10개 초과: 멀티페이지 분할
+    firstPageItems = items.slice(0, FIRST_PAGE_LIMIT);
+    var remainingItems = items.slice(FIRST_PAGE_LIMIT);
+
+    // 추가 페이지들 생성 (페이지당 30개씩)
+    for (var pageStart = 0; pageStart < remainingItems.length; pageStart += ADDITIONAL_PAGE_LIMIT) {
+      var pageItems = remainingItems.slice(pageStart, pageStart + ADDITIONAL_PAGE_LIMIT);
+
+      // rowNumber 추가 (첫 페이지 이후부터 번호 계속 이어짐)
+      for (var k = 0; k < pageItems.length; k++) {
+        pageItems[k].rowNumber = FIRST_PAGE_LIMIT + pageStart + k + 1;
+      }
+
+      additionalPages.push({ items: pageItems });
+    }
   }
 
-  // short 모드: 품목 리스트를 축약
-  if (actualMode === 'short' && itemCount > 0) {
-    var summaryText = brandName + ' 총 ' + itemCount + '건';
-    items = [{
-      code:   '',
-      name:   summaryText,
-      spec:   '',
-      qty:    formatNumber_(itemCount),
-      price:  '',
-      amount: formatNumber_(totalAmount),
-      note:   '(단축 출력)'
-    }];
-  }
-
-  if (!items.length) {
-    items.push({
+  if (!firstPageItems.length) {
+    // 품목이 하나도 없으면 형식상 1행 빈 행만 생성
+    firstPageItems.push({
       code: '', name: '', spec: '',
       qty: '', price: '', amount: '', note: ''
     });
@@ -606,7 +618,8 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
-    items:          items,
+    items:          firstPageItems,
+    additionalPages: additionalPages,
     buyerOrderCode: '',
     remark:         remarkLines.join('\n')
   };
@@ -701,31 +714,37 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
   }
 
   // ========================================
-  // 출력방식 로직 적용
+  // 멀티페이지 분할 로직
   // ========================================
-  var actualMode = printMode;
+  var firstPageItems = [];
+  var additionalPages = [];
+  var FIRST_PAGE_LIMIT = 10;
+  var ADDITIONAL_PAGE_LIMIT = 30;
 
-  // auto 모드: 품목수에 따라 자동 결정
-  if (printMode === 'auto') {
-    actualMode = itemCount <= 10 ? 'full' : 'short';
+  if (itemCount <= FIRST_PAGE_LIMIT) {
+    // 10개 이하: 첫 페이지에 모두 표시
+    firstPageItems = items;
+  } else {
+    // 10개 초과: 멀티페이지 분할
+    firstPageItems = items.slice(0, FIRST_PAGE_LIMIT);
+    var remainingItems = items.slice(FIRST_PAGE_LIMIT);
+
+    // 추가 페이지들 생성 (페이지당 30개씩)
+    for (var pageStart = 0; pageStart < remainingItems.length; pageStart += ADDITIONAL_PAGE_LIMIT) {
+      var pageItems = remainingItems.slice(pageStart, pageStart + ADDITIONAL_PAGE_LIMIT);
+
+      // rowNumber 추가 (첫 페이지 이후부터 번호 계속 이어짐)
+      for (var k = 0; k < pageItems.length; k++) {
+        pageItems[k].rowNumber = FIRST_PAGE_LIMIT + pageStart + k + 1;
+      }
+
+      additionalPages.push({ items: pageItems });
+    }
   }
 
-  // short 모드: 품목 리스트를 축약
-  if (actualMode === 'short' && itemCount > 0) {
-    var summaryText = brandName + ' 총 ' + itemCount + '건';
-    items = [{
-      code:   '',
-      name:   summaryText,
-      spec:   '',
-      qty:    formatNumber_(itemCount),
-      price:  '',
-      amount: formatNumber_(totalSupply),
-      note:   '(단축 출력)'
-    }];
-  }
-
-  if (!items.length) {
-    items.push({
+  if (!firstPageItems.length) {
+    // 품목이 하나도 없으면 형식상 1행 빈 행만 생성
+    firstPageItems.push({
       code: '', name: '', spec: '',
       qty: '', price: '', amount: '', note: ''
     });
@@ -758,7 +777,8 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
-    items:          items,
+    items:          firstPageItems,
+    additionalPages: additionalPages,
     buyerOrderCode: '',
     remark:         '※ 영세율 적용'
   };
@@ -868,43 +888,51 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
   }
 
   // ========================================
-  // 브랜드별 출력방식 적용 + 전체 품목 리스트 생성
+  // 브랜드별 품목 리스트 통합
   // ========================================
   var allItems = [];
   var grandTotalSupply = 0;
 
   for (var orderCode in orderGroups) {
     var group = orderGroups[orderCode];
-    var mode = modesByOrder[orderCode] || defaultMode || 'auto';
-
-    // auto 모드: 품목수에 따라 결정
-    var actualMode = mode;
-    if (mode === 'auto') {
-      actualMode = group.itemCount <= 10 ? 'full' : 'short';
-    }
-
-    // short 모드: 축약
-    if (actualMode === 'short' && group.itemCount > 0) {
-      var summaryText = group.brandName + ' 총 ' + group.itemCount + '건';
-      allItems.push({
-        code:   '',
-        name:   summaryText,
-        spec:   '',
-        qty:    formatNumber_(group.itemCount),
-        price:  '',
-        amount: formatNumber_(group.totalSupply),
-        note:   '(단축 출력)'
-      });
-    } else {
-      // full 모드: 전체 품목 추가
-      allItems = allItems.concat(group.items);
-    }
-
+    // 모든 품목을 allItems에 추가
+    allItems = allItems.concat(group.items);
     grandTotalSupply += group.totalSupply;
   }
 
-  if (!allItems.length) {
-    allItems.push({
+  // ========================================
+  // 멀티페이지 분할 로직
+  // ========================================
+  var firstPageItems = [];
+  var additionalPages = [];
+  var FIRST_PAGE_LIMIT = 10;
+  var ADDITIONAL_PAGE_LIMIT = 30;
+  var itemCount = allItems.length;
+
+  if (itemCount <= FIRST_PAGE_LIMIT) {
+    // 10개 이하: 첫 페이지에 모두 표시
+    firstPageItems = allItems;
+  } else {
+    // 10개 초과: 멀티페이지 분할
+    firstPageItems = allItems.slice(0, FIRST_PAGE_LIMIT);
+    var remainingItems = allItems.slice(FIRST_PAGE_LIMIT);
+
+    // 추가 페이지들 생성 (페이지당 30개씩)
+    for (var pageStart = 0; pageStart < remainingItems.length; pageStart += ADDITIONAL_PAGE_LIMIT) {
+      var pageItems = remainingItems.slice(pageStart, pageStart + ADDITIONAL_PAGE_LIMIT);
+
+      // rowNumber 추가 (첫 페이지 이후부터 번호 계속 이어짐)
+      for (var k = 0; k < pageItems.length; k++) {
+        pageItems[k].rowNumber = FIRST_PAGE_LIMIT + pageStart + k + 1;
+      }
+
+      additionalPages.push({ items: pageItems });
+    }
+  }
+
+  if (!firstPageItems.length) {
+    // 품목이 하나도 없으면 형식상 1행 빈 행만 생성
+    firstPageItems.push({
       code: '', name: '', spec: '',
       qty: '', price: '', amount: '', note: ''
     });
@@ -940,7 +968,8 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
-    items:          allItems,
+    items:          firstPageItems,
+    additionalPages: additionalPages,
     buyerOrderCode: '',
     remark:         '※ 영세율 적용'
   };
@@ -1191,43 +1220,51 @@ function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOr
   }
 
   // ========================================
-  // 브랜드별 출력방식 적용 + 전체 품목 리스트 생성
+  // 브랜드별 품목 리스트 통합
   // ========================================
   var allItems = [];
   var grandTotalAmount = 0;
 
   for (var orderCode in orderGroups) {
     var group = orderGroups[orderCode];
-    var mode = modesByOrder[orderCode] || defaultMode || 'auto';
-
-    // auto 모드: 품목수에 따라 결정
-    var actualMode = mode;
-    if (mode === 'auto') {
-      actualMode = group.itemCount <= 10 ? 'full' : 'short';
-    }
-
-    // short 모드: 축약
-    if (actualMode === 'short' && group.itemCount > 0) {
-      var summaryText = group.brandName + ' 총 ' + group.itemCount + '건';
-      allItems.push({
-        code:   '',
-        name:   summaryText,
-        spec:   '',
-        qty:    formatNumber_(group.itemCount),
-        price:  '',
-        amount: formatNumber_(group.totalAmount),
-        note:   '(단축 출력)'
-      });
-    } else {
-      // full 모드: 전체 품목 추가
-      allItems = allItems.concat(group.items);
-    }
-
+    // 모든 품목을 allItems에 추가
+    allItems = allItems.concat(group.items);
     grandTotalAmount += group.totalAmount;
   }
 
-  if (!allItems.length) {
-    allItems.push({
+  // ========================================
+  // 멀티페이지 분할 로직
+  // ========================================
+  var firstPageItems = [];
+  var additionalPages = [];
+  var FIRST_PAGE_LIMIT = 10;
+  var ADDITIONAL_PAGE_LIMIT = 30;
+  var itemCount = allItems.length;
+
+  if (itemCount <= FIRST_PAGE_LIMIT) {
+    // 10개 이하: 첫 페이지에 모두 표시
+    firstPageItems = allItems;
+  } else {
+    // 10개 초과: 멀티페이지 분할
+    firstPageItems = allItems.slice(0, FIRST_PAGE_LIMIT);
+    var remainingItems = allItems.slice(FIRST_PAGE_LIMIT);
+
+    // 추가 페이지들 생성 (페이지당 30개씩)
+    for (var pageStart = 0; pageStart < remainingItems.length; pageStart += ADDITIONAL_PAGE_LIMIT) {
+      var pageItems = remainingItems.slice(pageStart, pageStart + ADDITIONAL_PAGE_LIMIT);
+
+      // rowNumber 추가 (첫 페이지 이후부터 번호 계속 이어짐)
+      for (var k = 0; k < pageItems.length; k++) {
+        pageItems[k].rowNumber = FIRST_PAGE_LIMIT + pageStart + k + 1;
+      }
+
+      additionalPages.push({ items: pageItems });
+    }
+  }
+
+  if (!firstPageItems.length) {
+    // 품목이 하나도 없으면 형식상 1행 빈 행만 생성
+    firstPageItems.push({
       code: '', name: '', spec: '',
       qty: '', price: '', amount: '', note: ''
     });
@@ -1295,7 +1332,8 @@ function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOr
     totalAmount:    formatNumber_(grandTotalAmount),
     amountHangul:   numberToHangulKor_(Math.round(grandTotalAmount)),
 
-    items:          allItems,
+    items:          firstPageItems,
+    additionalPages: additionalPages,
     buyerOrderCode: '',
     remark:         remarkLines.join('\n')
   };
@@ -1414,7 +1452,7 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
   }
 
   // ========================================
-  // 브랜드별 출력방식 적용 + 전체 품목 리스트 생성
+  // 브랜드별 품목 리스트 통합
   // ========================================
   var allItems = [];
   var grandTotalSupply = 0;
@@ -1422,37 +1460,45 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
 
   for (var orderCode in orderGroups) {
     var group = orderGroups[orderCode];
-    var mode = modesByOrder[orderCode] || defaultMode || 'auto';
-
-    // auto 모드: 품목수에 따라 결정
-    var actualMode = mode;
-    if (mode === 'auto') {
-      actualMode = group.itemCount <= 10 ? 'full' : 'short';
-    }
-
-    // short 모드: 축약
-    if (actualMode === 'short' && group.itemCount > 0) {
-      var summaryText = group.brandName + ' 총 ' + group.itemCount + '건';
-      allItems.push({
-        code:   '',
-        name:   summaryText,
-        spec:   '',
-        qty:    formatNumber_(group.itemCount),
-        price:  '',
-        amount: formatNumber_(group.totalSupply),
-        note:   '(단축 출력)'
-      });
-    } else {
-      // full 모드: 전체 품목 추가
-      allItems = allItems.concat(group.items);
-    }
-
+    // 모든 품목을 allItems에 추가
+    allItems = allItems.concat(group.items);
     grandTotalSupply += group.totalSupply;
     grandTotalAmount += group.totalAmount;
   }
 
-  if (!allItems.length) {
-    allItems.push({
+  // ========================================
+  // 멀티페이지 분할 로직
+  // ========================================
+  var firstPageItems = [];
+  var additionalPages = [];
+  var FIRST_PAGE_LIMIT = 10;
+  var ADDITIONAL_PAGE_LIMIT = 30;
+  var itemCount = allItems.length;
+
+  if (itemCount <= FIRST_PAGE_LIMIT) {
+    // 10개 이하: 첫 페이지에 모두 표시
+    firstPageItems = allItems;
+  } else {
+    // 10개 초과: 멀티페이지 분할
+    firstPageItems = allItems.slice(0, FIRST_PAGE_LIMIT);
+    var remainingItems = allItems.slice(FIRST_PAGE_LIMIT);
+
+    // 추가 페이지들 생성 (페이지당 30개씩)
+    for (var pageStart = 0; pageStart < remainingItems.length; pageStart += ADDITIONAL_PAGE_LIMIT) {
+      var pageItems = remainingItems.slice(pageStart, pageStart + ADDITIONAL_PAGE_LIMIT);
+
+      // rowNumber 추가 (첫 페이지 이후부터 번호 계속 이어짐)
+      for (var k = 0; k < pageItems.length; k++) {
+        pageItems[k].rowNumber = FIRST_PAGE_LIMIT + pageStart + k + 1;
+      }
+
+      additionalPages.push({ items: pageItems });
+    }
+  }
+
+  if (!firstPageItems.length) {
+    // 품목이 하나도 없으면 형식상 1행 빈 행만 생성
+    firstPageItems.push({
       code: '', name: '', spec: '',
       qty: '', price: '', amount: '', note: ''
     });
@@ -1487,7 +1533,8 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
     totalAmount:    formatNumber_(grandTotalAmount),
     amountHangul:   numberToHangulKor_(Math.round(grandTotalAmount)),
 
-    items:          allItems,
+    items:          firstPageItems,
+    additionalPages: additionalPages,
     buyerOrderCode: '',
     remark:         ''
   };

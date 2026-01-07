@@ -385,6 +385,33 @@
       background: #ffffff;
     }
   }
+
+  /* ===== 멀티페이지 지원 ===== */
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .additional-page {
+    position: relative;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .additional-page .content {
+    padding: 25px 30px;
+  }
+
+  .page-number {
+    position: absolute;
+    top: 15px;
+    right: 30px;
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -564,5 +591,83 @@
   </div>
 
 </div>
+
+<!-- 추가 페이지들 (멀티페이지 지원) -->
+<? if (additionalPages && additionalPages.length > 0) { ?>
+  <? for (var pageIdx = 0; pageIdx < additionalPages.length; pageIdx++) { ?>
+    <? var page = additionalPages[pageIdx]; ?>
+
+    <div class="additional-page page-break">
+      <!-- 페이지 번호 -->
+      <div class="page-number">페이지 <?= pageIdx + 2 ?></div>
+
+      <!-- 간소화된 헤더 -->
+      <div class="header">
+        <div class="logo-area">
+          <? if (logoBase64) { ?>
+            <img src="data:image/png;base64,<?= logoBase64 ?>" alt="Company Logo">
+          <? } else { ?>
+            <div class="logo-placeholder">LOGO</div>
+          <? } ?>
+        </div>
+
+        <div class="title-area">
+          <div class="doc-title"><?= docTitle || '거래명세서' ?></div>
+          <div class="doc-subtitle">TRANSACTION STATEMENT (계속)</div>
+        </div>
+
+        <div class="header-info">
+          <div><span class="header-info-label">발주번호</span> <span class="header-info-value"><?= orderCode ?></span></div>
+          <div><span class="header-info-label">발주일자</span> <span class="header-info-value"><?= dueDate ?></span></div>
+        </div>
+      </div>
+
+      <!-- 컨텐츠: 품목 테이블만 -->
+      <div class="content">
+        <div class="items-section">
+          <div class="section-title">품목 내역 (계속)</div>
+
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th class="col-no">No</th>
+                <th class="col-code">품목코드</th>
+                <th class="col-name">품명</th>
+                <th class="col-spec">규격</th>
+                <th class="col-qty">수량</th>
+                <th class="col-price">단가</th>
+                <th class="col-amt">금액</th>
+                <th class="col-note">비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              <? var pageItems = page.items || []; ?>
+              <? for (var i = 0; i < pageItems.length; i++) {
+                   var it = pageItems[i]; ?>
+                <tr>
+                  <td class="col-no"><?= it.rowNumber || (i + 1) ?></td>
+                  <td class="col-code"><?= it.code || '' ?></td>
+                  <td class="col-name"><?= it.name || '' ?></td>
+                  <td class="col-spec"><?= it.spec || '' ?></td>
+                  <td class="col-qty"><?= it.qty || '' ?></td>
+                  <td class="col-price"><?= it.price || '' ?></td>
+                  <td class="col-amt"><?= it.amount || '' ?></td>
+                  <td class="col-note"><?= it.note || '' ?></td>
+                </tr>
+              <? } ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 푸터 -->
+      <div class="footer">
+        본 문서는 (주)원브릿지 ERP 시스템에서 자동 생성되었습니다. | OneBridge ERP v2.1
+      </div>
+    </div>
+
+  <? } ?>
+<? } ?>
+
 </body>
 </html>
