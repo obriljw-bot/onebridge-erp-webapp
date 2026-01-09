@@ -168,7 +168,7 @@ function generateInvoiceZip(params) {
         // 발주별 개별 출력방식 적용
         var mode = modesByOrder[orderCode] || printMode || 'auto';
 
-        var pdfBlob;
+        var fileBlob;
 
         // 추가 옵션 전달
         var options = {
@@ -177,19 +177,39 @@ function generateInvoiceZip(params) {
           manualRemark: manualRemark
         };
 
+        // Excel 출력인 경우 전용 양식 체크
+        if (outputFormat === 'EXCEL') {
+          var idxBrand = header.indexOf('브랜드');
+          var brandName = orderRows[0] && orderRows[0][idxBrand] || '';
+          var templateGroup = getCustomTemplateGroup_(brandName);
+
+          if (templateGroup) {
+            // 전용 양식 브랜드: Excel 템플릿 사용
+            Logger.log('[generateInvoiceZip] 전용 양식 적용 - 브랜드: ' + brandName + ', 그룹: ' + templateGroup);
+            fileBlob = buildCustomTemplateExcel_(templateGroup, orderCode, orderRows, header, options);
+
+            if (fileBlob) {
+              fileBlob.setName('발주서_' + brandName + '_' + orderCode + '.xlsx');
+              pdfBlobs.push(fileBlob);
+            }
+            return;  // 전용 양식 처리 완료
+          }
+        }
+
+        // 일반 PDF 출력 또는 전용 양식 아닌 Excel (PDF로 대체)
         switch (docType) {
           case 'INVOICE_VAT':
           default:
-            pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode, options);
+            fileBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode, options);
             break;
         }
 
-        if (pdfBlob) {
-          pdfBlob.setName('거래명세서_VAT_' + orderCode + '.pdf');
-          pdfBlobs.push(pdfBlob);
+        if (fileBlob) {
+          fileBlob.setName('거래명세서_VAT_' + orderCode + '.pdf');
+          pdfBlobs.push(fileBlob);
         }
       } catch (err) {
-        Logger.log('[generateInvoiceZip] PDF 생성 실패 - ' + orderCode + ': ' + err.message);
+        Logger.log('[generateInvoiceZip] 파일 생성 실패 - ' + orderCode + ': ' + err.message);
         // 실패한 발주는 건너뛰고 계속 진행
       }
     });
@@ -198,7 +218,7 @@ function generateInvoiceZip(params) {
   if (!pdfBlobs.length) {
     return {
       success: false,
-      error: 'PDF를 생성할 유효한 발주 데이터가 없습니다.'
+      error: '출력 파일을 생성할 유효한 발주 데이터가 없습니다.'
     };
   }
 
@@ -748,4 +768,397 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
     .getAs('application/pdf');
 
   return blob;
+}
+
+// ============================================================
+// 전용 양식 출력 기능 (롬앤/누즈, 종근당, 삐아계열)
+// ============================================================
+
+/**
+ * 전용 양식 브랜드 상수 정의
+ */
+var CUSTOM_TEMPLATE_BRANDS = {
+  // 롬앤/누즈 (같은 회사, 공유 템플릿)
+  ROMAND_NUDZ: ['롬앤', '누즈', 'ROMAND', 'ROMAND & CO', 'rom&nd'],
+
+  // 종근당
+  JONGGEUNDANG: ['종근당', '종근당건강'],
+
+  // 삐아계열 (같은 회사, 공유 템플릿)
+  BBIA_GROUP: ['삐아', '어바웃톤', '이글립스', 'BBIA', 'ABOUTTONE', 'EGLIPS']
+};
+
+/**
+ * 전용 양식 템플릿 파일 ID (Google Drive)
+ * 실제 파일 ID로 교체 필요 - Script Properties에서 관리
+ */
+function getCustomTemplateFileIds_() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    ROMAND_NUDZ: props.getProperty('TEMPLATE_ROMAND_NUDZ') || '',
+    JONGGEUNDANG: props.getProperty('TEMPLATE_JONGGEUNDANG') || '',
+    BBIA_GROUP: props.getProperty('TEMPLATE_BBIA_GROUP') || ''
+  };
+}
+
+/**
+ * 브랜드가 전용 양식 대상인지 확인
+ * @param {string} brandName - 브랜드명
+ * @return {string|null} 템플릿 그룹 키 (ROMAND_NUDZ, JONGGEUNDANG, BBIA_GROUP) 또는 null
+ */
+function getCustomTemplateGroup_(brandName) {
+  if (!brandName) return null;
+
+  var normalizedBrand = String(brandName).trim().toUpperCase();
+
+  // 롬앤/누즈
+  for (var i = 0; i < CUSTOM_TEMPLATE_BRANDS.ROMAND_NUDZ.length; i++) {
+    if (normalizedBrand.indexOf(CUSTOM_TEMPLATE_BRANDS.ROMAND_NUDZ[i].toUpperCase()) >= 0) {
+      return 'ROMAND_NUDZ';
+    }
+  }
+
+  // 종근당
+  for (var i = 0; i < CUSTOM_TEMPLATE_BRANDS.JONGGEUNDANG.length; i++) {
+    if (normalizedBrand.indexOf(CUSTOM_TEMPLATE_BRANDS.JONGGEUNDANG[i].toUpperCase()) >= 0) {
+      return 'JONGGEUNDANG';
+    }
+  }
+
+  // 삐아계열
+  for (var i = 0; i < CUSTOM_TEMPLATE_BRANDS.BBIA_GROUP.length; i++) {
+    if (normalizedBrand.indexOf(CUSTOM_TEMPLATE_BRANDS.BBIA_GROUP[i].toUpperCase()) >= 0) {
+      return 'BBIA_GROUP';
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 전용 양식 Excel 파일 생성 (메인 라우터)
+ * @param {string} templateGroup - 템플릿 그룹 키
+ * @param {string} orderCode - 발주번호
+ * @param {Array} orderRows - 발주 데이터 행 배열
+ * @param {Array} header - 거래원장 헤더
+ * @param {Object} options - 추가 옵션 {docDate, deliveryDate}
+ * @return {Blob|null} Excel 파일 Blob 또는 null
+ */
+function buildCustomTemplateExcel_(templateGroup, orderCode, orderRows, header, options) {
+  options = options || {};
+
+  var templateIds = getCustomTemplateFileIds_();
+  var templateId = templateIds[templateGroup];
+
+  if (!templateId) {
+    Logger.log('[buildCustomTemplateExcel_] 템플릿 파일 ID 미설정: ' + templateGroup);
+    return null;
+  }
+
+  try {
+    switch (templateGroup) {
+      case 'ROMAND_NUDZ':
+        return buildRomandNudzExcel_(templateId, orderCode, orderRows, header, options);
+      case 'JONGGEUNDANG':
+        return buildJonggeundangExcel_(templateId, orderCode, orderRows, header, options);
+      case 'BBIA_GROUP':
+        return buildBbiaGroupExcel_(templateId, orderCode, orderRows, header, options);
+      default:
+        Logger.log('[buildCustomTemplateExcel_] 지원하지 않는 템플릿 그룹: ' + templateGroup);
+        return null;
+    }
+  } catch (e) {
+    Logger.log('[buildCustomTemplateExcel_] 오류: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * 롬앤/누즈 전용 양식 Excel 생성
+ * - 시트: 롬앤(발주양식)
+ * - 데이터 시작: 15행
+ * - 컬럼: A=자체코드, B=바코드, C=제품명, E=소비자가, F="39%", G=공급가, I=수량, J=금액
+ */
+function buildRomandNudzExcel_(templateFileId, orderCode, orderRows, header, options) {
+  Logger.log('[buildRomandNudzExcel_] 시작 - 발주번호: ' + orderCode);
+
+  // 템플릿 파일 복사
+  var templateFile = DriveApp.getFileById(templateFileId);
+  var copiedFile = templateFile.makeCopy('롬앤발주_' + orderCode + '_' + new Date().getTime());
+  var ss = SpreadsheetApp.open(copiedFile);
+  var sheet = ss.getSheetByName('롬앤(발주양식)');
+
+  if (!sheet) {
+    Logger.log('[buildRomandNudzExcel_] 시트 "롬앤(발주양식)" 찾을 수 없음');
+    DriveApp.getFileById(copiedFile.getId()).setTrashed(true);
+    return null;
+  }
+
+  // 헤더 인덱스
+  var idxBarcode     = header.indexOf('바코드');
+  var idxProductName = header.indexOf('제품명');
+  var idxQtyConfirmed = header.indexOf('확정수량');
+  var idxQtyOrder    = header.indexOf('발주수량');
+  var qtyIdx = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder;
+
+  // 품목DB에서 추가 정보 조회용 (자체코드, 소비자가, 공급가)
+  var productDb = getProducts();
+  var productHeader = productDb.header;
+  var productRows = productDb.rows;
+
+  var pIdxBarcode     = productHeader.indexOf('바코드');
+  var pIdxSelfCode    = productHeader.indexOf('자체코드');     // J열
+  var pIdxRetailPrice = productHeader.indexOf('소비자가');     // F열
+  var pIdxSupplyPrice = productHeader.indexOf('공급가');       // H열
+
+  // 바코드 → 품목정보 맵 생성
+  var productMap = {};
+  for (var i = 0; i < productRows.length; i++) {
+    var barcode = String(productRows[i][pIdxBarcode] || '').trim();
+    if (barcode) {
+      productMap[barcode] = {
+        selfCode: pIdxSelfCode >= 0 ? productRows[i][pIdxSelfCode] : '',
+        retailPrice: pIdxRetailPrice >= 0 ? Number(productRows[i][pIdxRetailPrice] || 0) : 0,
+        supplyPrice: pIdxSupplyPrice >= 0 ? Number(productRows[i][pIdxSupplyPrice] || 0) : 0
+      };
+    }
+  }
+
+  // 데이터 입력 시작: 15행
+  var startRow = 15;
+
+  for (var i = 0; i < orderRows.length; i++) {
+    var row = orderRows[i];
+    var barcode = String(row[idxBarcode] || '').trim();
+    var productName = row[idxProductName] || '';
+    var qty = Number(row[qtyIdx] || 0);
+
+    if (!qty) continue;  // 수량 0은 건너뜀
+
+    var productInfo = productMap[barcode] || {};
+    var selfCode = productInfo.selfCode || '';
+    var retailPrice = productInfo.retailPrice || 0;
+    var supplyPrice = productInfo.supplyPrice || 0;
+    var amount = qty * supplyPrice;
+
+    var rowNum = startRow + i;
+
+    sheet.getRange(rowNum, 1).setValue(selfCode);       // A열: 자체코드
+    sheet.getRange(rowNum, 2).setValue(barcode);        // B열: 바코드
+    sheet.getRange(rowNum, 3).setValue(productName);    // C열: 제품명
+    sheet.getRange(rowNum, 5).setValue(retailPrice);    // E열: 소비자가
+    sheet.getRange(rowNum, 6).setValue('39%');          // F열: 39% 고정
+    sheet.getRange(rowNum, 7).setValue(supplyPrice);    // G열: 공급가
+    sheet.getRange(rowNum, 9).setValue(qty);            // I열: 수량
+    sheet.getRange(rowNum, 10).setFormula('=G' + rowNum + '*I' + rowNum);  // J열: 금액
+  }
+
+  SpreadsheetApp.flush();
+
+  // Excel Blob으로 변환
+  var blob = copiedFile.getBlob();
+
+  // 임시 파일 삭제
+  DriveApp.getFileById(copiedFile.getId()).setTrashed(true);
+
+  Logger.log('[buildRomandNudzExcel_] 완료');
+  return blob;
+}
+
+/**
+ * 종근당 전용 양식 Excel 생성
+ * - 시트: 2. 발주서
+ * - 데이터 시작: 5행
+ * - 컬럼: B5=날짜, E=품목코드, F=제품명, I=공급가, J=수량, L=입고지, M=담당자
+ */
+function buildJonggeundangExcel_(templateFileId, orderCode, orderRows, header, options) {
+  Logger.log('[buildJonggeundangExcel_] 시작 - 발주번호: ' + orderCode);
+
+  // 템플릿 파일 복사
+  var templateFile = DriveApp.getFileById(templateFileId);
+  var copiedFile = templateFile.makeCopy('종근당발주_' + orderCode + '_' + new Date().getTime());
+  var ss = SpreadsheetApp.open(copiedFile);
+  var sheet = ss.getSheetByName('2. 발주서');
+
+  if (!sheet) {
+    Logger.log('[buildJonggeundangExcel_] 시트 "2. 발주서" 찾을 수 없음');
+    DriveApp.getFileById(copiedFile.getId()).setTrashed(true);
+    return null;
+  }
+
+  // 헤더 인덱스
+  var idxProductCode = header.indexOf('품목코드');
+  var idxProductName = header.indexOf('제품명');
+  var idxSupplyPrice = header.indexOf('공급가');
+  var idxQtyConfirmed = header.indexOf('확정수량');
+  var idxQtyOrder    = header.indexOf('발주수량');
+  var idxSupplier    = header.indexOf('매입처');
+  var qtyIdx = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder;
+
+  // 거래처DB에서 입고지/담당자 조회
+  var supplierName = orderRows[0] && orderRows[0][idxSupplier] || '';
+  var supplierInfo = findPartnerByName_(supplierName);
+  var warehouse = supplierInfo ? (supplierInfo.warehouse || '') : '';
+  var manager = supplierInfo ? (supplierInfo.manager || '') : '';
+
+  // 날짜 입력 (B5)
+  var docDate = options.docDate || new Date();
+  sheet.getRange('B5').setValue(formatDateYmd_(new Date(docDate)));
+
+  // 데이터 입력 시작: 5행
+  var startRow = 5;
+
+  for (var i = 0; i < orderRows.length; i++) {
+    var row = orderRows[i];
+    var productCode = row[idxProductCode] || '';
+    var productName = row[idxProductName] || '';
+    var supplyPrice = Number(idxSupplyPrice >= 0 ? (row[idxSupplyPrice] || 0) : 0);
+    var qty = Number(row[qtyIdx] || 0);
+
+    if (!qty) continue;
+
+    var rowNum = startRow + i;
+
+    sheet.getRange(rowNum, 5).setValue(productCode);     // E열: 품목코드
+    sheet.getRange(rowNum, 6).setValue(productName);     // F열: 제품명
+    sheet.getRange(rowNum, 9).setValue(supplyPrice);     // I열: 공급가
+    sheet.getRange(rowNum, 10).setValue(qty);            // J열: 수량
+    sheet.getRange(rowNum, 11).setFormula('=I' + rowNum + '*J' + rowNum);  // K열: 금액
+    sheet.getRange(rowNum, 12).setValue(warehouse);      // L열: 입고지
+    sheet.getRange(rowNum, 13).setValue(manager);        // M열: 담당자
+  }
+
+  SpreadsheetApp.flush();
+
+  // Excel Blob으로 변환
+  var blob = copiedFile.getBlob();
+
+  // 임시 파일 삭제
+  DriveApp.getFileById(copiedFile.getId()).setTrashed(true);
+
+  Logger.log('[buildJonggeundangExcel_] 완료');
+  return blob;
+}
+
+/**
+ * 삐아계열 전용 양식 Excel 생성
+ * - 시트: 브랜드명별 (삐아, 어바웃톤, 이글립스)
+ * - 데이터 시작: 10행
+ * - 바코드 매칭 방식: H열에 수량만 입력
+ * - B8: 발주일 + 납품일
+ */
+function buildBbiaGroupExcel_(templateFileId, orderCode, orderRows, header, options) {
+  Logger.log('[buildBbiaGroupExcel_] 시작 - 발주번호: ' + orderCode);
+
+  // 템플릿 파일 복사
+  var templateFile = DriveApp.getFileById(templateFileId);
+  var copiedFile = templateFile.makeCopy('삐아계열발주_' + orderCode + '_' + new Date().getTime());
+  var ss = SpreadsheetApp.open(copiedFile);
+
+  // 브랜드 확인
+  var idxBrand = header.indexOf('브랜드');
+  var brandName = orderRows[0] && orderRows[0][idxBrand] || '삐아';
+
+  // 브랜드명에 따른 시트 선택
+  var sheetName = brandName;
+  if (brandName.toUpperCase().indexOf('BBIA') >= 0 || brandName.indexOf('삐아') >= 0) {
+    sheetName = '삐아';
+  } else if (brandName.toUpperCase().indexOf('ABOUTTONE') >= 0 || brandName.indexOf('어바웃톤') >= 0) {
+    sheetName = '어바웃톤';
+  } else if (brandName.toUpperCase().indexOf('EGLIPS') >= 0 || brandName.indexOf('이글립스') >= 0) {
+    sheetName = '이글립스';
+  }
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    Logger.log('[buildBbiaGroupExcel_] 시트 "' + sheetName + '" 찾을 수 없음, 첫번째 시트 사용');
+    sheet = ss.getSheets()[0];
+  }
+
+  // 헤더 인덱스
+  var idxBarcode = header.indexOf('바코드');
+  var idxQtyConfirmed = header.indexOf('확정수량');
+  var idxQtyOrder = header.indexOf('발주수량');
+  var qtyIdx = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder;
+
+  // B8: 발주일 + 납품일 입력
+  var docDate = options.docDate || new Date();
+  var deliveryDate = options.deliveryDate || '';
+  var dateStr = formatDateYmd_(new Date(docDate));
+  if (deliveryDate) {
+    dateStr += ' / 납품: ' + formatDateYmd_(new Date(deliveryDate));
+  }
+  sheet.getRange('B8').setValue(dateStr);
+
+  // 기존 템플릿의 바코드 읽기 (A열 또는 B열)
+  // 바코드 매칭 방식: 템플릿의 바코드와 발주 데이터 바코드 매칭하여 수량 입력
+  var dataRange = sheet.getRange(10, 1, sheet.getLastRow() - 9, 8);  // A10부터 H열까지
+  var templateData = dataRange.getValues();
+
+  // 발주 데이터를 바코드 맵으로 변환
+  var qtyByBarcode = {};
+  for (var i = 0; i < orderRows.length; i++) {
+    var barcode = String(orderRows[i][idxBarcode] || '').trim();
+    var qty = Number(orderRows[i][qtyIdx] || 0);
+    if (barcode && qty) {
+      qtyByBarcode[barcode] = (qtyByBarcode[barcode] || 0) + qty;
+    }
+  }
+
+  // 템플릿의 각 행에서 바코드 매칭하여 수량 입력
+  for (var r = 0; r < templateData.length; r++) {
+    var templateBarcode = String(templateData[r][1] || templateData[r][0] || '').trim();  // B열 또는 A열
+    if (templateBarcode && qtyByBarcode[templateBarcode]) {
+      sheet.getRange(10 + r, 8).setValue(qtyByBarcode[templateBarcode]);  // H열에 수량 입력
+    }
+  }
+
+  SpreadsheetApp.flush();
+
+  // Excel Blob으로 변환
+  var blob = copiedFile.getBlob();
+
+  // 임시 파일 삭제
+  DriveApp.getFileById(copiedFile.getId()).setTrashed(true);
+
+  Logger.log('[buildBbiaGroupExcel_] 완료');
+  return blob;
+}
+
+/**
+ * 품목DB 조회 (캐시 활용)
+ */
+function getProducts() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('productData');
+
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      // 캐시 파싱 실패시 새로 조회
+    }
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('품목DB');
+
+  if (!sheet) {
+    return { header: [], rows: [] };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var result = {
+    header: data[0] || [],
+    rows: data.slice(1) || []
+  };
+
+  // 6시간 캐시
+  try {
+    cache.put('productData', JSON.stringify(result), 21600);
+  } catch (e) {
+    // 캐시 저장 실패 무시
+  }
+
+  return result;
 }
