@@ -373,11 +373,62 @@
     padding-top: 10px;
   }
 
+  /* ===== 페이지 번호 ===== */
+  .page-number {
+    position: absolute;
+    bottom: 8mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  /* ===== 멀티페이지 지원 ===== */
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .page-continuation {
+    position: relative;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .continuation-header {
+    background: linear-gradient(135deg, #334155 0%, #475569 100%);
+    color: #ffffff;
+    padding: 12px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #f97316;
+  }
+
+  .continuation-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .continuation-info {
+    font-size: 11px;
+    color: #cbd5e1;
+  }
+
   /* ===== 인쇄 최적화 ===== */
   @media print {
-    .page {
+    .page, .page-continuation {
       margin: 0;
       padding: 0;
+    }
+
+    .page-break {
+      page-break-after: always;
+      break-after: page;
     }
 
     body {
@@ -492,9 +543,16 @@
       <div class="summary-hangul"><?= amountHangul ?></div>
     </div>
 
-    <!-- 품목 리스트 -->
+    <?
+      var rowCount = items && items.length ? items.length : 0;
+      var ITEMS_PER_PAGE = 10;
+      var totalPages = rowCount <= ITEMS_PER_PAGE ? 1 : Math.ceil(rowCount / ITEMS_PER_PAGE);
+      var firstPageItems = Math.min(rowCount, ITEMS_PER_PAGE);
+    ?>
+
+    <!-- 품목 리스트 (1페이지: 최대 10행) -->
     <div class="items-section">
-      <div class="section-title">품목 내역</div>
+      <div class="section-title">품목 내역 <? if (totalPages > 1) { ?>(총 <?= rowCount ?>건 중 1~<?= firstPageItems ?>)<? } ?></div>
 
       <table class="items-table">
         <thead>
@@ -510,8 +568,7 @@
           </tr>
         </thead>
         <tbody>
-          <? var rowCount = items && items.length ? items.length : 0; ?>
-          <? for (var i = 0; i < rowCount; i++) {
+          <? for (var i = 0; i < firstPageItems; i++) {
                var it = items[i]; ?>
             <tr>
               <td class="col-no"><?= i + 1 ?></td>
@@ -525,8 +582,9 @@
             </tr>
           <? } ?>
 
-          <!-- 최소 5행 보장 -->
-          <? for (var j = rowCount; j < 5; j++) { ?>
+          <!-- 최소 5행 보장 (1페이지만) -->
+          <? if (totalPages === 1) {
+               for (var j = rowCount; j < 5; j++) { ?>
             <tr>
               <td class="col-no">&nbsp;</td>
               <td class="col-code">&nbsp;</td>
@@ -537,12 +595,14 @@
               <td class="col-amt">&nbsp;</td>
               <td class="col-note">&nbsp;</td>
             </tr>
-          <? } ?>
+          <?   }
+             } ?>
         </tbody>
       </table>
     </div>
 
-    <!-- 비고 -->
+    <!-- 비고 (1페이지에만 표시) -->
+    <? if (totalPages === 1) { ?>
     <div class="remark-section">
       <div class="remark-header">특이사항 및 비고</div>
       <div class="remark-body">
@@ -554,6 +614,90 @@
         <?= remark || '' ?>
       </div>
     </div>
+    <? } ?>
+
+  </div>
+
+  <!-- 푸터 (1페이지) -->
+  <div class="footer">
+    본 문서는 (주)원브릿지 ERP 시스템에서 자동 생성되었습니다. | OneBridge ERP v2.1
+  </div>
+
+  <!-- 페이지 번호 (1페이지) -->
+  <? if (totalPages > 1) { ?>
+  <div class="page-number">- 1 -</div>
+  <? } ?>
+
+</div>
+
+<!-- ===== 추가 페이지 (11행 이상일 때) ===== -->
+<? for (var pageNum = 2; pageNum <= totalPages; pageNum++) {
+     var startIdx = (pageNum - 1) * ITEMS_PER_PAGE;
+     var endIdx = Math.min(startIdx + ITEMS_PER_PAGE, rowCount);
+     var isLastPage = (pageNum === totalPages);
+?>
+
+<div class="page-break"></div>
+<div class="page-continuation">
+
+  <!-- 연속 페이지 헤더 -->
+  <div class="continuation-header">
+    <div class="continuation-title">거래명세서 (계속)</div>
+    <div class="continuation-info">
+      발주번호: <?= orderCode ?> | <?= dueDate ?>
+    </div>
+  </div>
+
+  <div class="content" style="padding-top: 20px;">
+    <!-- 품목 리스트 (연속) -->
+    <div class="items-section">
+      <div class="section-title">품목 내역 (<?= startIdx + 1 ?>~<?= endIdx ?> / 총 <?= rowCount ?>건)</div>
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-code">품목코드</th>
+            <th class="col-name">품명</th>
+            <th class="col-spec">규격</th>
+            <th class="col-qty">수량</th>
+            <th class="col-price">단가</th>
+            <th class="col-amt">금액</th>
+            <th class="col-note">비고</th>
+          </tr>
+        </thead>
+        <tbody>
+          <? for (var k = startIdx; k < endIdx; k++) {
+               var it = items[k]; ?>
+            <tr>
+              <td class="col-no"><?= k + 1 ?></td>
+              <td class="col-code"><?= it.code || '' ?></td>
+              <td class="col-name"><?= it.name || '' ?></td>
+              <td class="col-spec"><?= it.spec || '' ?></td>
+              <td class="col-qty"><?= it.qty || '' ?></td>
+              <td class="col-price"><?= it.price || '' ?></td>
+              <td class="col-amt"><?= it.amount || '' ?></td>
+              <td class="col-note"><?= it.note || '' ?></td>
+            </tr>
+          <? } ?>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 비고 (마지막 페이지에만 표시) -->
+    <? if (isLastPage) { ?>
+    <div class="remark-section">
+      <div class="remark-header">특이사항 및 비고</div>
+      <div class="remark-body">
+        <? if (buyerOrderCode) { ?>
+          <div class="remark-label">발주처 발주코드:</div>
+          <div><?= buyerOrderCode ?></div>
+          <br>
+        <? } ?>
+        <?= remark || '' ?>
+      </div>
+    </div>
+    <? } ?>
 
   </div>
 
@@ -562,6 +706,11 @@
     본 문서는 (주)원브릿지 ERP 시스템에서 자동 생성되었습니다. | OneBridge ERP v2.1
   </div>
 
+  <!-- 페이지 번호 -->
+  <div class="page-number">- <?= pageNum ?> -</div>
+
 </div>
+<? } ?>
+
 </body>
 </html>
