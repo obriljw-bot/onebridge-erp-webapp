@@ -26,6 +26,17 @@ function generateInvoiceZip(params) {
   var modesByOrder = params.modesByOrder || {};
   var mergeBySupplier = params.mergeBySupplier || false;
 
+  // 새로운 파라미터들
+  var outputFormat = params.outputFormat || 'PDF';  // PDF 또는 EXCEL
+  var docDate      = params.docDate      || '';     // 발주일/출고일
+  var deliveryDate = params.deliveryDate || '';     // 납품일 (삐아계열용)
+  var manualRemark = params.manualRemark || '';     // 비고 수동입력
+
+  Logger.log('[generateInvoiceZip] docType=' + docType + ', outputFormat=' + outputFormat + ', printMode=' + printMode);
+  if (manualRemark) {
+    Logger.log('[generateInvoiceZip] 비고 수동입력: ' + manualRemark);
+  }
+
   if (!orderCodes.length) {
     return {
       success: false,
@@ -159,10 +170,17 @@ function generateInvoiceZip(params) {
 
         var pdfBlob;
 
+        // 추가 옵션 전달
+        var options = {
+          docDate: docDate,
+          deliveryDate: deliveryDate,
+          manualRemark: manualRemark
+        };
+
         switch (docType) {
           case 'INVOICE_VAT':
           default:
-            pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode);
+            pdfBlob = buildInvoiceVatPdf(orderCode, orderRows, header, mode, options);
             break;
         }
 
@@ -199,8 +217,18 @@ function generateInvoiceZip(params) {
  * 거래명세서 (VAT 포함) PDF 1건 생성
  * - 거래원장 행 배열(orderRows)과 헤더를 기반으로 템플릿에 매핑
  * - 수량 기준: 확정수량
+ * @param {string} orderCode - 발주번호
+ * @param {Array} orderRows - 거래원장 행 배열
+ * @param {Array} header - 거래원장 헤더
+ * @param {string} printMode - 출력 모드 (auto/full/short)
+ * @param {Object} options - 추가 옵션 {docDate, deliveryDate, manualRemark}
  */
-function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
+function buildInvoiceVatPdf(orderCode, orderRows, header, printMode, options) {
+  options = options || {};
+  var docDate = options.docDate || '';
+  var deliveryDate = options.deliveryDate || '';
+  var manualRemark = options.manualRemark || '';
+
   // 거래원장 인덱스 정의
   var idxDate          = header.indexOf('발주일');
   var idxBrand         = header.indexOf('브랜드');
@@ -284,26 +312,28 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     }
 
   // ========================================
-  // 출력방식 로직 적용
+  // 출력방식 로직 적용 (10행 기준)
   // ========================================
+  var ITEMS_THRESHOLD = 10;  // 멀티페이지 기준 행수
   var actualMode = printMode;
 
-  // auto 모드: 품목수에 따라 자동 결정
+  // auto 모드: 품목수에 따라 자동 결정 (10개 이하면 full, 초과면 short+멀티페이지)
   if (printMode === 'auto') {
-    actualMode = itemCount <= 5 ? 'full' : 'short';
+    actualMode = itemCount <= ITEMS_THRESHOLD ? 'full' : 'short';
   }
 
-  // short 모드: 품목 리스트를 축약
+  // short 모드: 품목 리스트를 축약 (1페이지 요약용)
+  var shortItems = [];
   if (actualMode === 'short' && itemCount > 0) {
     var summaryText = brandName + ' 외 ' + (itemCount - 1) + '건';
-    items = [{
+    shortItems = [{
       code:   '',
       name:   summaryText,
       spec:   '',
       qty:    formatNumber_(itemCount),
       price:  '',
       amount: formatNumber_(totalSupply),
-      note:   '(단축 출력)'
+      note:   ''
     }];
   }
 
@@ -318,7 +348,21 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
   var totalVat = totalAmount - totalSupply;
   if (totalVat < 0) totalVat = 0;
 
-  var ctx = {
+  // ========================================
+  // 멀티페이지 PDF 생성 로직
+  // ========================================
+  var ITEMS_PER_DETAIL_PAGE = 15;  // 상세페이지 당 품목 수
+  var needsMultiPage = (actualMode === 'short' && itemCount > ITEMS_THRESHOLD);
+
+  // 상세 페이지 수 계산
+  var detailPageCount = needsMultiPage ? Math.ceil(items.length / ITEMS_PER_DETAIL_PAGE) : 0;
+  var totalPages = needsMultiPage ? (1 + detailPageCount) : 1;
+
+  // 날짜 처리: UI에서 지정한 docDate가 있으면 사용, 없으면 발주일 사용
+  var displayDate = docDate ? formatDateYmd_(new Date(docDate)) : formatDateYmd_(orderDate);
+
+  // 기본 컨텍스트 (공통)
+  var baseCtx = {
     stampBase64:    getStampBase64_(),
 
     supplierName:   supplierNm,
@@ -330,18 +374,66 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     buyerPhone:     buyerPhone,
     buyerAddress:   buyerAddress,
 
-    dueDate:        formatDateYmd_(orderDate),
+    dueDate:        displayDate,
     orderCode:      orderCode,
+    deliveryDate:   deliveryDate ? formatDateYmd_(new Date(deliveryDate)) : '',
 
     totalSupply:    formatNumber_(totalSupply),
     totalVat:       formatNumber_(totalVat),
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
-    items:          items,
     buyerOrderCode: '',
-    remark:         ''
+    remark:         manualRemark || ''
   };
+
+  // ========================================
+  // 페이지 데이터 구성
+  // ========================================
+  var pages = [];
+
+  if (needsMultiPage) {
+    // 멀티페이지: 1페이지 요약 + 2페이지~ 상세
+
+    // 1페이지: 요약 (short)
+    pages.push({
+      items: shortItems,
+      pageNumber: 1,
+      isFirstPage: true,
+      isDetailPage: false,
+      showFullHeader: true
+    });
+
+    // 2페이지~: 상세 품목 목록
+    for (var p = 0; p < detailPageCount; p++) {
+      var startIdx = p * ITEMS_PER_DETAIL_PAGE;
+      var endIdx = Math.min(startIdx + ITEMS_PER_DETAIL_PAGE, items.length);
+      var pageItems = items.slice(startIdx, endIdx);
+
+      pages.push({
+        items: pageItems,
+        pageNumber: p + 2,  // 2, 3, 4...
+        isFirstPage: false,
+        isDetailPage: true,
+        showFullHeader: false  // 상세 페이지는 테이블 헤더만
+      });
+    }
+  } else {
+    // 단일페이지
+    pages.push({
+      items: (actualMode === 'short' && shortItems.length > 0) ? shortItems : items,
+      pageNumber: 1,
+      isFirstPage: true,
+      isDetailPage: false,
+      showFullHeader: true
+    });
+  }
+
+  // 최종 컨텍스트 구성
+  var ctx = JSON.parse(JSON.stringify(baseCtx));
+  ctx.pages = pages;
+  ctx.totalPages = totalPages;
+  ctx.isMultiPage = needsMultiPage;
 
   var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
 
