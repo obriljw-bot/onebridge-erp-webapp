@@ -265,7 +265,7 @@ function generateInvoiceZip(params) {
         // 실제 출력 모드 결정
         var actualMode = mode;
         if (mode === 'auto') {
-          actualMode = itemCount <= 10 ? 'full' : 'short';
+          actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
         }
 
         var docTypeLabel = '';
@@ -436,7 +436,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
 
   // auto 모드: 품목수에 따라 자동 결정
   if (printMode === 'auto') {
-    actualMode = itemCount <= 10 ? 'full' : 'short';
+    actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
   }
 
   // short 모드: 품목 리스트를 축약
@@ -597,7 +597,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
 
   // auto 모드: 품목수에 따라 자동 결정
   if (printMode === 'auto') {
-    actualMode = itemCount <= 10 ? 'full' : 'short';
+    actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
   }
 
   // short 모드: 품목 리스트를 축약
@@ -781,7 +781,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
 
   // auto 모드: 품목수에 따라 자동 결정
   if (printMode === 'auto') {
-    actualMode = itemCount <= 10 ? 'full' : 'short';
+    actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
   }
 
   // short 모드: 품목 리스트를 축약
@@ -953,7 +953,7 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     // auto 모드: 품목수에 따라 결정
     var actualMode = mode;
     if (mode === 'auto') {
-      actualMode = group.itemCount <= 10 ? 'full' : 'short';
+      actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
     }
 
     // short 모드: 축약
@@ -1372,7 +1372,7 @@ function buildOrderPurchasePdfMerged(orderCodes, allOrderRows, header, modesByOr
     // auto 모드: 품목수에 따라 결정
     var actualMode = mode;
     if (mode === 'auto') {
-      actualMode = group.itemCount <= 10 ? 'full' : 'short';
+      actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
     }
 
     // short 모드: 축약
@@ -1596,7 +1596,7 @@ function buildInvoiceVatPdfMerged(orderCodes, allOrderRows, header, modesByOrder
     // auto 모드: 품목수에 따라 결정
     var actualMode = mode;
     if (mode === 'auto') {
-      actualMode = group.itemCount <= 10 ? 'full' : 'short';
+      actualMode = 'full'; // auto 모드: 항상 full (템플릿이 멀티페이지 처리)
     }
 
     // short 모드: 축약
