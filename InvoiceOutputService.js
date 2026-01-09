@@ -1745,10 +1745,29 @@ function buildCustomTemplateExcel_(templateGroup, orderCode, orderRows, header, 
  */
 function buildRomandNudzExcel_(templateFileId, orderCode, orderRows, header, options) {
   Logger.log('[buildRomandNudzExcel_] 시작 - ' + orderCode);
+
+  // XLSX 파일을 Google Sheets로 변환하여 복사
   var templateFile = DriveApp.getFileById(templateFileId);
-  var copiedFile = templateFile.makeCopy('롬앤발주_' + orderCode + '_' + Date.now());
+  var mimeType = templateFile.getMimeType();
+  var copiedFile;
+
+  if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    // XLSX 파일인 경우 Google Sheets로 변환
+    Logger.log('[buildRomandNudzExcel_] XLSX 파일 감지 - Google Sheets로 변환');
+    var blob = templateFile.getBlob();
+    var resource = {
+      title: '롬앤발주_' + orderCode + '_' + Date.now(),
+      mimeType: MimeType.GOOGLE_SHEETS
+    };
+    copiedFile = Drive.Files.insert(resource, blob, { convert: true });
+    copiedFile = DriveApp.getFileById(copiedFile.id);
+  } else {
+    // 이미 Google Sheets인 경우 단순 복사
+    copiedFile = templateFile.makeCopy('롬앤발주_' + orderCode + '_' + Date.now());
+  }
+
   var ss = SpreadsheetApp.open(copiedFile);
-  var sheet = ss.getSheetByName('롬앤(발주양식)');
+  var sheet = ss.getSheetByName('롬앤(발주양식)') || ss.getSheets()[0]; // 시트명이 다르면 첫번째 시트 사용
   if (!sheet) { copiedFile.setTrashed(true); return null; }
 
   var idxBarcode = header.indexOf('바코드');
@@ -1779,10 +1798,27 @@ function buildRomandNudzExcel_(templateFileId, orderCode, orderRows, header, opt
  */
 function buildJonggeundangExcel_(templateFileId, orderCode, orderRows, header, options) {
   Logger.log('[buildJonggeundangExcel_] 시작 - ' + orderCode);
+
+  // XLSX 파일을 Google Sheets로 변환하여 복사
   var templateFile = DriveApp.getFileById(templateFileId);
-  var copiedFile = templateFile.makeCopy('종근당발주_' + orderCode + '_' + Date.now());
+  var mimeType = templateFile.getMimeType();
+  var copiedFile;
+
+  if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    Logger.log('[buildJonggeundangExcel_] XLSX 파일 감지 - Google Sheets로 변환');
+    var blob = templateFile.getBlob();
+    var resource = {
+      title: '종근당발주_' + orderCode + '_' + Date.now(),
+      mimeType: MimeType.GOOGLE_SHEETS
+    };
+    copiedFile = Drive.Files.insert(resource, blob, { convert: true });
+    copiedFile = DriveApp.getFileById(copiedFile.id);
+  } else {
+    copiedFile = templateFile.makeCopy('종근당발주_' + orderCode + '_' + Date.now());
+  }
+
   var ss = SpreadsheetApp.open(copiedFile);
-  var sheet = ss.getSheetByName('2. 발주서');
+  var sheet = ss.getSheetByName('2. 발주서') || ss.getSheets()[0];
   if (!sheet) { copiedFile.setTrashed(true); return null; }
 
   var idxProductCode = header.indexOf('품목코드');
@@ -1817,7 +1853,26 @@ function buildJonggeundangExcel_(templateFileId, orderCode, orderRows, header, o
 function buildBbiaGroupExcel_(templateFileId, orderCode, orderRows, header, options) {
   Logger.log('[buildBbiaGroupExcel_] 시작 - ' + orderCode);
   var templateFile = DriveApp.getFileById(templateFileId);
-  var copiedFile = templateFile.makeCopy('삐아계열발주_' + orderCode + '_' + Date.now());
+  var copiedFile;
+
+  // XLSX 파일인 경우 Google Sheets로 변환
+  var mimeType = templateFile.getMimeType();
+  Logger.log('[buildBbiaGroupExcel_] 템플릿 MIME 타입: ' + mimeType);
+
+  if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    Logger.log('[buildBbiaGroupExcel_] XLSX 파일 감지 - Google Sheets로 변환');
+    var blob = templateFile.getBlob();
+    var resource = {
+      title: '삐아계열발주_' + orderCode + '_' + Date.now(),
+      mimeType: MimeType.GOOGLE_SHEETS
+    };
+    var insertedFile = Drive.Files.insert(resource, blob, { convert: true });
+    copiedFile = DriveApp.getFileById(insertedFile.id);
+    Logger.log('[buildBbiaGroupExcel_] 변환 완료 - 파일 ID: ' + insertedFile.id);
+  } else {
+    copiedFile = templateFile.makeCopy('삐아계열발주_' + orderCode + '_' + Date.now());
+  }
+
   var ss = SpreadsheetApp.open(copiedFile);
 
   var idxBrand = header.indexOf('브랜드');
