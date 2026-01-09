@@ -230,8 +230,8 @@
       if (tbody) {
         tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">조회 결과가 없습니다.</td></tr>';
       }
-      document.getElementById('inv-pagination').style.display = 'none';
-      document.getElementById('inv-bulk-select').style.display = 'none';
+      var pagination = document.getElementById('inv-pagination');
+      if (pagination) pagination.style.display = 'none';
     }
 
     // ========================================
@@ -388,12 +388,18 @@
     }
 
     // ========================================
-    // 4. 브랜드/매입처별 일괄 선택
+    // 4. 브랜드/매입처별 일괄 선택 (빠른선택 UI 제거됨 - 함수 유지하되 동작 안함)
     // ========================================
     function renderBulkSelectButtons() {
+      // 빠른선택 UI가 제거되어 더 이상 동작하지 않음
+      // 나중에 필요시 재활성화 가능하도록 함수 유지
       var bulkSelectContainer = document.getElementById('inv-bulk-select');
+      if (!bulkSelectContainer) return;
+
       var brandBtnsContainer = document.getElementById('inv-brand-btns');
       var supplierBtnsContainer = document.getElementById('inv-supplier-btns');
+
+      if (!brandBtnsContainer || !supplierBtnsContainer) return;
 
       if (state.filteredOrders.length === 0) {
         bulkSelectContainer.style.display = 'none';
@@ -591,10 +597,10 @@
     }
 
     // ========================================
-    // PDF 출력 기능
+    // 선택항목 출력 기능 (PDF/Excel 통합)
     // ========================================
-    function exportPDF() {
-      console.log('📄 PDF 출력 버튼 클릭');
+    function exportSelected() {
+      console.log('📄 선택항목 출력 버튼 클릭');
 
       // 체크된 발주번호 수집
       var selected = [];
@@ -607,23 +613,29 @@
         return;
       }
 
-      // 문서 유형 매핑
-      var docTypeName = document.getElementById("inv-doc-type").value;
-      var docTypeMap = {
-        "거래명세서(부포)": "INVOICE_VAT",
-        "거래명세서(영세)": "INVOICE_NVAT",
-        "거래명세서(해외)": "INVOICE_EN",
-        "발주서(매입)": "ORDER_BASIC",
-        "발주서(매입)_롬앤": "ORDER_ROMAND",
-        "발주서(매입)_종근당": "ORDER_JONGGEUN",
-        "발주서(매입)_삐아계열": "ORDER_BBIA"
-      };
-      var docType = docTypeMap[docTypeName] || "INVOICE_VAT";
+      // 문서 유형 (직접 value 사용: ORDER_PURCHASE, INVOICE_VAT, INVOICE_NVAT)
+      var docType = document.getElementById("inv-doc-type").value || "INVOICE_VAT";
 
-      // 출력방식 수집
+      // 출력 형식 (PDF/EXCEL)
+      var outputFormat = document.getElementById("inv-output-format").value || "PDF";
+
+      // 기본 출력방식 (auto/full/short)
+      var defaultMode = document.getElementById("inv-default-mode").value || "auto";
+
+      // 발주일/출고일
+      var docDate = document.getElementById("inv-doc-date").value || "";
+
+      // 납품일 (삐아계열 전용)
+      var deliveryDate = document.getElementById("inv-delivery-date").value || "";
+
+      // 비고 수동입력
+      var manualRemarkChecked = document.getElementById("inv-manual-remark").checked;
+      var manualRemarkText = manualRemarkChecked ? document.getElementById("inv-manual-remark-text").value : "";
+
+      // 개별 출력방식 수집 (테이블의 각 행에서)
       var modes = {};
       document.querySelectorAll(".inv-mode").forEach(function(sel) {
-        modes[sel.dataset.oc] = sel.value || "auto";
+        modes[sel.dataset.oc] = sel.value || defaultMode;
       });
 
       // 매입처별 통합 출력 체크 여부
@@ -632,39 +644,50 @@
       var params = {
         orderCodes: selected,
         docType: docType,
-        printMode: "auto",
+        outputFormat: outputFormat,
+        printMode: defaultMode,
         modesByOrder: modes,
-        mergeBySupplier: mergeBySupplier
+        mergeBySupplier: mergeBySupplier,
+        docDate: docDate,
+        deliveryDate: deliveryDate,
+        manualRemark: manualRemarkText
       };
 
-      console.log('📄 PDF 생성 파라미터:', params);
+      console.log('📄 출력 파라미터:', params);
       if (mergeBySupplier) {
         console.log('🔗 매입처별 통합 출력 모드 활성화');
       }
 
-      OB.showLoading('PDF 생성 중... (' + selected.length + '건)');
+      var loadingMsg = outputFormat === 'EXCEL' ? 'Excel 파일 생성 중...' : 'PDF 생성 중...';
+      OB.showLoading(loadingMsg + ' (' + selected.length + '건)');
 
       google.script.run
         .withSuccessHandler(function(res) {
           OB.hideLoading();
 
           if (!res || !res.success) {
-            alert(res ? res.error : "PDF 생성 중 오류가 발생했습니다.");
+            alert(res ? res.error : "파일 생성 중 오류가 발생했습니다.");
             return;
           }
 
-          // ZIP 다운로드 URL 오픈
+          // 다운로드 URL 오픈
           var url = "https://drive.google.com/uc?export=download&id=" + res.fileId;
           window.open(url, "_blank");
 
-          alert('✅ PDF 생성 완료!\n파일: ' + res.fileName);
+          var successMsg = outputFormat === 'EXCEL' ? 'Excel 파일 생성 완료!' : 'PDF 생성 완료!';
+          alert('✅ ' + successMsg + '\n파일: ' + res.fileName);
         })
         .withFailureHandler(function(err) {
           OB.hideLoading();
-          console.error('❌ PDF 생성 실패:', err);
-          alert("PDF 생성 실패: " + (err.message || err));
+          console.error('❌ 파일 생성 실패:', err);
+          alert("파일 생성 실패: " + (err.message || err));
         })
         .generateInvoiceZipApi(params);
+    }
+
+    // 이전 함수명 호환성 유지
+    function exportPDF() {
+      exportSelected();
     }
 
     // ========================================
@@ -677,16 +700,10 @@
       searchBtn.addEventListener('click', searchOrders);
     }
 
-    // Excel 출력 버튼
-    var excelBtn = document.getElementById('inv-export-xlsx');
-    if (excelBtn) {
-      excelBtn.addEventListener('click', downloadExcel);
-    }
-
-    // PDF 출력 버튼
-    var pdfBtn = document.getElementById('inv-export-pdf');
-    if (pdfBtn) {
-      pdfBtn.addEventListener('click', exportPDF);
+    // 선택항목 출력 버튼 (PDF/Excel 통합)
+    var exportSelectedBtn = document.getElementById('inv-export-selected');
+    if (exportSelectedBtn) {
+      exportSelectedBtn.addEventListener('click', exportSelected);
     }
 
     // 전체 체크박스
@@ -697,6 +714,32 @@
         checkboxes.forEach(function(c) {
           c.checked = e.target.checked;
         });
+      });
+    }
+
+    // 문서유형 변경 시 날짜 라벨 변경
+    var docTypeSelect = document.getElementById('inv-doc-type');
+    if (docTypeSelect) {
+      docTypeSelect.addEventListener('change', function() {
+        var dateLabel = document.getElementById('inv-date-label');
+        if (dateLabel) {
+          if (this.value === 'ORDER_PURCHASE') {
+            dateLabel.textContent = '발주일';
+          } else {
+            dateLabel.textContent = '출고일';
+          }
+        }
+      });
+    }
+
+    // 비고 수동입력 체크박스 변경 시 텍스트 영역 표시/숨김
+    var manualRemarkCheckbox = document.getElementById('inv-manual-remark');
+    if (manualRemarkCheckbox) {
+      manualRemarkCheckbox.addEventListener('change', function() {
+        var remarkArea = document.getElementById('inv-remark-input-area');
+        if (remarkArea) {
+          remarkArea.style.display = this.checked ? 'block' : 'none';
+        }
       });
     }
 
@@ -718,26 +761,14 @@
       });
     });
 
-    // 일괄 선택 버튼
-    var selectAllBtn = document.getElementById('inv-select-all');
-    if (selectAllBtn) {
-      selectAllBtn.addEventListener('click', function() {
-        var checkboxes = document.querySelectorAll('.inv-row-check');
-        checkboxes.forEach(function(c) {
-          c.checked = true;
-        });
-      });
-    }
-
-    var deselectAllBtn = document.getElementById('inv-deselect-all');
-    if (deselectAllBtn) {
-      deselectAllBtn.addEventListener('click', function() {
-        var checkboxes = document.querySelectorAll('.inv-row-check');
-        checkboxes.forEach(function(c) {
-          c.checked = false;
-        });
-        document.getElementById('inv-check-all').checked = false;
-      });
+    // 기본 날짜 설정 (오늘)
+    var docDateInput = document.getElementById('inv-doc-date');
+    if (docDateInput && !docDateInput.value) {
+      var today = new Date();
+      var yyyy = today.getFullYear();
+      var mm = String(today.getMonth() + 1).padStart(2, '0');
+      var dd = String(today.getDate()).padStart(2, '0');
+      docDateInput.value = yyyy + '-' + mm + '-' + dd;
     }
 
     // ========================================
