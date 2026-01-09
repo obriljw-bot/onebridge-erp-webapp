@@ -895,17 +895,42 @@
       });
     }
 
-    // 문서유형 변경 시 날짜 라벨 변경
+    // 문서유형 변경 시 UI 동적 변경
     var docTypeSelect = document.getElementById('inv-doc-type');
     if (docTypeSelect) {
       docTypeSelect.addEventListener('change', function() {
         var dateLabel = document.getElementById('inv-date-label');
+        var outputFormatSelect = document.getElementById('inv-output-format');
+        var deliveryLabel = document.getElementById('inv-delivery-label');
+        var deliveryInput = document.getElementById('inv-delivery-date');
+        var docType = this.value;
+
+        // 날짜 라벨 변경
         if (dateLabel) {
-          if (this.value === 'ORDER_PURCHASE') {
+          if (docType === 'ORDER_PURCHASE') {
+            dateLabel.textContent = '발주일';
+          } else if (docType.startsWith('CUSTOM_')) {
             dateLabel.textContent = '발주일';
           } else {
             dateLabel.textContent = '출고일';
           }
+        }
+
+        // 전용양식 선택 시 출력형식 자동 Excel로 변경
+        if (docType.startsWith('CUSTOM_') && outputFormatSelect) {
+          outputFormatSelect.value = 'EXCEL';
+          outputFormatSelect.disabled = true;
+        } else if (outputFormatSelect) {
+          outputFormatSelect.disabled = false;
+        }
+
+        // 삐아계열 선택 시 납품일 필드 표시
+        if (docType === 'CUSTOM_BBIA') {
+          if (deliveryLabel) deliveryLabel.style.display = '';
+          if (deliveryInput) deliveryInput.style.display = '';
+        } else {
+          if (deliveryLabel) deliveryLabel.style.display = 'none';
+          if (deliveryInput) deliveryInput.style.display = 'none';
         }
       });
     }

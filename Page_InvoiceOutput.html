@@ -266,10 +266,17 @@
       <span style="border-left:1px solid #cbd5e1;height:20px;"></span>
 
       <label>문서유형</label>
-      <select id="inv-doc-type" style="min-width:130px;">
-        <option value="ORDER_PURCHASE">발주서(매입)</option>
-        <option value="INVOICE_VAT">거래명세서(부포)</option>
-        <option value="INVOICE_NVAT">거래명세서(영세)</option>
+      <select id="inv-doc-type" style="min-width:160px;">
+        <optgroup label="기본 문서">
+          <option value="ORDER_PURCHASE">발주서(매입)</option>
+          <option value="INVOICE_VAT">거래명세서(부포)</option>
+          <option value="INVOICE_NVAT">거래명세서(영세)</option>
+        </optgroup>
+        <optgroup label="전용 양식 (Excel)">
+          <option value="CUSTOM_ROMAND">롬앤/누즈 전용</option>
+          <option value="CUSTOM_JONGGEUNDANG">종근당 전용</option>
+          <option value="CUSTOM_BBIA">삐아계열 전용</option>
+        </optgroup>
       </select>
 
       <label>출력방식</label>

@@ -1906,6 +1906,14 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
     return { success: false, error: '출력할 데이터가 없습니다.' };
   }
 
+  // ========================================
+  // 전용 양식 Excel 출력 처리
+  // ========================================
+  if (docType.indexOf('CUSTOM_') === 0) {
+    Logger.log('[generateExcelOutput_] 전용 양식 출력: ' + docType);
+    return generateCustomTemplateExcel_(docType, orderCodes, filteredRows, header, options);
+  }
+
   // 문서 유형에 따른 라벨
   var docTypeLabel = '';
   switch (docType) {
@@ -2059,9 +2067,8 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
   // 임시 스프레드시트 삭제
   file.setTrashed(true);
 
-  // ZIP 파일에 Excel 하나만 있으면 그냥 직접 저장
-  var outputFolder = getOrCreateOutputFolder_();
-  var savedFile = outputFolder.createFile(excelBlob);
+  // Drive에 Excel 파일 저장
+  var savedFile = DriveApp.createFile(excelBlob);
 
   Logger.log('[generateExcelOutput_] Excel 생성 완료: ' + savedFile.getName());
 
@@ -2070,5 +2077,92 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
     fileId: savedFile.getId(),
     fileName: savedFile.getName(),
     downloadUrl: savedFile.getDownloadUrl()
+  };
+}
+
+// ========================================
+// 전용 양식 Excel 출력 메인 함수
+// ========================================
+/**
+ * 전용 양식 Excel 파일 생성 (docType 기반)
+ * @param {string} docType CUSTOM_ROMAND, CUSTOM_JONGGEUNDANG, CUSTOM_BBIA
+ * @param {string[]} orderCodes 발주번호 배열
+ * @param {Array[]} rows 필터링된 데이터 행
+ * @param {string[]} header 헤더 배열
+ * @param {Object} options 옵션
+ */
+function generateCustomTemplateExcel_(docType, orderCodes, rows, header, options) {
+  // docType -> templateGroup 변환
+  var templateGroupMap = {
+    'CUSTOM_ROMAND': 'ROMAND_NUDZ',
+    'CUSTOM_JONGGEUNDANG': 'JONGGEUNDANG',
+    'CUSTOM_BBIA': 'BBIA_GROUP'
+  };
+  var templateGroup = templateGroupMap[docType];
+  if (!templateGroup) {
+    return { success: false, error: '지원하지 않는 전용 양식입니다: ' + docType };
+  }
+
+  var templateLabelMap = {
+    'CUSTOM_ROMAND': '롬앤누즈',
+    'CUSTOM_JONGGEUNDANG': '종근당',
+    'CUSTOM_BBIA': '삐아계열'
+  };
+  var templateLabel = templateLabelMap[docType] || '전용양식';
+
+  Logger.log('[generateCustomTemplateExcel_] 전용 양식: ' + templateLabel + ', 발주: ' + orderCodes.length + '건');
+
+  var idxOrderNo = header.indexOf('발주번호');
+  var blobs = [];
+  var tz = Session.getScriptTimeZone();
+  var ts = Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss');
+
+  // 발주번호별로 전용 양식 Excel 생성
+  for (var i = 0; i < orderCodes.length; i++) {
+    var orderCode = orderCodes[i];
+    var orderRows = rows.filter(function(row) {
+      return String(row[idxOrderNo]) === String(orderCode);
+    });
+
+    if (!orderRows.length) continue;
+
+    try {
+      var blob = buildCustomTemplateExcel_(templateGroup, orderCode, orderRows, header, options);
+      if (blob) {
+        blob.setName(templateLabel + '_' + orderCode + '_' + ts + '.xlsx');
+        blobs.push(blob);
+        Logger.log('[generateCustomTemplateExcel_] 생성 완료: ' + orderCode);
+      }
+    } catch (err) {
+      Logger.log('[generateCustomTemplateExcel_] 생성 실패 - ' + orderCode + ': ' + err.message);
+    }
+  }
+
+  if (!blobs.length) {
+    return { success: false, error: '전용 양식 파일을 생성할 수 없습니다. 템플릿 설정을 확인하세요.' };
+  }
+
+  // 단일 파일인 경우 직접 저장
+  if (blobs.length === 1) {
+    var savedFile = DriveApp.createFile(blobs[0]);
+    return {
+      success: true,
+      fileId: savedFile.getId(),
+      fileName: savedFile.getName(),
+      downloadUrl: savedFile.getDownloadUrl()
+    };
+  }
+
+  // 여러 파일인 경우 ZIP으로 묶기
+  var zipBlob = Utilities.zip(blobs, templateLabel + '_' + ts + '.zip');
+  var driveFile = DriveApp.createFile(zipBlob);
+
+  Logger.log('[generateCustomTemplateExcel_] ZIP 생성 완료: ' + driveFile.getName());
+
+  return {
+    success: true,
+    fileId: driveFile.getId(),
+    fileName: driveFile.getName(),
+    downloadUrl: driveFile.getDownloadUrl()
   };
 }
