@@ -948,17 +948,19 @@ chore: 빌드/설정 변경
 
 ## 📊 진행 상황 추적
 
-### Phase 1: 코드 병합 (0/4 완료)
-- [ ] InvoiceOutputService.js 병합
-- [ ] CommonScripts.html 병합
-- [ ] Templates_Invoice_VAT.html 병합
-- [ ] Page_InvoiceOutput.html 병합
+### Phase 1: 코드 병합 (4/4 완료) ✅
+- [x] InvoiceOutputService.js 병합
+- [x] CommonScripts.html 병합
+- [x] Templates_Invoice_VAT.html 병합
+- [x] Page_InvoiceOutput.html 병합
 
-### Phase 2: 기능 검증 (0/4 완료)
-- [ ] 기본 출력 기능 테스트
-- [ ] 전용 양식 출력 테스트
-- [ ] 매입처별 통합 출력 테스트
-- [ ] 에러 처리 테스트
+### Phase 2: 기능 검증 (4/4 완료) ✅
+- [x] 기본 출력 기능 테스트
+- [x] 전용 양식 출력 테스트
+- [x] 매입처별 통합 출력 테스트
+- [x] 에러 처리 테스트
+
+**검증 보고서**: [PHASE2_VERIFICATION_REPORT.md](./PHASE2_VERIFICATION_REPORT.md)
 
 ### Phase 3: 부분결제 기능 (0/3 완료)
 - [ ] 데이터 구조 설계 및 생성
