@@ -247,60 +247,82 @@
     font-style: italic;
   }
 
-  /* ===== 금액 행 (새로운 레이아웃) ===== */
-  .amount-row {
-    background: #f8fafc;
-    border: 2px solid #cbd5e1;
-    border-radius: 8px;
-    padding: 14px 20px;
-    margin-bottom: 16px;
+  /* ===== 금액 행 (스크린샷 기반 재설계) ===== */
+
+  /* 총합계 - 가장 눈에 띄게 */
+  .amount-row.total-row {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 3px solid #0f172a;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-
-  .amount-row.supply-row {
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    border-color: #0ea5e9;
-  }
-
-  .amount-row.vat-row {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border-color: #f59e0b;
-  }
-
-  .amount-row.total-row {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    border-color: #0f172a;
-    padding: 18px 20px;
     flex-wrap: wrap;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.3);
   }
 
-  .amount-row.total-row .amount-label,
-  .amount-row.total-row .amount-value {
+  .amount-row.total-row .amount-label {
+    font-size: 15px;
+    font-weight: 700;
     color: #ffffff;
   }
 
-  .amount-label {
-    font-size: 13px;
+  .amount-row.total-row .amount-value {
+    font-size: 24px;
     font-weight: 700;
-    color: #1e293b;
-  }
-
-  .amount-value {
-    font-size: 20px;
-    font-weight: 700;
-    color: #1e293b;
+    color: #ffffff;
     font-family: 'Courier New', monospace;
   }
 
   .amount-row.total-row .amount-hangul {
     width: 100%;
     text-align: right;
-    margin-top: 8px;
-    font-size: 11px;
+    margin-top: 10px;
+    font-size: 12px;
     color: #cbd5e1;
     font-style: italic;
+  }
+
+  /* 부가세 및 공급가액 - 단순한 행 형태 (테이블 스타일) */
+  .amount-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .amount-summary-table tr {
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .amount-summary-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .amount-summary-table td {
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+
+  .amount-summary-table td.label {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #475569;
+    width: 150px;
+    text-align: right;
+  }
+
+  .amount-summary-table td.value {
+    background: #ffffff;
+    font-weight: 700;
+    color: #1e293b;
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
   }
 
   /* ===== 품목 테이블 ===== */
@@ -512,8 +534,8 @@
     </div>
 
     <div class="header-info">
-      <div><span class="header-info-label">발주번호</span> <span class="header-info-value"><?= orderCode ?></span></div>
-      <div><span class="header-info-label">발주일자</span> <span class="header-info-value"><?= dueDate ?></span></div>
+      <!-- 발주번호/발주일자는 비고란으로 이동 -->
+      &nbsp;
     </div>
   </div>
 
@@ -574,20 +596,22 @@
       </div>
     </div>
 
-    <!-- ① 공급가액 (Supply Amount) -->
-    <div class="amount-row supply-row">
-      <div class="amount-label">공급가액 (Supply Amount)</div>
-      <div class="amount-value">₩<?= totalSupply ?></div>
-    </div>
-
     <?
       var rowCount = items && items.length ? items.length : 0;
       var ITEMS_PER_PAGE = 10;
-      var totalPages = rowCount <= ITEMS_PER_PAGE ? 1 : Math.ceil(rowCount / ITEMS_PER_PAGE);
+      var ITEMS_PER_PAGE_CONTINUATION = 50;
+      var totalPages = rowCount <= ITEMS_PER_PAGE ? 1 : (1 + Math.ceil((rowCount - ITEMS_PER_PAGE) / ITEMS_PER_PAGE_CONTINUATION));
       var firstPageItems = Math.min(rowCount, ITEMS_PER_PAGE);
     ?>
 
-    <!-- 품목 리스트 (1페이지: 최대 10행) -->
+    <!-- ① 총합계 (Total Amount) - 가장 먼저, 가장 눈에 띄게 -->
+    <div class="amount-row total-row">
+      <div class="amount-label">합계 (Total Amount <? if (totalVat > 0) { ?>VAT Inc<? } ?>)</div>
+      <div class="amount-value">₩<?= totalAmount ?></div>
+      <div class="amount-hangul"><?= amountHangul ?></div>
+    </div>
+
+    <!-- ② 품목 리스트 (1페이지: 최대 10행) -->
     <div class="items-section">
       <div class="section-title">품목 내역 <? if (totalPages > 1) { ?>(총 <?= rowCount ?>건 중 1~<?= firstPageItems ?>)<? } ?></div>
 
@@ -618,44 +642,31 @@
               <td class="col-note"><?= it.note || '' ?></td>
             </tr>
           <? } ?>
-
-          <!-- 최소 5행 보장 (1페이지만) -->
-          <? if (totalPages === 1) {
-               for (var j = rowCount; j < 5; j++) { ?>
-            <tr>
-              <td class="col-no">&nbsp;</td>
-              <td class="col-code">&nbsp;</td>
-              <td class="col-name">&nbsp;</td>
-              <td class="col-spec">&nbsp;</td>
-              <td class="col-qty">&nbsp;</td>
-              <td class="col-price">&nbsp;</td>
-              <td class="col-amt">&nbsp;</td>
-              <td class="col-note">&nbsp;</td>
-            </tr>
-          <?   }
-             } ?>
         </tbody>
       </table>
     </div>
 
-    <!-- ③ 부가세 (VAT 10%) -->
-    <div class="amount-row vat-row">
-      <div class="amount-label">부가세 (VAT 10%)</div>
-      <div class="amount-value">₩<?= totalVat ?></div>
-    </div>
+    <!-- ③ 부가세 및 공급가액 (테이블 형태) -->
+    <? if (totalVat > 0) { ?>
+    <table class="amount-summary-table">
+      <tr>
+        <td class="label">VAT (10%)</td>
+        <td class="value">₩<?= totalVat ?></td>
+      </tr>
+      <tr>
+        <td class="label">공급가액 (합계 - VAT)</td>
+        <td class="value">₩<?= totalSupply ?></td>
+      </tr>
+    </table>
+    <? } ?>
 
-    <!-- ④ 합계 (Total Amount) -->
-    <div class="amount-row total-row">
-      <div class="amount-label">합계 (Total Amount)</div>
-      <div class="amount-value">₩<?= totalAmount ?></div>
-      <div class="amount-hangul"><?= amountHangul ?></div>
-    </div>
-
-    <!-- 비고 (1페이지에만 표시) -->
-    <? if (totalPages === 1) { ?>
+    <!-- 비고 (항상 1페이지에 고정) -->
     <div class="remark-section">
       <div class="remark-header">특이사항 및 비고</div>
       <div class="remark-body">
+        <div style="margin-bottom: 8px;">
+          <strong>발주번호:</strong> <?= orderCode ?> &nbsp;&nbsp; <strong>발주일자:</strong> <?= dueDate ?>
+        </div>
         <? if (buyerOrderCode) { ?>
           <div class="remark-label">발주처 발주코드:</div>
           <div><?= buyerOrderCode ?></div>
@@ -664,7 +675,6 @@
         <?= remark || '' ?>
       </div>
     </div>
-    <? } ?>
 
   </div>
 
@@ -682,8 +692,9 @@
 
 <!-- ===== 추가 페이지 (11행 이상일 때) ===== -->
 <? for (var pageNum = 2; pageNum <= totalPages; pageNum++) {
-     var startIdx = (pageNum - 1) * ITEMS_PER_PAGE;
-     var endIdx = Math.min(startIdx + ITEMS_PER_PAGE, rowCount);
+     // 2페이지부터는 50개씩
+     var startIdx = ITEMS_PER_PAGE + (pageNum - 2) * ITEMS_PER_PAGE_CONTINUATION;
+     var endIdx = Math.min(startIdx + ITEMS_PER_PAGE_CONTINUATION, rowCount);
      var isLastPage = (pageNum === totalPages);
 ?>
 
@@ -699,7 +710,7 @@
   </div>
 
   <div class="content" style="padding-top: 20px;">
-    <!-- 품목 리스트 (연속) -->
+    <!-- 품목 리스트 (연속: 최대 50행) -->
     <div class="items-section">
       <div class="section-title">품목 내역 (<?= startIdx + 1 ?>~<?= endIdx ?> / 총 <?= rowCount ?>건)</div>
 
@@ -733,37 +744,6 @@
         </tbody>
       </table>
     </div>
-
-    <!-- 부가세/합계 (마지막 페이지에만 표시) -->
-    <? if (isLastPage) { ?>
-    <!-- ③ 부가세 (VAT 10%) -->
-    <div class="amount-row vat-row">
-      <div class="amount-label">부가세 (VAT 10%)</div>
-      <div class="amount-value">₩<?= totalVat ?></div>
-    </div>
-
-    <!-- ④ 합계 (Total Amount) -->
-    <div class="amount-row total-row">
-      <div class="amount-label">합계 (Total Amount)</div>
-      <div class="amount-value">₩<?= totalAmount ?></div>
-      <div class="amount-hangul"><?= amountHangul ?></div>
-    </div>
-    <? } ?>
-
-    <!-- 비고 (마지막 페이지에만 표시) -->
-    <? if (isLastPage) { ?>
-    <div class="remark-section">
-      <div class="remark-header">특이사항 및 비고</div>
-      <div class="remark-body">
-        <? if (buyerOrderCode) { ?>
-          <div class="remark-label">발주처 발주코드:</div>
-          <div><?= buyerOrderCode ?></div>
-          <br>
-        <? } ?>
-        <?= remark || '' ?>
-      </div>
-    </div>
-    <? } ?>
 
   </div>
 
