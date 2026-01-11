@@ -553,9 +553,9 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
   var buyerPhone      = companyInfo ? (companyInfo.phone || '')     : '';
   var buyerAddress    = companyInfo ? (companyInfo.address || '')   : '';
 
-  // 입고지 및 요청사항 정보
-  var deliveryAddr    = partnerInfo ? (partnerInfo.deliveryAddr || '')   : '';
-  var specialRequest  = partnerInfo ? (partnerInfo.specialRequest || '') : '';
+  // 입고지 및 요청사항 정보 (발주서는 원브릿지 쪽 정보)
+  var deliveryAddr    = companyInfo ? (companyInfo.deliveryAddr || '')   : '';
+  var specialRequest  = companyInfo ? (companyInfo.specialRequest || '') : '';
 
   // 행 단위 품목 구성 (발주서는 발주수량 기준)
   var qtyCol = idxQtyOrder >= 0 ? idxQtyOrder : header.indexOf('확정수량');
@@ -634,19 +634,13 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     totalSupply = Math.round(totalAmount / 1.1);
     totalVat = totalAmount - totalSupply;
   } else {
-    // 부포 (VAT included): 총액 그대로, VAT는 10%
-    totalSupply = totalAmount;
-    totalVat = Math.round(totalSupply * 0.1);
-    totalAmount = totalSupply + totalVat;
+    // 부포 (VAT included): 총액에서 VAT 역산
+    totalSupply = Math.round(totalAmount / 1.1);
+    totalVat = totalAmount - totalSupply;
   }
 
   // 비고란 구성: 입고지, 담당자, 요청사항
   var remarkLines = [];
-  if (vatType === '부별') {
-    remarkLines.push('※ 부가세별도');
-  } else {
-    remarkLines.push('※ 부가세포함');
-  }
   if (deliveryAddr) {
     remarkLines.push('입고지: ' + deliveryAddr);
   }
