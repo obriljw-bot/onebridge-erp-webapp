@@ -469,6 +469,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     logoBase64:     getLogoBase64_(),
 
     docTitle:       '(주)원브릿지 거래명세서',
+    docSubtitle:    'TRANSACTION STATEMENT',
 
     supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
@@ -484,6 +485,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
 
     totalSupply:    formatNumber_(totalSupply),
     totalVat:       formatNumber_(totalVat),
+    totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
@@ -662,6 +664,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     logoBase64:     getLogoBase64_(),
 
     docTitle:       '(주)원브릿지 매입발주서',
+    docSubtitle:    'PURCHASE ORDER',
 
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
@@ -677,6 +680,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
 
     totalSupply:    formatNumber_(totalSupply),
     totalVat:       formatNumber_(totalVat),
+    totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 

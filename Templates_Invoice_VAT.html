@@ -364,11 +364,12 @@
   }
 
   .items-table th {
-    padding: 10px 8px;
-    font-size: 10px;
+    padding: 12px 10px;
+    font-size: 11px;
     font-weight: 700;
     text-align: center;
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
   }
 
   .items-table th:last-child {
@@ -376,10 +377,12 @@
   }
 
   .items-table td {
-    padding: 8px;
-    font-size: 10px;
-    border-bottom: 1px solid #e2e8f0;
-    border-right: 1px solid #f1f5f9;
+    padding: 10px;
+    font-size: 11px;
+    border-bottom: 1px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
+    color: #0f172a;
+    font-weight: 500;
   }
 
   .items-table td:last-child {
@@ -398,14 +401,15 @@
     background: #fef3c7;
   }
 
-  .col-no { width: 8mm; text-align: center; }
-  .col-code { width: 24mm; text-align: center; font-family: 'Courier New', monospace; }
-  .col-name { width: auto; text-align: left; padding-left: 10px; }
-  .col-spec { width: 18mm; text-align: center; }
-  .col-qty { width: 18mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; }
-  .col-price { width: 24mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; }
-  .col-amt { width: 28mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; font-weight: 600; }
-  .col-note { width: 18mm; text-align: left; font-size: 9px; color: #64748b; }
+  /* 칼럼 크기 재조정: 품명 중심으로 */
+  .col-no { width: 8mm; text-align: center; font-weight: 600; }
+  .col-code { width: 22mm; text-align: center; font-family: 'Courier New', monospace; font-weight: 600; }
+  .col-name { width: auto; text-align: left; padding-left: 12px; font-weight: 600; }
+  .col-spec { width: 14mm; text-align: center; }
+  .col-qty { width: 14mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; font-weight: 600; }
+  .col-price { width: 22mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; font-weight: 600; }
+  .col-amt { width: 28mm; text-align: right; padding-right: 10px; font-family: 'Courier New', monospace; font-weight: 700; color: #0f172a; }
+  .col-note { width: 12mm; text-align: left; font-size: 10px; color: #475569; font-weight: 500; }
 
   /* ===== 비고 영역 ===== */
   .remark-section {
@@ -426,10 +430,11 @@
 
   .remark-body {
     padding: 14px 16px;
-    min-height: 50mm;
+    min-height: 20mm;
     font-size: 10px;
     line-height: 1.6;
     color: #475569;
+    white-space: pre-line;
   }
 
   .remark-label {
@@ -530,7 +535,7 @@
 
     <div class="title-area">
       <div class="doc-title"><?= docTitle || '거래명세서' ?></div>
-      <div class="doc-subtitle">TRANSACTION STATEMENT</div>
+      <div class="doc-subtitle"><?= docSubtitle || 'TRANSACTION STATEMENT' ?></div>
     </div>
 
     <div class="header-info">
@@ -647,7 +652,7 @@
     </div>
 
     <!-- ③ 부가세 및 공급가액 (테이블 형태) -->
-    <? if (totalVat > 0) { ?>
+    <? if (totalVatNum > 0) { ?>
     <table class="amount-summary-table">
       <tr>
         <td class="label">VAT (10%)</td>
