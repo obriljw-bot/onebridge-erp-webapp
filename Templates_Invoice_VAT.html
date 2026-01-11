@@ -247,6 +247,62 @@
     font-style: italic;
   }
 
+  /* ===== 금액 행 (새로운 레이아웃) ===== */
+  .amount-row {
+    background: #f8fafc;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .amount-row.supply-row {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-color: #0ea5e9;
+  }
+
+  .amount-row.vat-row {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-color: #f59e0b;
+  }
+
+  .amount-row.total-row {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-color: #0f172a;
+    padding: 18px 20px;
+    flex-wrap: wrap;
+  }
+
+  .amount-row.total-row .amount-label,
+  .amount-row.total-row .amount-value {
+    color: #ffffff;
+  }
+
+  .amount-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .amount-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    font-family: 'Courier New', monospace;
+  }
+
+  .amount-row.total-row .amount-hangul {
+    width: 100%;
+    text-align: right;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #cbd5e1;
+    font-style: italic;
+  }
+
   /* ===== 품목 테이블 ===== */
   .items-section {
     margin-bottom: 25px;
@@ -451,7 +507,7 @@
     </div>
 
     <div class="title-area">
-      <div class="doc-title">거래명세서</div>
+      <div class="doc-title"><?= docTitle || '거래명세서' ?></div>
       <div class="doc-subtitle">TRANSACTION STATEMENT</div>
     </div>
 
@@ -518,29 +574,10 @@
       </div>
     </div>
 
-    <!-- 금액 요약 -->
-    <div class="summary-box">
-      <div class="summary-grid">
-        <div class="summary-item">
-          <div class="summary-label">공급가액</div>
-          <div class="summary-amount">₩<?= totalSupply ?></div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">부가세</div>
-          <div class="summary-amount">₩<?= totalVat ?></div>
-        </div>
-        <div class="summary-item" style="background: #fef3c7; border-color: #fbbf24;">
-          <div class="summary-label" style="color: #92400e;">VAT 포함</div>
-          <div class="summary-amount" style="color: #92400e;">₩<?= totalAmount ?></div>
-        </div>
-      </div>
-
-      <div class="summary-total">
-        <div class="summary-total-label">총 금액 (VAT 포함)</div>
-        <div class="summary-total-amount">₩<?= totalAmount ?></div>
-      </div>
-
-      <div class="summary-hangul"><?= amountHangul ?></div>
+    <!-- ① 공급가액 (Supply Amount) -->
+    <div class="amount-row supply-row">
+      <div class="amount-label">공급가액 (Supply Amount)</div>
+      <div class="amount-value">₩<?= totalSupply ?></div>
     </div>
 
     <?
@@ -601,6 +638,19 @@
       </table>
     </div>
 
+    <!-- ③ 부가세 (VAT 10%) -->
+    <div class="amount-row vat-row">
+      <div class="amount-label">부가세 (VAT 10%)</div>
+      <div class="amount-value">₩<?= totalVat ?></div>
+    </div>
+
+    <!-- ④ 합계 (Total Amount) -->
+    <div class="amount-row total-row">
+      <div class="amount-label">합계 (Total Amount)</div>
+      <div class="amount-value">₩<?= totalAmount ?></div>
+      <div class="amount-hangul"><?= amountHangul ?></div>
+    </div>
+
     <!-- 비고 (1페이지에만 표시) -->
     <? if (totalPages === 1) { ?>
     <div class="remark-section">
@@ -642,7 +692,7 @@
 
   <!-- 연속 페이지 헤더 -->
   <div class="continuation-header">
-    <div class="continuation-title">거래명세서 (계속)</div>
+    <div class="continuation-title"><?= docTitle || '거래명세서' ?> (계속)</div>
     <div class="continuation-info">
       발주번호: <?= orderCode ?> | <?= dueDate ?>
     </div>
@@ -683,6 +733,22 @@
         </tbody>
       </table>
     </div>
+
+    <!-- 부가세/합계 (마지막 페이지에만 표시) -->
+    <? if (isLastPage) { ?>
+    <!-- ③ 부가세 (VAT 10%) -->
+    <div class="amount-row vat-row">
+      <div class="amount-label">부가세 (VAT 10%)</div>
+      <div class="amount-value">₩<?= totalVat ?></div>
+    </div>
+
+    <!-- ④ 합계 (Total Amount) -->
+    <div class="amount-row total-row">
+      <div class="amount-label">합계 (Total Amount)</div>
+      <div class="amount-value">₩<?= totalAmount ?></div>
+      <div class="amount-hangul"><?= amountHangul ?></div>
+    </div>
+    <? } ?>
 
     <!-- 비고 (마지막 페이지에만 표시) -->
     <? if (isLastPage) { ?>
