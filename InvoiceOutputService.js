@@ -376,11 +376,14 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
   var companyInfo = findPartnerByName_('원브릿지');
   var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = companyInfo ? (companyInfo.bizNo || '')     : '';
-  var supplierManager = companyInfo ? (companyInfo.manager || '')   : '';
-  var buyerBizNo      = partnerInfo ? (partnerInfo.bizNo || '')     : '';
-  var buyerPhone      = partnerInfo ? (partnerInfo.phone || '')     : '';
-  var buyerAddress    = partnerInfo ? (partnerInfo.address || '')   : '';
+  var supplierBizNo      = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager    = companyInfo ? (companyInfo.manager || '')   : '';
+  var supplierAddress    = companyInfo ? (companyInfo.address || '')   : '';
+  var supplierPhone      = companyInfo ? (companyInfo.phone || '')     : '';
+
+  var buyerBizNo         = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone         = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress       = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // 납기일자: 일단 발주일 기반으로 사용 (추후 별도 컬럼 매핑 가능)
   var dueDate = orderDate;
@@ -477,6 +480,8 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
+    supplierAddress:supplierAddress,
+    supplierPhone:  supplierPhone,
 
     buyerName:      buyerNm,
     buyerBizNo:     buyerBizNo,
@@ -669,6 +674,8 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
+    supplierAddress:supplierAddress,
+    supplierPhone:  supplierPhone,
 
     buyerName:      buyerNm,
     buyerBizNo:     buyerBizNo,
@@ -738,11 +745,14 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
   var companyInfo = findPartnerByName_('원브릿지');
   var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = companyInfo ? (companyInfo.bizNo || '')     : '';
-  var supplierManager = companyInfo ? (companyInfo.manager || '')   : '';
-  var buyerBizNo      = partnerInfo ? (partnerInfo.bizNo || '')     : '';
-  var buyerPhone      = partnerInfo ? (partnerInfo.phone || '')     : '';
-  var buyerAddress    = partnerInfo ? (partnerInfo.address || '')   : '';
+  var supplierBizNo      = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager    = companyInfo ? (companyInfo.manager || '')   : '';
+  var supplierAddress    = companyInfo ? (companyInfo.address || '')   : '';
+  var supplierPhone      = companyInfo ? (companyInfo.phone || '')     : '';
+
+  var buyerBizNo         = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone         = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress       = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // 행 단위 품목 구성
   var qtyCol = idxQtyConfirmed >= 0 ? idxQtyConfirmed : idxQtyOrder; // 거래명세서 → 확정수량 우선
@@ -817,11 +827,17 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    docTitle:       '(주)원브릿지 거래명세서',
+    docTitle:       '거래명세서 (영세율)',
+    buyerLabel:     '납<br>품<br>처',
+    dueDateLabel:   '발주일자',
+    deliveryLabel:  '주소(납품처)',
+    deliveryAddr:   buyerAddress,
 
     supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
+    supplierAddress:supplierAddress,
+    supplierPhone:  supplierPhone,
 
     buyerName:      buyerNm,
     buyerBizNo:     buyerBizNo,
@@ -833,6 +849,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
 
     totalSupply:    formatNumber_(totalSupply),
     totalVat:       formatNumber_(totalVat),
+    totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
@@ -894,11 +911,14 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
   var supplierInfo = findPartnerByName_(supplierNm);
   var buyerInfo    = findPartnerByName_(buyerNm);
 
-  var supplierBizNo   = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var buyerBizNo      = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone      = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress    = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var supplierBizNo      = supplierInfo ? (supplierInfo.bizNo || '')     : '';
+  var supplierManager    = supplierInfo ? (supplierInfo.manager || '')   : '';
+  var supplierAddress    = supplierInfo ? (supplierInfo.address || '')   : '';
+  var supplierPhone      = supplierInfo ? (supplierInfo.phone || '')     : '';
+
+  var buyerBizNo         = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
+  var buyerPhone         = buyerInfo    ? (buyerInfo.phone || '')        : '';
+  var buyerAddress       = buyerInfo    ? (buyerInfo.address || '')      : '';
 
   // ========================================
   // 발주번호(브랜드)별로 품목 그룹핑
@@ -998,9 +1018,17 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
+    docTitle:       '거래명세서 (영세율)',
+    buyerLabel:     '납<br>품<br>처',
+    dueDateLabel:   '발주일자',
+    deliveryLabel:  '주소(납품처)',
+    deliveryAddr:   buyerAddress,
+
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
+    supplierAddress:supplierAddress,
+    supplierPhone:  supplierPhone,
 
     buyerName:      buyerNm,
     buyerBizNo:     buyerBizNo,
@@ -1008,16 +1036,17 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     buyerAddress:   buyerAddress,
 
     dueDate:        formatDateYmd_(orderDate),
-    orderCode:      orderCodes.join(', '),  // 여러 발주번호 표시
+    orderCode:      orderCodes.join(', '),
 
     totalSupply:    formatNumber_(grandTotalSupply),
     totalVat:       formatNumber_(totalVat),
+    totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
     items:          allItems,
     buyerOrderCode: '',
-    remark:         '(영세율)'
+    remark:         '※ 영세율 적용'
   };
 
   var tmpl = HtmlService.createTemplateFromFile('Templates_Invoice_VAT');
