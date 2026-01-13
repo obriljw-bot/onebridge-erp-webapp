@@ -468,8 +468,11 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    docTitle:       '(주)원브릿지 거래명세서',
-    docSubtitle:    'TRANSACTION STATEMENT',
+    docTitle:       '거래명세서',
+    buyerLabel:     '납<br>품<br>처',
+    dueDateLabel:   '발주일자',
+    deliveryLabel:  '주소(납품처)',
+    deliveryAddr:   buyerAddress,
 
     supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
@@ -657,8 +660,11 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     stampBase64:    getStampBase64_(),
     logoBase64:     getLogoBase64_(),
 
-    docTitle:       '(주)원브릿지 매입발주서',
-    docSubtitle:    'PURCHASE ORDER',
+    docTitle:       '매입발주서',
+    buyerLabel:     '발<br>주<br>자',
+    dueDateLabel:   '납기일자',
+    deliveryLabel:  '주소(입고지)',
+    deliveryAddr:   deliveryAddr,
 
     supplierName:   supplierNm,
     supplierBizNo:  supplierBizNo,
