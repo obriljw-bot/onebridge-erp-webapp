@@ -647,18 +647,16 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     totalVat = totalAmount - totalSupply;
   }
 
-  // 비고란 구성: 입고지, 담당자, 요청사항
+  // 비고란 구성: 발주번호, 입고지, 요청사항
   var remarkLines = [];
-  if (deliveryAddr) {
-    remarkLines.push('입고지: ' + deliveryAddr);
+  if (orderCode) {
+    remarkLines.push('[발주번호] ' + orderCode);
   }
-  if (supplierManager || supplierPhone) {
-    var managerInfo = '담당자: ' + supplierManager;
-    if (supplierPhone) managerInfo += ' (' + supplierPhone + ')';
-    remarkLines.push(managerInfo);
+  if (deliveryAddr) {
+    remarkLines.push('[입고지] ' + deliveryAddr);
   }
   if (specialRequest) {
-    remarkLines.push('요청사항: ' + specialRequest);
+    remarkLines.push('[요청사항] ' + specialRequest);
   }
 
   var ctx = {
@@ -677,7 +675,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     supplierAddress:supplierAddress,
     supplierPhone:  supplierPhone,
 
-    buyerName:      buyerNm,
+    buyerName:      '원브릿지',
     buyerBizNo:     buyerBizNo,
     buyerPhone:     buyerPhone,
     buyerAddress:   buyerAddress,
@@ -908,17 +906,18 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
   var buyerNm    = firstRow[idxBuyerName];
 
   // 거래처 상세 정보(거래처DB) 조회
-  var supplierInfo = findPartnerByName_(supplierNm);
-  var buyerInfo    = findPartnerByName_(buyerNm);
+  // 거래명세서(영세): 원브릿지 = 공급자(상단 좌측), 발주처 = 거래처(상단 우측)
+  var companyInfo = findPartnerByName_('원브릿지');
+  var partnerInfo = findPartnerByName_(buyerNm);
 
-  var supplierBizNo      = supplierInfo ? (supplierInfo.bizNo || '')     : '';
-  var supplierManager    = supplierInfo ? (supplierInfo.manager || '')   : '';
-  var supplierAddress    = supplierInfo ? (supplierInfo.address || '')   : '';
-  var supplierPhone      = supplierInfo ? (supplierInfo.phone || '')     : '';
+  var supplierBizNo      = companyInfo ? (companyInfo.bizNo || '')     : '';
+  var supplierManager    = companyInfo ? (companyInfo.manager || '')   : '';
+  var supplierAddress    = companyInfo ? (companyInfo.address || '')   : '';
+  var supplierPhone      = companyInfo ? (companyInfo.phone || '')     : '';
 
-  var buyerBizNo         = buyerInfo    ? (buyerInfo.bizNo || '')        : '';
-  var buyerPhone         = buyerInfo    ? (buyerInfo.phone || '')        : '';
-  var buyerAddress       = buyerInfo    ? (buyerInfo.address || '')      : '';
+  var buyerBizNo         = partnerInfo ? (partnerInfo.bizNo || '')     : '';
+  var buyerPhone         = partnerInfo ? (partnerInfo.phone || '')     : '';
+  var buyerAddress       = partnerInfo ? (partnerInfo.address || '')   : '';
 
   // ========================================
   // 발주번호(브랜드)별로 품목 그룹핑
@@ -1024,7 +1023,7 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     deliveryLabel:  '주소(납품처)',
     deliveryAddr:   buyerAddress,
 
-    supplierName:   supplierNm,
+    supplierName:   '원브릿지',
     supplierBizNo:  supplierBizNo,
     supplierManager:supplierManager,
     supplierAddress:supplierAddress,
