@@ -339,10 +339,12 @@ function generateInvoiceZip(params) {
   for (var i = 0; i < pdfBlobs.length; i++) {
     try {
       var savedFile = outputFolder.createFile(pdfBlobs[i]);
+      var fileId = savedFile.getId();
       savedFiles.push({
-        fileId: savedFile.getId(),
+        fileId: fileId,
         fileName: savedFile.getName(),
-        downloadUrl: savedFile.getDownloadUrl()
+        downloadUrl: 'https://drive.google.com/uc?export=download&id=' + fileId,
+        viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view'
       });
       Logger.log('[generateInvoiceZip] 파일 저장 완료: ' + savedFile.getName());
     } catch (saveErr) {
@@ -2174,14 +2176,16 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
   // Drive 지정 폴더에 Excel 파일 저장
   var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
   var savedFile = outputFolder.createFile(excelBlob);
+  var fileId = savedFile.getId();
 
   Logger.log('[generateExcelOutput_] Excel 생성 완료: ' + savedFile.getName());
 
   return {
     success: true,
-    fileId: savedFile.getId(),
+    fileId: fileId,
     fileName: savedFile.getName(),
-    downloadUrl: savedFile.getDownloadUrl()
+    downloadUrl: 'https://drive.google.com/uc?export=download&id=' + fileId,
+    viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view'
   };
 }
 
@@ -2254,10 +2258,12 @@ function generateCustomTemplateExcel_(docType, orderCodes, rows, header, options
   for (var i = 0; i < blobs.length; i++) {
     try {
       var savedFile = outputFolder.createFile(blobs[i]);
+      var fileId = savedFile.getId();
       savedFiles.push({
-        fileId: savedFile.getId(),
+        fileId: fileId,
         fileName: savedFile.getName(),
-        downloadUrl: savedFile.getDownloadUrl()
+        downloadUrl: 'https://drive.google.com/uc?export=download&id=' + fileId,
+        viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view'
       });
       Logger.log('[generateCustomTemplateExcel_] 파일 저장 완료: ' + savedFile.getName());
     } catch (saveErr) {
