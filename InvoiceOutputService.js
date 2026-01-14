@@ -10,24 +10,7 @@
  */
 
 // 출력 파일 저장 폴더 설정
-var OUTPUT_FOLDER_NAME = '발주서출력';
-
-/**
- * 출력 폴더 가져오기 (없으면 생성)
- */
-function getOutputFolder_() {
-  try {
-    var folders = DriveApp.getFoldersByName(OUTPUT_FOLDER_NAME);
-    if (folders.hasNext()) {
-      return folders.next();
-    }
-    // 폴더가 없으면 루트에 생성
-    return DriveApp.createFolder(OUTPUT_FOLDER_NAME);
-  } catch (err) {
-    Logger.log('[getOutputFolder_] 폴더 접근 실패, 루트 폴더 사용: ' + err.message);
-    return DriveApp.getRootFolder();
-  }
-}
+var OUTPUT_FOLDER_ID = '1WVCLN_G6qAfagyL73C0Bzl2CHOBc_ukg';
 
 /**
  * 메인 엔드포인트
@@ -349,31 +332,28 @@ function generateInvoiceZip(params) {
     };
   }
 
-  // 파일들을 지정된 폴더에 개별 저장 (압축 안함)
-  var outputFolder = getOutputFolder_();
-  var savedFiles = [];
+  // 지정된 폴더에 파일들 저장
+  try {
+    var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
 
-  for (var i = 0; i < pdfBlobs.length; i++) {
-    try {
-      var savedFile = outputFolder.createFile(pdfBlobs[i]);
-      var fileId = savedFile.getId();
-      savedFiles.push({
-        fileId: fileId,
-        fileName: savedFile.getName(),
-        downloadUrl: 'https://drive.google.com/uc?export=download&id=' + fileId,
-        viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view'
-      });
-      Logger.log('[generateInvoiceZip] 파일 저장 완료: ' + savedFile.getName());
-    } catch (saveErr) {
-      Logger.log('[generateInvoiceZip] 파일 저장 실패: ' + pdfBlobs[i].getName() + ' - ' + saveErr.message);
+    for (var i = 0; i < pdfBlobs.length; i++) {
+      outputFolder.createFile(pdfBlobs[i]);
+      Logger.log('[generateInvoiceZip] 파일 저장: ' + pdfBlobs[i].getName());
     }
-  }
 
-  return {
-    success: true,
-    files: savedFiles,
-    fileCount: savedFiles.length
-  };
+    return {
+      success: true,
+      message: pdfBlobs.length + '개 파일이 저장되었습니다.',
+      fileCount: pdfBlobs.length,
+      folderUrl: 'https://drive.google.com/drive/folders/' + OUTPUT_FOLDER_ID
+    };
+  } catch (err) {
+    Logger.log('[generateInvoiceZip] 저장 실패: ' + err.message);
+    return {
+      success: false,
+      error: '파일 저장 중 오류: ' + err.message
+    };
+  }
 }
 
 /**
@@ -2191,19 +2171,23 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
   file.setTrashed(true);
 
   // Drive 지정 폴더에 Excel 파일 저장
-  var outputFolder = getOutputFolder_();
-  var savedFile = outputFolder.createFile(excelBlob);
-  var fileId = savedFile.getId();
+  try {
+    var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+    outputFolder.createFile(excelBlob);
+    Logger.log('[generateExcelOutput_] Excel 저장 완료: ' + excelBlob.getName());
 
-  Logger.log('[generateExcelOutput_] Excel 생성 완료: ' + savedFile.getName());
-
-  return {
-    success: true,
-    fileId: fileId,
-    fileName: savedFile.getName(),
-    downloadUrl: 'https://drive.google.com/uc?export=download&id=' + fileId,
-    viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view'
-  };
+    return {
+      success: true,
+      message: 'Excel 파일이 저장되었습니다.',
+      folderUrl: 'https://drive.google.com/drive/folders/' + OUTPUT_FOLDER_ID
+    };
+  } catch (err) {
+    Logger.log('[generateExcelOutput_] 저장 실패: ' + err.message);
+    return {
+      success: false,
+      error: '파일 저장 중 오류: ' + err.message
+    };
+  }
 }
 
 // ========================================
@@ -2268,29 +2252,26 @@ function generateCustomTemplateExcel_(docType, orderCodes, rows, header, options
     return { success: false, error: '전용 양식 파일을 생성할 수 없습니다. 템플릿 설정을 확인하세요.' };
   }
 
-  // 파일들을 지정된 폴더에 개별 저장 (압축 안함)
-  var outputFolder = getOutputFolder_();
-  var savedFiles = [];
+  // 지정된 폴더에 파일들 저장
+  try {
+    var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
 
-  for (var i = 0; i < blobs.length; i++) {
-    try {
-      var savedFile = outputFolder.createFile(blobs[i]);
-      var fileId = savedFile.getId();
-      savedFiles.push({
-        fileId: fileId,
-        fileName: savedFile.getName(),
-        downloadUrl: 'https://drive.google.com/uc?export=download&id=' + fileId,
-        viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view'
-      });
-      Logger.log('[generateCustomTemplateExcel_] 파일 저장 완료: ' + savedFile.getName());
-    } catch (saveErr) {
-      Logger.log('[generateCustomTemplateExcel_] 파일 저장 실패: ' + blobs[i].getName() + ' - ' + saveErr.message);
+    for (var i = 0; i < blobs.length; i++) {
+      outputFolder.createFile(blobs[i]);
+      Logger.log('[generateCustomTemplateExcel_] 파일 저장: ' + blobs[i].getName());
     }
-  }
 
-  return {
-    success: true,
-    files: savedFiles,
-    fileCount: savedFiles.length
-  };
+    return {
+      success: true,
+      message: blobs.length + '개 파일이 저장되었습니다.',
+      fileCount: blobs.length,
+      folderUrl: 'https://drive.google.com/drive/folders/' + OUTPUT_FOLDER_ID
+    };
+  } catch (err) {
+    Logger.log('[generateCustomTemplateExcel_] 저장 실패: ' + err.message);
+    return {
+      success: false,
+      error: '파일 저장 중 오류: ' + err.message
+    };
+  }
 }
