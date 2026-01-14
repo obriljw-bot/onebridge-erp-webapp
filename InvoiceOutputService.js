@@ -10,7 +10,24 @@
  */
 
 // 출력 파일 저장 폴더 설정
-var OUTPUT_FOLDER_ID = '1WVCLN_G6qAfagyL73C0Bzl2CHOBc_ukg';
+var OUTPUT_FOLDER_NAME = '발주서출력';
+
+/**
+ * 출력 폴더 가져오기 (없으면 생성)
+ */
+function getOutputFolder_() {
+  try {
+    var folders = DriveApp.getFoldersByName(OUTPUT_FOLDER_NAME);
+    if (folders.hasNext()) {
+      return folders.next();
+    }
+    // 폴더가 없으면 루트에 생성
+    return DriveApp.createFolder(OUTPUT_FOLDER_NAME);
+  } catch (err) {
+    Logger.log('[getOutputFolder_] 폴더 접근 실패, 루트 폴더 사용: ' + err.message);
+    return DriveApp.getRootFolder();
+  }
+}
 
 /**
  * 메인 엔드포인트
@@ -333,7 +350,7 @@ function generateInvoiceZip(params) {
   }
 
   // 파일들을 지정된 폴더에 개별 저장 (압축 안함)
-  var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+  var outputFolder = getOutputFolder_();
   var savedFiles = [];
 
   for (var i = 0; i < pdfBlobs.length; i++) {
@@ -2174,7 +2191,7 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
   file.setTrashed(true);
 
   // Drive 지정 폴더에 Excel 파일 저장
-  var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+  var outputFolder = getOutputFolder_();
   var savedFile = outputFolder.createFile(excelBlob);
   var fileId = savedFile.getId();
 
@@ -2252,7 +2269,7 @@ function generateCustomTemplateExcel_(docType, orderCodes, rows, header, options
   }
 
   // 파일들을 지정된 폴더에 개별 저장 (압축 안함)
-  var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+  var outputFolder = getOutputFolder_();
   var savedFiles = [];
 
   for (var i = 0; i < blobs.length; i++) {
