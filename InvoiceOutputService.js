@@ -343,9 +343,9 @@ function generateInvoiceZip(params) {
 
     return {
       success: true,
-      message: pdfBlobs.length + '개 파일이 저장되었습니다.',
       fileCount: pdfBlobs.length,
-      folderUrl: 'https://drive.google.com/drive/folders/' + OUTPUT_FOLDER_ID
+      folderId: OUTPUT_FOLDER_ID,
+      message: pdfBlobs.length + '개 파일이 저장되었습니다.'
     };
   } catch (err) {
     Logger.log('[generateInvoiceZip] 저장 실패: ' + err.message);

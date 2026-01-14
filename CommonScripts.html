@@ -838,12 +838,19 @@
             return;
           }
 
-          // 다운로드 URL 오픈
-          var url = "https://drive.google.com/uc?export=download&id=" + res.fileId;
-          window.open(url, "_blank");
-
-          var successMsg = outputFormat === 'EXCEL' ? 'Excel 파일 생성 완료!' : 'PDF 생성 완료!';
-          alert('✅ ' + successMsg + '\n파일: ' + res.fileName);
+          // 폴더 열기
+          if (res.folderId) {
+            var url = "https://drive.google.com/drive/folders/" + res.folderId;
+            window.open(url, "_blank");
+            alert('✅ ' + res.fileCount + '개 파일이 생성되었습니다.\n\n구글 드라이브 폴더가 열립니다.');
+          } else if (res.fileId) {
+            // 단일 파일 다운로드 (하위호환)
+            var url = "https://drive.google.com/uc?export=download&id=" + res.fileId;
+            window.open(url, "_blank");
+            alert('✅ 파일 생성 완료!\n파일: ' + res.fileName);
+          } else {
+            alert('✅ ' + (res.message || '완료'));
+          }
         })
         .withFailureHandler(function(err) {
           OB.hideLoading();
