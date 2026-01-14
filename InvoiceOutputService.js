@@ -472,7 +472,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     logoBase64:     getLogoBase64_(),
 
     docTitle:       '거래명세서',
-    buyerLabel:     '납<br>품<br>처',
+    buyerLabel:     '공급처',
     dueDateLabel:   '발주일자',
     deliveryLabel:  '주소(납품처)',
     deliveryAddr:   buyerAddress,
@@ -666,7 +666,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     logoBase64:     getLogoBase64_(),
 
     docTitle:       '매입발주서',
-    buyerLabel:     '발<br>주<br>자',
+    buyerLabel:     '발주처',
     dueDateLabel:   '납기일자',
     deliveryLabel:  '주소(입고지)',
     deliveryAddr:   deliveryAddr,
@@ -828,7 +828,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
     logoBase64:     getLogoBase64_(),
 
     docTitle:       '거래명세서 (영세율)',
-    buyerLabel:     '납<br>품<br>처',
+    buyerLabel:     '공급처',
     dueDateLabel:   '발주일자',
     deliveryLabel:  '주소(납품처)',
     deliveryAddr:   buyerAddress,
@@ -1019,7 +1019,7 @@ function buildInvoiceNvatPdfMerged(orderCodes, allOrderRows, header, modesByOrde
     logoBase64:     getLogoBase64_(),
 
     docTitle:       '거래명세서 (영세율)',
-    buyerLabel:     '납<br>품<br>처',
+    buyerLabel:     '공급처',
     dueDateLabel:   '발주일자',
     deliveryLabel:  '주소(납품처)',
     deliveryAddr:   buyerAddress,

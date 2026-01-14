@@ -26,7 +26,7 @@
 
   /* 테이블 공통 스타일 */
   table { width: 100%; border-collapse: collapse; border-spacing: 0; margin-bottom: 20px; }
-  th, td { padding: 6px 8px; font-size: 9.5pt; vertical-align: middle; }
+  th, td { padding: 6px 8px; font-size: 10pt; vertical-align: middle; }
 
   /* ===== 1. 상단 헤더 영역 ===== */
   .header-section {
@@ -92,22 +92,23 @@
   .total-text { font-size: 10pt; color: #666; margin-left: 10px; font-weight: 500; }
 
   /* ===== 4. 품목 리스트 (가독성 중심) ===== */
-  .items-section { margin-bottom: 20px; }
+  .items-section { margin-bottom: 70px; }
   .section-title { font-size: 11pt; font-weight: 700; color: #111; margin-bottom: 8px; border-left: 4px solid #333; padding-left: 8px; line-height: 1; }
 
   .list-table { border-top: 2px solid #333; border-bottom: 1px solid #aaa; }
   .list-table th {
     background: #f9f9f9;
     color: #444;
-    font-weight: 600;
+    font-weight: 700;
     padding: 10px 5px;
     border-bottom: 1px solid #ddd;
-    font-size: 9.5pt;
+    font-size: 10pt;
   }
   .list-table td {
     padding: 10px 5px;
     border-bottom: 1px solid #eee;
     color: #333;
+    font-size: 10pt;
   }
   .list-table th, .list-table td { border-left: none; border-right: none; }
 
@@ -129,7 +130,7 @@
   .summary-table .content { min-height: 80px; vertical-align: top; line-height: 1.6; white-space: pre-line; }
 
   .vat-box { border: 1px solid #ddd; background: #fff; padding: 15px; border-radius: 4px; }
-  .vat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 9.5pt; }
+  .vat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 10pt; font-weight: 600; }
   .vat-row.total { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; font-weight: 700; color: #2563eb; }
 
   /* ===== 6. 푸터 및 인쇄 설정 ===== */
@@ -171,9 +172,9 @@
 
   <!-- 2. 공급자/납품처 정보 -->
   <div class="info-grid">
-    <!-- 공급자 -->
+    <!-- 공급처 -->
     <div class="info-box">
-      <div class="info-title">공 급 자</div>
+      <div class="info-title">공급처</div>
       <table class="clean-table">
         <tr>
           <td class="label">상 호</td>
@@ -194,9 +195,9 @@
       </table>
     </div>
 
-    <!-- 납품처 -->
+    <!-- 발주처/공급처 (동적) -->
     <div class="info-box">
-      <div class="info-title"><?= buyerLabel || '납 품 처' ?></div>
+      <div class="info-title"><?= buyerLabel || '발주처' ?></div>
       <table class="clean-table">
         <tr>
           <td class="label">상 호</td>
@@ -212,7 +213,7 @@
         </tr>
         <tr>
           <td class="label">현장주소</td>
-          <td class="value" style="font-size: 9pt;"><?= buyerAddress ?></td>
+          <td class="value"><?= buyerAddress ?></td>
         </tr>
       </table>
     </div>
@@ -229,7 +230,7 @@
   <div class="items-section">
     <div class="section-title">
       품목 상세 내역
-      <span style="font-size:9pt; font-weight:400; color:#888; margin-left:5px;">
+      <span style="font-weight:400; color:#888; margin-left:5px;">
         (Page 1 / <?= totalPages ?>)
       </span>
     </div>
@@ -268,13 +269,8 @@
             <td class="tr t-bold"><?= it.qty || '' ?></td>
             <td class="tr" style="color:#666;"><?= it.price || '' ?></td>
             <td class="tr t-bold" style="color:#333;"><?= it.amount || '' ?></td>
-            <td class="tc" style="font-size:8pt; color:#999;"><?= it.note || '' ?></td>
+            <td class="tc" style="color:#999;"><?= it.note || '' ?></td>
           </tr>
-        <? } ?>
-
-        <!-- 빈 줄 채우기 -->
-        <? for (var j = firstPageItems; j < ITEMS_PER_PAGE; j++) { ?>
-          <tr><td colspan="8" style="height: 33px;"></td></tr>
         <? } ?>
       </tbody>
     </table>
@@ -373,7 +369,7 @@
             <td class="tr t-bold"><?= it.qty || '' ?></td>
             <td class="tr" style="color:#666;"><?= it.price || '' ?></td>
             <td class="tr t-bold" style="color:#333;"><?= it.amount || '' ?></td>
-            <td class="tc" style="font-size:8pt; color:#999;"><?= it.note || '' ?></td>
+            <td class="tc" style="color:#999;"><?= it.note || '' ?></td>
           </tr>
         <? } ?>
       </tbody>
