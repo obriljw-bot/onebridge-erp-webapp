@@ -67,8 +67,8 @@
 
   .clean-table td { border-bottom: 1px solid #eee; padding: 7px 10px; }
   .clean-table tr:last-child td { border-bottom: none; }
-  .clean-table td.label { width: 70px; color: #333; font-weight: 600; background: #fff; }
-  .clean-table td.value { color: #333; font-weight: 600; }
+  .clean-table td.label { width: 70px; color: #111; font-weight: 600; background: #fff; }
+  .clean-table td.value { color: #111; font-weight: 500; }
 
   /* ===== 3. 금액 합계 (가장 강조) ===== */
   .total-wrapper {
@@ -82,9 +82,9 @@
     margin-bottom: 25px;
   }
 
-  .total-title { font-size: 11pt; font-weight: 600; color: #555; margin-right: 20px; }
-  .total-price { font-size: 22pt; font-weight: 800; color: #2563eb; letter-spacing: -0.5px; }
-  .total-text { font-size: 10pt; color: #666; margin-left: 10px; font-weight: 500; }
+  .total-title { font-size: 11pt; font-weight: 600; color: #111; margin-right: 20px; }
+  .total-price { font-size: 16pt; font-weight: 800; color: #111; letter-spacing: -0.5px; }
+  .total-text { font-size: 10pt; color: #111; margin-left: 10px; font-weight: 500; }
 
   /* ===== 4. 품목 리스트 (가독성 중심) ===== */
   .items-section { margin-bottom: 70px; }
@@ -93,7 +93,7 @@
   .list-table { border-top: 2px solid #333; border-bottom: 1px solid #aaa; }
   .list-table th {
     background: #f9f9f9;
-    color: #444;
+    color: #111;
     font-weight: 700;
     padding: 10px 5px;
     border-bottom: 1px solid #ddd;
@@ -102,7 +102,7 @@
   .list-table td {
     padding: 10px 5px;
     border-bottom: 1px solid #eee;
-    color: #333;
+    color: #111;
     font-size: 10pt;
   }
   .list-table th, .list-table td { border-left: none; border-right: none; }
@@ -121,12 +121,12 @@
 
   .summary-table { border: 1px solid #ddd; margin-bottom: 0; }
   .summary-table td { padding: 8px 10px; border: 1px solid #ddd; }
-  .summary-table .label { background: #f3f4f6; width: 100px; text-align: center; font-weight: 600; color: #555; }
-  .summary-table .content { min-height: 80px; vertical-align: top; line-height: 1.6; white-space: pre-line; }
+  .summary-table .label { background: #f3f4f6; width: 100px; text-align: center; font-weight: 600; color: #111; }
+  .summary-table .content { min-height: 80px; vertical-align: top; line-height: 1.6; white-space: pre-line; color: #111; }
 
   .vat-box { border: 1px solid #ddd; background: #fff; padding: 15px; border-radius: 4px; }
-  .vat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 10pt; font-weight: 600; }
-  .vat-row.total { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; font-weight: 700; color: #2563eb; }
+  .vat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 10pt; font-weight: 600; color: #111; }
+  .vat-row.total { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; font-weight: 700; color: #111; }
 
   /* ===== 6. 푸터 및 인쇄 설정 ===== */
   .footer {
@@ -252,14 +252,14 @@
         <? for (var i = 0; i < firstPageItems; i++) {
              var it = items[i]; ?>
           <tr>
-            <td class="tc" style="color:#999;"><?= i + 1 ?></td>
+            <td class="tc" style="color:#111;"><?= i + 1 ?></td>
             <td class="tc" style="font-family:'Courier New'"><?= it.code || '' ?></td>
             <td class="tl"><?= it.name || '' ?></td>
-            <td class="tc" style="color:#666;"><?= it.spec || '' ?></td>
+            <td class="tc" style="color:#111;"><?= it.spec || '' ?></td>
             <td class="tr"><?= it.qty || '' ?></td>
-            <td class="tr" style="color:#666;"><?= it.price || '' ?></td>
-            <td class="tr t-bold" style="color:#333;"><?= it.amount || '' ?></td>
-            <td class="tc" style="color:#999;"><?= it.note || '' ?></td>
+            <td class="tr" style="color:#111;"><?= it.price || '' ?></td>
+            <td class="tr t-bold" style="color:#111;"><?= it.amount || '' ?></td>
+            <td class="tc" style="color:#111;"><?= it.note || '' ?></td>
           </tr>
         <? } ?>
       </tbody>
@@ -349,14 +349,14 @@
         <? for (var k = startIdx; k < endIdx; k++) {
              var it = items[k]; ?>
           <tr>
-            <td class="tc" style="color:#999;"><?= k + 1 ?></td>
+            <td class="tc" style="color:#111;"><?= k + 1 ?></td>
             <td class="tc" style="font-family:'Courier New'"><?= it.code || '' ?></td>
             <td class="tl"><?= it.name || '' ?></td>
-            <td class="tc" style="color:#666;"><?= it.spec || '' ?></td>
+            <td class="tc" style="color:#111;"><?= it.spec || '' ?></td>
             <td class="tr"><?= it.qty || '' ?></td>
-            <td class="tr" style="color:#666;"><?= it.price || '' ?></td>
-            <td class="tr t-bold" style="color:#333;"><?= it.amount || '' ?></td>
-            <td class="tc" style="color:#999;"><?= it.note || '' ?></td>
+            <td class="tr" style="color:#111;"><?= it.price || '' ?></td>
+            <td class="tr t-bold" style="color:#111;"><?= it.amount || '' ?></td>
+            <td class="tc" style="color:#111;"><?= it.note || '' ?></td>
           </tr>
         <? } ?>
       </tbody>

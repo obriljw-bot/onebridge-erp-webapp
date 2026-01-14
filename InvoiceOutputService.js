@@ -9,6 +9,9 @@
  *   에서 호출되는 엔진
  */
 
+// 출력 파일 저장 폴더 설정
+var OUTPUT_FOLDER_ID = '1WVCLN_G6qAfagyL73C0Bzl2CHOBc_ukg';
+
 /**
  * 메인 엔드포인트
  * @param {Object} params
@@ -329,14 +332,28 @@ function generateInvoiceZip(params) {
     };
   }
 
-  var zipFileName = 'Invoices_' + ts + '.zip';
-  var zipBlob     = Utilities.zip(pdfBlobs, zipFileName);
-  var driveFile   = DriveApp.createFile(zipBlob);
+  // 파일들을 지정된 폴더에 개별 저장 (압축 안함)
+  var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+  var savedFiles = [];
+
+  for (var i = 0; i < pdfBlobs.length; i++) {
+    try {
+      var savedFile = outputFolder.createFile(pdfBlobs[i]);
+      savedFiles.push({
+        fileId: savedFile.getId(),
+        fileName: savedFile.getName(),
+        downloadUrl: savedFile.getDownloadUrl()
+      });
+      Logger.log('[generateInvoiceZip] 파일 저장 완료: ' + savedFile.getName());
+    } catch (saveErr) {
+      Logger.log('[generateInvoiceZip] 파일 저장 실패: ' + pdfBlobs[i].getName() + ' - ' + saveErr.message);
+    }
+  }
 
   return {
     success: true,
-    fileId: driveFile.getId(),
-    fileName: driveFile.getName()
+    files: savedFiles,
+    fileCount: savedFiles.length
   };
 }
 
@@ -2154,8 +2171,9 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
   // 임시 스프레드시트 삭제
   file.setTrashed(true);
 
-  // Drive에 Excel 파일 저장
-  var savedFile = DriveApp.createFile(excelBlob);
+  // Drive 지정 폴더에 Excel 파일 저장
+  var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+  var savedFile = outputFolder.createFile(excelBlob);
 
   Logger.log('[generateExcelOutput_] Excel 생성 완료: ' + savedFile.getName());
 
@@ -2229,27 +2247,27 @@ function generateCustomTemplateExcel_(docType, orderCodes, rows, header, options
     return { success: false, error: '전용 양식 파일을 생성할 수 없습니다. 템플릿 설정을 확인하세요.' };
   }
 
-  // 단일 파일인 경우 직접 저장
-  if (blobs.length === 1) {
-    var savedFile = DriveApp.createFile(blobs[0]);
-    return {
-      success: true,
-      fileId: savedFile.getId(),
-      fileName: savedFile.getName(),
-      downloadUrl: savedFile.getDownloadUrl()
-    };
+  // 파일들을 지정된 폴더에 개별 저장 (압축 안함)
+  var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
+  var savedFiles = [];
+
+  for (var i = 0; i < blobs.length; i++) {
+    try {
+      var savedFile = outputFolder.createFile(blobs[i]);
+      savedFiles.push({
+        fileId: savedFile.getId(),
+        fileName: savedFile.getName(),
+        downloadUrl: savedFile.getDownloadUrl()
+      });
+      Logger.log('[generateCustomTemplateExcel_] 파일 저장 완료: ' + savedFile.getName());
+    } catch (saveErr) {
+      Logger.log('[generateCustomTemplateExcel_] 파일 저장 실패: ' + blobs[i].getName() + ' - ' + saveErr.message);
+    }
   }
-
-  // 여러 파일인 경우 ZIP으로 묶기
-  var zipBlob = Utilities.zip(blobs, templateLabel + '_' + ts + '.zip');
-  var driveFile = DriveApp.createFile(zipBlob);
-
-  Logger.log('[generateCustomTemplateExcel_] ZIP 생성 완료: ' + driveFile.getName());
 
   return {
     success: true,
-    fileId: driveFile.getId(),
-    fileName: driveFile.getName(),
-    downloadUrl: driveFile.getDownloadUrl()
+    files: savedFiles,
+    fileCount: savedFiles.length
   };
 }
