@@ -9,10 +9,10 @@
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-    font-size: 10pt;
+    font-size: 8pt;
     color: #333;
     background: #fff;
-    line-height: 1.4;
+    line-height: 1.3;
     padding: 10mm;
   }
 
@@ -25,8 +25,8 @@
   }
 
   /* 테이블 공통 스타일 */
-  table { width: 100%; border-collapse: collapse; border-spacing: 0; margin-bottom: 20px; }
-  th, td { padding: 6px 8px; font-size: 10pt; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; border-spacing: 0; margin-bottom: 15px; }
+  th, td { padding: 4px 6px; font-size: 8pt; vertical-align: middle; }
 
   /* ===== 1. 상단 헤더 영역 ===== */
   .header-section {
@@ -37,14 +37,14 @@
   }
 
   .doc-title {
-    font-size: 24pt; font-weight: 800; color: #111; letter-spacing: -0.5px;
+    font-size: 20pt; font-weight: 800; color: #111; letter-spacing: -0.5px;
   }
 
   /* ===== 2. 공급자/공급받는자 정보 (카드 형태) ===== */
   .info-grid {
     display: flex;
-    gap: 15px;
-    margin-bottom: 25px;
+    gap: 10px;
+    margin-bottom: 15px;
   }
 
   .info-box {
@@ -59,16 +59,16 @@
     color: #333;
     font-weight: 700;
     text-align: center;
-    padding: 6px 0;
+    padding: 4px 0;
     border-bottom: 1px solid #ddd;
-    font-size: 10pt;
-    letter-spacing: 2px;
+    font-size: 8pt;
+    letter-spacing: 1px;
   }
 
-  .clean-table td { border-bottom: 1px solid #eee; padding: 7px 10px; }
+  .clean-table td { border-bottom: 1px solid #eee; padding: 5px 8px; }
   .clean-table tr:last-child td { border-bottom: none; }
-  .clean-table td.label { width: 70px; color: #111; font-weight: 600; background: #fff; }
-  .clean-table td.value { color: #111; font-weight: 500; }
+  .clean-table td.label { width: 60px; color: #111; font-weight: 600; background: #fff; font-size: 8pt; }
+  .clean-table td.value { color: #111; font-weight: 500; font-size: 8pt; word-break: break-all; }
 
   /* ===== 3. 금액 합계 (가장 강조) ===== */
   .total-wrapper {
@@ -82,28 +82,28 @@
     margin-bottom: 25px;
   }
 
-  .total-title { font-size: 11pt; font-weight: 600; color: #111; margin-right: 20px; }
-  .total-price { font-size: 16pt; font-weight: 800; color: #111; letter-spacing: -0.5px; }
-  .total-text { font-size: 10pt; color: #111; margin-left: 10px; font-weight: 500; }
+  .total-title { font-size: 9pt; font-weight: 600; color: #111; margin-right: 15px; }
+  .total-price { font-size: 14pt; font-weight: 800; color: #111; letter-spacing: -0.5px; }
+  .total-text { font-size: 8pt; color: #111; margin-left: 8px; font-weight: 500; }
 
   /* ===== 4. 품목 리스트 (가독성 중심) ===== */
-  .items-section { margin-bottom: 70px; }
-  .section-title { font-size: 11pt; font-weight: 700; color: #111; margin-bottom: 8px; border-left: 4px solid #333; padding-left: 8px; line-height: 1; }
+  .items-section { margin-bottom: 50px; }
+  .section-title { font-size: 9pt; font-weight: 700; color: #111; margin-bottom: 6px; border-left: 3px solid #333; padding-left: 6px; line-height: 1; }
 
   .list-table { border-top: 2px solid #333; border-bottom: 1px solid #aaa; }
   .list-table th {
     background: #f9f9f9;
     color: #111;
     font-weight: 700;
-    padding: 10px 5px;
+    padding: 6px 4px;
     border-bottom: 1px solid #ddd;
-    font-size: 10pt;
+    font-size: 8pt;
   }
   .list-table td {
-    padding: 10px 5px;
+    padding: 6px 4px;
     border-bottom: 1px solid #eee;
     color: #111;
-    font-size: 10pt;
+    font-size: 8pt;
   }
   .list-table th, .list-table td { border-left: none; border-right: none; }
 
@@ -120,13 +120,13 @@
   .bottom-right { width: 35%; }
 
   .summary-table { border: 1px solid #ddd; margin-bottom: 0; }
-  .summary-table td { padding: 8px 10px; border: 1px solid #ddd; }
-  .summary-table .label { background: #f3f4f6; width: 100px; text-align: center; font-weight: 600; color: #111; }
-  .summary-table .content { min-height: 80px; vertical-align: top; line-height: 1.6; white-space: pre-line; color: #111; }
+  .summary-table td { padding: 6px 8px; border: 1px solid #ddd; font-size: 8pt; }
+  .summary-table .label { background: #f3f4f6; width: 80px; text-align: center; font-weight: 600; color: #111; }
+  .summary-table .content { min-height: 60px; vertical-align: top; line-height: 1.5; white-space: pre-line; color: #111; }
 
-  .vat-box { border: 1px solid #ddd; background: #fff; padding: 15px; border-radius: 4px; }
-  .vat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 10pt; font-weight: 600; color: #111; }
-  .vat-row.total { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; font-weight: 700; color: #111; }
+  .vat-box { border: 1px solid #ddd; background: #fff; padding: 10px; border-radius: 4px; }
+  .vat-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 8pt; font-weight: 600; color: #111; }
+  .vat-row.total { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ddd; font-weight: 700; color: #111; }
 
   /* ===== 6. 푸터 및 인쇄 설정 ===== */
   .footer {

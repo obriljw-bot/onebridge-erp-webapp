@@ -35,10 +35,7 @@ function generateInvoiceZip(params) {
   var deliveryDate = params.deliveryDate || '';
   var manualRemark = params.manualRemark || '';
 
-  Logger.log('[generateInvoiceZip] docType=' + docType + ', outputFormat=' + outputFormat + ', printMode=' + printMode);
-
   Logger.log('[generateInvoiceZip] 시작 - docType: ' + docType + ', orderCodes: ' + orderCodes.length + '건');
-  Logger.log('[generateInvoiceZip] 선택된 발주번호: ' + JSON.stringify(orderCodes));
 
   if (!orderCodes.length) {
     return {
@@ -304,12 +301,8 @@ function generateInvoiceZip(params) {
         }
 
         if (pdfBlob) {
-          // 중복 방지를 위해 타임스탬프 추가
-          var timestamp = new Date().getTime();
-          var fileNameWithTimestamp = fileName.replace('.pdf', '_' + timestamp + '.pdf');
-          pdfBlob.setName(fileNameWithTimestamp);
+          pdfBlob.setName(fileName);
           pdfBlobs.push(pdfBlob);
-          Logger.log('[generateInvoiceZip] PDF 생성 완료 - orderCode: ' + orderCode + ', fileName: ' + fileNameWithTimestamp);
 
           // Short 모드인 경우 세부목록 엑셀도 생성
           if (actualMode === 'short' && itemCount > 5) {
@@ -340,13 +333,11 @@ function generateInvoiceZip(params) {
   // 지정된 폴더에 파일들 저장
   try {
     var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
-    Logger.log('[generateInvoiceZip] ===== 폴더에 저장 시작 - 파일 개수: ' + pdfBlobs.length + ' =====');
 
     for (var i = 0; i < pdfBlobs.length; i++) {
       outputFolder.createFile(pdfBlobs[i]);
-      Logger.log('[generateInvoiceZip] 파일 저장 완료 [' + (i+1) + '/' + pdfBlobs.length + ']: ' + pdfBlobs[i].getName());
     }
-    Logger.log('[generateInvoiceZip] ===== 폴더 저장 완료 =====');
+    Logger.log('[generateInvoiceZip] ' + pdfBlobs.length + '개 파일 저장 완료');
 
     return {
       success: true,
