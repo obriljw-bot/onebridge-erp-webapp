@@ -50,8 +50,8 @@
 
   .info-box {
     flex: 0 0 40%;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    border: none;
+    border-bottom: 1px solid #ddd;
     overflow: hidden;
   }
 
@@ -79,15 +79,15 @@
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 10px 15px;
-    margin-bottom: 20px;
-    max-width: 400px;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+    max-width: 380px;
     margin-left: auto;
   }
 
-  .total-title { font-size: 9pt; font-weight: 600; color: #111; margin-right: 12px; }
+  .total-title { font-size: 9pt; font-weight: 600; color: #111; margin-right: 10px; }
   .total-price { font-size: 14pt; font-weight: 800; color: #111; letter-spacing: -0.5px; }
-  .total-text { font-size: 8pt; color: #111; margin-left: 6px; font-weight: 500; }
+  .total-text { font-size: 8pt; color: #111; margin-left: 4px; font-weight: 500; }
 
   /* ===== 4. 품목 리스트 (가독성 중심) ===== */
   .items-section { margin-bottom: 50px; }
@@ -111,21 +111,21 @@
   .list-table th, .list-table td { border-left: none; border-right: none; }
 
   /* 컬럼 스타일 */
-  .tc { text-align: center; }
-  .tl { text-align: left; padding-left: 10px !important; }
+  .tc { text-align: center; word-wrap: break-word; word-break: break-word; }
+  .tl { text-align: left; padding-left: 10px !important; word-wrap: break-word; word-break: break-word; }
   .tr { text-align: right; padding-right: 10px !important; }
   .t-bold { font-weight: 600; }
   .col-bg { background-color: #fcfcfc; }
 
   /* ===== 5. 하단 정보 (부가세, 비고) ===== */
   .bottom-layout { display: flex; gap: 20px; margin-top: 10px; align-items: flex-start; }
-  .bottom-left { flex: 1; }
+  .bottom-left { flex: 0 0 60%; max-width: 60%; }
   .bottom-right { max-width: 280px; }
 
   .summary-table { border: 1px solid #ddd; margin-bottom: 0; }
   .summary-table td { padding: 6px 8px; border: 1px solid #ddd; font-size: 8pt; }
   .summary-table .label { background: #f3f4f6; width: 80px; text-align: center; font-weight: 600; color: #111; }
-  .summary-table .content { min-height: 60px; vertical-align: top; line-height: 1.5; white-space: pre-line; color: #111; }
+  .summary-table .content { min-height: 60px; vertical-align: top; line-height: 1.5; white-space: pre-line; color: #111; word-wrap: break-word; word-break: break-word; }
 
   .vat-box { background: #fff; padding: 0; }
   .vat-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 8pt; font-weight: 600; color: #111; }
@@ -256,7 +256,7 @@
              var it = items[i]; ?>
           <tr>
             <td class="tc" style="color:#111;"><?= i + 1 ?></td>
-            <td class="tc" style="font-family:'Courier New'; color:#111;"><?= it.code || '' ?></td>
+            <td class="tc" style="font-family:'Courier New'; color:#000 !important;"><?= it.code || '' ?></td>
             <td class="tc"><?= it.name || '' ?></td>
             <td class="tc" style="color:#111;"><?= it.spec || '' ?></td>
             <td class="tr"><?= it.qty || '' ?></td>
@@ -266,6 +266,13 @@
           </tr>
         <? } ?>
       </tbody>
+      <tfoot>
+        <tr style="border-top: 2px solid #333;">
+          <td colspan="4" class="tr" style="font-weight: 700; padding: 8px 10px;">합계수량</td>
+          <td class="tr" style="font-weight: 700; padding: 8px 10px;"><?= totalQty || '' ?></td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 
@@ -353,7 +360,7 @@
              var it = items[k]; ?>
           <tr>
             <td class="tc" style="color:#111;"><?= k + 1 ?></td>
-            <td class="tc" style="font-family:'Courier New'; color:#111;"><?= it.code || '' ?></td>
+            <td class="tc" style="font-family:'Courier New'; color:#000 !important;"><?= it.code || '' ?></td>
             <td class="tc"><?= it.name || '' ?></td>
             <td class="tc" style="color:#111;"><?= it.spec || '' ?></td>
             <td class="tr"><?= it.qty || '' ?></td>

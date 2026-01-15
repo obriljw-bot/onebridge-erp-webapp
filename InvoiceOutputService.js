@@ -408,6 +408,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     var items        = [];
     var totalSupply  = 0;
     var totalAmount  = 0;
+    var totalQty     = 0;
     var itemCount    = 0;
     var brandName    = firstRow[idxBrand] || '';
 
@@ -415,6 +416,8 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
       var r   = orderRows[i];
       var qty = Number(r[qtyCol] || 0);
       if (!qty) continue;  // 수량 0은 출력 제외
+
+      totalQty += qty;
 
       // ✅ 수정: 거래원장에서 직접 값을 읽음
       var unitPrice   = Number(idxUnitPrice   >= 0 ? (r[idxUnitPrice]   || 0) : 0);
@@ -478,8 +481,9 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     });
   }
 
-  var totalVat = totalAmount - totalSupply;
-  if (totalVat < 0) totalVat = 0;
+  // ✅ 수정: 거래명세서는 공급가 기준, VAT 10% 추가
+  var totalVat = Math.round(totalSupply * 0.1);
+  totalAmount = totalSupply + totalVat;
 
   var ctx = {
     stampBase64:    getStampBase64_(),
@@ -509,6 +513,7 @@ function buildInvoiceVatPdf(orderCode, orderRows, header, printMode) {
     totalVat:       formatNumber_(totalVat),
     totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
+    totalQty:       formatNumber_(totalQty),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
     items:          items,
@@ -584,6 +589,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
 
   var items        = [];
   var totalAmount  = 0;
+  var totalQty     = 0;
   var itemCount    = 0;
   var brandName    = firstRow[idxBrand] || '';
 
@@ -597,6 +603,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     var amount    = Number(idxAmount >= 0 ? (r[idxAmount] || 0) : (qty * unitPrice));
 
     totalAmount += amount;
+    totalQty += qty;
     itemCount++;
 
     var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
@@ -701,6 +708,7 @@ function buildOrderPurchasePdf(orderCode, orderRows, header, printMode) {
     totalVat:       formatNumber_(totalVat),
     totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
+    totalQty:       formatNumber_(totalQty),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
     items:          items,
@@ -771,6 +779,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
 
   var items        = [];
   var totalSupply  = 0;
+  var totalQty     = 0;
   var itemCount    = 0;
   var brandName    = firstRow[idxBrand] || '';
 
@@ -783,6 +792,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
     var supply = Number(idxSupplyAmount >= 0 ? (r[idxSupplyAmount] || 0) : (qty * supplyPrice));
 
     totalSupply += supply;
+    totalQty += qty;
     itemCount++;
 
     var code = idxProductCode >= 0 ? (r[idxProductCode] || '') : '';
@@ -863,6 +873,7 @@ function buildInvoiceNvatPdf(orderCode, orderRows, header, printMode) {
     totalVat:       formatNumber_(totalVat),
     totalVatNum:    totalVat,
     totalAmount:    formatNumber_(totalAmount),
+    totalQty:       formatNumber_(totalQty),
     amountHangul:   numberToHangulKor_(Math.round(totalAmount)),
 
     items:          items,
