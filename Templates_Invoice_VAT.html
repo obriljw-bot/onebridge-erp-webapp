@@ -109,6 +109,7 @@
     font-size: 8pt;
   }
   .list-table th, .list-table td { border-left: none; border-right: none; }
+  .list-table td.code-col { color: #000 !important; font-family: 'Courier New', monospace !important; }
 
   /* 컬럼 스타일 */
   .tc { text-align: center; word-wrap: break-word; word-break: break-word; }
@@ -150,7 +151,7 @@
 
 <?
   var rowCount = items && items.length ? items.length : 0;
-  var ITEMS_PER_PAGE = 15;
+  var ITEMS_PER_PAGE = 10;
   var ITEMS_PER_PAGE_CONTINUATION = 50;
   var totalPages = rowCount <= ITEMS_PER_PAGE ? 1 : (1 + Math.ceil((rowCount - ITEMS_PER_PAGE) / ITEMS_PER_PAGE_CONTINUATION));
   var firstPageItems = Math.min(rowCount, ITEMS_PER_PAGE);
@@ -256,8 +257,8 @@
              var it = items[i]; ?>
           <tr>
             <td class="tc" style="color:#111;"><?= i + 1 ?></td>
-            <td class="tc" style="font-family:'Courier New'; color:#000 !important;"><?= it.code || '' ?></td>
-            <td class="tc"><?= it.name || '' ?></td>
+            <td class="tc code-col"><?= it.code || '' ?></td>
+            <td class="tl"><?= it.name || '' ?></td>
             <td class="tc" style="color:#111;"><?= it.spec || '' ?></td>
             <td class="tr"><?= it.qty || '' ?></td>
             <td class="tr" style="color:#111;"><?= it.price || '' ?></td>
@@ -360,8 +361,8 @@
              var it = items[k]; ?>
           <tr>
             <td class="tc" style="color:#111;"><?= k + 1 ?></td>
-            <td class="tc" style="font-family:'Courier New'; color:#000 !important;"><?= it.code || '' ?></td>
-            <td class="tc"><?= it.name || '' ?></td>
+            <td class="tc code-col"><?= it.code || '' ?></td>
+            <td class="tl"><?= it.name || '' ?></td>
             <td class="tc" style="color:#111;"><?= it.spec || '' ?></td>
             <td class="tr"><?= it.qty || '' ?></td>
             <td class="tr" style="color:#111;"><?= it.price || '' ?></td>
