@@ -2026,148 +2026,337 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
     return generateCustomTemplateExcel_(docType, orderCodes, filteredRows, header, options);
   }
 
-  // 문서 유형에 따른 라벨
-  var docTypeLabel = '';
-  switch (docType) {
-    case 'ORDER_PURCHASE': docTypeLabel = '발주서(매입)'; break;
-    case 'INVOICE_VAT': docTypeLabel = '거래명세서(부포)'; break;
-    case 'INVOICE_NVAT': docTypeLabel = '거래명세서(영세)'; break;
-    default: docTypeLabel = '문서';
+  // ========================================
+  // PDF 템플릿과 동일한 레이아웃으로 Excel 생성
+  // ========================================
+  return generateTemplateStyleExcel_(docType, orderCodes, filteredRows, header, options);
+}
+
+/**
+ * PDF 템플릿과 동일한 레이아웃의 Excel 생성
+ */
+function generateTemplateStyleExcel_(docType, orderCodes, rows, header, options) {
+  var manualRemark = options.manualRemark || '';
+
+  var idxOrderNo = header.indexOf('발주번호');
+  var idxSupplier = header.indexOf('매입처');
+  var idxBuyer = header.indexOf('발주처');
+  var idxBrand = header.indexOf('브랜드');
+  var idxProductCode = header.indexOf('품목코드');
+  var idxProductName = header.indexOf('품명');
+  var idxSpec = header.indexOf('규격');
+  var idxOrderDate = header.indexOf('발주일');
+  var idxQtyOrder = header.indexOf('발주수량');
+  var idxQtyConfirmed = header.indexOf('확정수량');
+  var idxPurchasePrice = header.indexOf('매입가');
+  var idxPurchaseAmt = header.indexOf('매입액');
+  var idxSupplyPrice = header.indexOf('공급가');
+  var idxSupplyAmt = header.indexOf('공급액');
+  var idxVatType = header.indexOf('부가세구분');
+
+  // 첫 번째 행의 데이터로 문서 정보 구성
+  var firstRow = rows[0];
+  var orderCode = firstRow[idxOrderNo];
+  var orderDate = formatDateYmd_(firstRow[idxOrderDate]);
+
+  // 문서 타입별 설정
+  var docTitle, supplierLabel, buyerLabel;
+  var isOrderPurchase = (docType === 'ORDER_PURCHASE');
+
+  if (isOrderPurchase) {
+    docTitle = '매입발주서';
+    supplierLabel = '공급처';
+    buyerLabel = '발주처';
+  } else {
+    docTitle = '거래명세서';
+    supplierLabel = '공급처';
+    buyerLabel = '공급처';  // 거래명세서는 양쪽 모두 공급처 레이블
   }
 
-  var tz = Session.getScriptTimeZone();
-  var ts = Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss');
-  var fileName = '원브릿지_' + docTypeLabel + '_' + ts;
+  // 거래처 정보 조회
+  var supplierNm = firstRow[idxSupplier];
+  var buyerNm = firstRow[idxBuyer];
+
+  var supplierInfo = findPartnerByName_(isOrderPurchase ? supplierNm : '원브릿지');
+  var buyerInfo = findPartnerByName_(isOrderPurchase ? '원브릿지' : buyerNm);
 
   // 스프레드시트 생성
+  var tz = Session.getScriptTimeZone();
+  var ts = Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss');
+  var fileName = '원브릿지_' + docTitle + '_' + ts;
+
   var ss = SpreadsheetApp.create(fileName);
   var sheet = ss.getActiveSheet();
-  sheet.setName('출력데이터');
+  sheet.setName(docTitle);
 
-  // 헤더 행 (문서유형에 따라 다름)
-  var excelHeader, dataFunc;
+  var currentRow = 1;
 
-  if (docType === 'ORDER_PURCHASE') {
-    // 발주서: 매입가, 매입액 사용
-    excelHeader = ['No', '발주번호', '발주일', '매입처', '브랜드', '품목코드', '품명', '규격', '발주수량', '매입단가', '매입금액', '비고'];
-    dataFunc = function(row, idx) {
-      var qty = Number(row[idxQtyOrder] || 0);
-      var price = Number(row[idxPurchasePrice] || 0);
-      var amt = Number(row[idxPurchaseAmt] || qty * price);
-      return [
-        idx + 1,
-        row[idxOrderNo] || '',
-        formatDateYmd_(row[idxOrderDate]),
-        row[idxSupplier] || '',
-        row[idxBrand] || '',
-        row[idxProductCode] || '',
-        row[idxProductName] || '',
-        row[idxSpec] || '',
-        qty,
-        price,
-        amt,
-        ''
-      ];
-    };
-  } else {
-    // 거래명세서: 공급가, 공급액, VAT 포함
-    var isVat = (docType === 'INVOICE_VAT');
-    excelHeader = ['No', '발주번호', '발주일', '발주처', '브랜드', '품목코드', '품명', '규격', '확정수량', '공급단가', '공급가액', 'VAT', '합계', '비고'];
-    dataFunc = function(row, idx) {
-      var qty = Number(row[idxQtyConfirmed] || row[idxQtyOrder] || 0);
-      var price = Number(row[idxSupplyPrice] || 0);
-      var supplyAmt = Number(row[idxSupplyAmt] || qty * price);
-      var vat = 0;
-      if (isVat) {
-        var vatType = String(row[idxVatType] || '').trim();
-        if (vatType === '부별') {
-          vat = Math.round(supplyAmt * 0.1);
-        } else if (vatType === '부포') {
-          vat = Math.round(supplyAmt / 11);
-        }
-      }
-      var total = supplyAmt + vat;
-      return [
-        idx + 1,
-        row[idxOrderNo] || '',
-        formatDateYmd_(row[idxOrderDate]),
-        row[idxBuyer] || '',
-        row[idxBrand] || '',
-        row[idxProductCode] || '',
-        row[idxProductName] || '',
-        row[idxSpec] || '',
-        qty,
-        price,
-        supplyAmt,
-        vat,
-        total,
-        ''
-      ];
-    };
+  // ========================================
+  // 1. 문서 제목
+  // ========================================
+  sheet.getRange(currentRow, 1, 1, 8).merge();
+  sheet.getRange(currentRow, 1).setValue(docTitle);
+  sheet.getRange(currentRow, 1)
+    .setFontSize(20)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(currentRow, 40);
+  currentRow += 2;
+
+  // ========================================
+  // 2. 공급처/발주처 정보
+  // ========================================
+  var infoStartRow = currentRow;
+
+  // 공급처 (왼쪽)
+  sheet.getRange(currentRow, 1, 1, 4).merge();
+  sheet.getRange(currentRow, 1).setValue(supplierLabel);
+  sheet.getRange(currentRow, 1)
+    .setBackground('#f3f4f6')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, false, false, '#ddd', SpreadsheetApp.BorderStyle.SOLID);
+
+  // 발주처 (오른쪽)
+  sheet.getRange(currentRow, 5, 1, 4).merge();
+  sheet.getRange(currentRow, 5).setValue(buyerLabel);
+  sheet.getRange(currentRow, 5)
+    .setBackground('#f3f4f6')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, false, false, '#ddd', SpreadsheetApp.BorderStyle.SOLID);
+
+  currentRow++;
+
+  // 공급처 상세 정보
+  var supplierRows = [
+    ['상 호', supplierInfo ? supplierInfo.name : supplierNm],
+    ['등록번호', supplierInfo ? supplierInfo.bizNo : ''],
+    ['대표/담당', supplierInfo ? supplierInfo.manager : ''],
+    ['주 소', supplierInfo ? supplierInfo.address : '']
+  ];
+
+  var buyerRows = [
+    ['상 호', buyerInfo ? buyerInfo.name : buyerNm],
+    ['등록번호', buyerInfo ? buyerInfo.bizNo : ''],
+    ['연락처', buyerInfo ? buyerInfo.phone : ''],
+    ['현장주소', buyerInfo ? buyerInfo.address : '']
+  ];
+
+  for (var i = 0; i < 4; i++) {
+    // 공급처 정보
+    sheet.getRange(currentRow, 1).setValue(supplierRows[i][0]);
+    sheet.getRange(currentRow, 1)
+      .setFontWeight('bold')
+      .setBackground('#fff')
+      .setBorder(true, true, true, true, false, false, '#eee', SpreadsheetApp.BorderStyle.SOLID);
+
+    sheet.getRange(currentRow, 2, 1, 3).merge();
+    sheet.getRange(currentRow, 2).setValue(supplierRows[i][1]);
+    sheet.getRange(currentRow, 2)
+      .setBorder(true, true, true, true, false, false, '#eee', SpreadsheetApp.BorderStyle.SOLID);
+
+    // 발주처 정보
+    sheet.getRange(currentRow, 5).setValue(buyerRows[i][0]);
+    sheet.getRange(currentRow, 5)
+      .setFontWeight('bold')
+      .setBackground('#fff')
+      .setBorder(true, true, true, true, false, false, '#eee', SpreadsheetApp.BorderStyle.SOLID);
+
+    sheet.getRange(currentRow, 6, 1, 3).merge();
+    sheet.getRange(currentRow, 6).setValue(buyerRows[i][1]);
+    sheet.getRange(currentRow, 6)
+      .setBorder(true, true, true, true, false, false, '#eee', SpreadsheetApp.BorderStyle.SOLID);
+
+    currentRow++;
   }
 
-  // 헤더 쓰기
-  sheet.getRange(1, 1, 1, excelHeader.length).setValues([excelHeader]);
-  var headerRange = sheet.getRange(1, 1, 1, excelHeader.length);
-  headerRange.setBackground('#334155');
-  headerRange.setFontColor('#ffffff');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
+  currentRow += 2;  // 간격
 
-  // 데이터 행 쓰기
-  var dataRows = [];
-  for (var i = 0; i < filteredRows.length; i++) {
-    var qty = docType === 'ORDER_PURCHASE'
-      ? Number(filteredRows[i][idxQtyOrder] || 0)
-      : Number(filteredRows[i][idxQtyConfirmed] || filteredRows[i][idxQtyOrder] || 0);
-    if (qty > 0) {
-      dataRows.push(dataFunc(filteredRows[i], dataRows.length));
+  // ========================================
+  // 3. 품목 상세 내역
+  // ========================================
+  var itemsStartRow = currentRow;
+
+  // 제목
+  sheet.getRange(currentRow, 1).setValue('품목 상세 내역');
+  sheet.getRange(currentRow, 1)
+    .setFontSize(10)
+    .setFontWeight('bold');
+  currentRow++;
+
+  // 테이블 헤더
+  var tableHeaders = ['No', '코드', '품명', '규격', '수량', '단가', '금액', '비고'];
+  sheet.getRange(currentRow, 1, 1, 8).setValues([tableHeaders]);
+  sheet.getRange(currentRow, 1, 1, 8)
+    .setBackground('#f9f9f9')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, true, true, '#ddd', SpreadsheetApp.BorderStyle.SOLID);
+
+  currentRow++;
+  var itemsDataStartRow = currentRow;
+
+  // 품목 데이터
+  var totalQty = 0;
+  var totalSupply = 0;
+  var totalAmount = 0;
+
+  var itemNo = 1;
+  rows.forEach(function(row) {
+    var qty = isOrderPurchase
+      ? Number(row[idxQtyOrder] || 0)
+      : Number(row[idxQtyConfirmed] || row[idxQtyOrder] || 0);
+
+    if (qty === 0) return;
+
+    var price = isOrderPurchase
+      ? Number(row[idxPurchasePrice] || 0)
+      : Number(row[idxSupplyPrice] || 0);
+
+    var amount = isOrderPurchase
+      ? Number(row[idxPurchaseAmt] || qty * price)
+      : Number(row[idxSupplyAmt] || qty * price);
+
+    totalQty += qty;
+    if (isOrderPurchase) {
+      totalAmount += amount;
+    } else {
+      totalSupply += amount;
     }
+
+    var itemData = [
+      itemNo,
+      row[idxProductCode] || '',
+      row[idxProductName] || '',
+      row[idxSpec] || '',
+      qty,
+      price,
+      amount,
+      ''
+    ];
+
+    sheet.getRange(currentRow, 1, 1, 8).setValues([itemData]);
+    sheet.getRange(currentRow, 1).setHorizontalAlignment('center');
+    sheet.getRange(currentRow, 2).setHorizontalAlignment('center').setFontFamily('Courier New');
+    sheet.getRange(currentRow, 3).setHorizontalAlignment('left');
+    sheet.getRange(currentRow, 4).setHorizontalAlignment('center');
+    sheet.getRange(currentRow, 5, 1, 3).setHorizontalAlignment('right').setNumberFormat('#,##0');
+    sheet.getRange(currentRow, 8).setHorizontalAlignment('center');
+
+    sheet.getRange(currentRow, 1, 1, 8)
+      .setBorder(true, true, true, true, true, true, '#eee', SpreadsheetApp.BorderStyle.SOLID);
+
+    currentRow++;
+    itemNo++;
+  });
+
+  // ========================================
+  // 4. 합계 영역 (tfoot 스타일)
+  // ========================================
+
+  // 합계수량 + 공급가액
+  sheet.getRange(currentRow, 1, 1, 4).merge();
+  sheet.getRange(currentRow, 1).setValue('합계수량');
+  sheet.getRange(currentRow, 1)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('right');
+
+  sheet.getRange(currentRow, 5).setValue(totalQty);
+  sheet.getRange(currentRow, 5)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('right')
+    .setNumberFormat('#,##0');
+
+  if (!isOrderPurchase) {
+    // 거래명세서: 공급가액 표시
+    sheet.getRange(currentRow, 6).setValue('공급가액');
+    sheet.getRange(currentRow, 6)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('right');
+
+    sheet.getRange(currentRow, 7).setValue(totalSupply);
+    sheet.getRange(currentRow, 7)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('right')
+      .setNumberFormat('#,##0');
   }
 
-  if (dataRows.length > 0) {
-    sheet.getRange(2, 1, dataRows.length, excelHeader.length).setValues(dataRows);
+  currentRow++;
 
-    // 숫자 열 서식
-    var numCols = docType === 'ORDER_PURCHASE' ? [9, 10, 11] : [9, 10, 11, 12, 13];
-    numCols.forEach(function(col) {
-      sheet.getRange(2, col, dataRows.length, 1).setNumberFormat('#,##0');
-    });
+  // 부가세 및 합계 (거래명세서만)
+  if (!isOrderPurchase) {
+    var totalVat = Math.round(totalSupply * 0.1);
+    totalAmount = totalSupply + totalVat;
+
+    // 부가세 행
+    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 6).setValue('부가세 (10%)');
+    sheet.getRange(currentRow, 6)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('right');
+
+    sheet.getRange(currentRow, 7).setValue(totalVat);
+    sheet.getRange(currentRow, 7)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('right')
+      .setNumberFormat('#,##0');
+
+    currentRow++;
+
+    // 합계 행
+    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 6).setValue('합 계');
+    sheet.getRange(currentRow, 6)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('right')
+      .setBackground('#f9f9f9');
+
+    sheet.getRange(currentRow, 7).setValue(totalAmount);
+    sheet.getRange(currentRow, 7)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('right')
+      .setNumberFormat('#,##0')
+      .setBackground('#f9f9f9');
+
+    currentRow++;
   }
 
-  // 합계 행
-  var sumRow = dataRows.length + 2;
-  sheet.getRange(sumRow, 1).setValue('합계');
-  sheet.getRange(sumRow, 1, 1, 8).merge();
-  sheet.getRange(sumRow, 1).setFontWeight('bold').setBackground('#f1f5f9');
+  currentRow += 2;
 
-  if (docType === 'ORDER_PURCHASE') {
-    if (dataRows.length > 0) {
-      sheet.getRange(sumRow, 9).setFormula('=SUM(I2:I' + (sumRow - 1) + ')');
-      sheet.getRange(sumRow, 11).setFormula('=SUM(K2:K' + (sumRow - 1) + ')');
-    }
-    sheet.getRange(sumRow, 9, 1, 3).setNumberFormat('#,##0').setFontWeight('bold').setBackground('#f1f5f9');
-  } else {
-    if (dataRows.length > 0) {
-      sheet.getRange(sumRow, 9).setFormula('=SUM(I2:I' + (sumRow - 1) + ')');
-      sheet.getRange(sumRow, 11).setFormula('=SUM(K2:K' + (sumRow - 1) + ')');
-      sheet.getRange(sumRow, 12).setFormula('=SUM(L2:L' + (sumRow - 1) + ')');
-      sheet.getRange(sumRow, 13).setFormula('=SUM(M2:M' + (sumRow - 1) + ')');
-    }
-    sheet.getRange(sumRow, 9, 1, 5).setNumberFormat('#,##0').setFontWeight('bold').setBackground('#f1f5f9');
-  }
-
-  // 비고 추가
+  // ========================================
+  // 5. 비고란
+  // ========================================
   if (manualRemark) {
-    var remarkRow = sumRow + 2;
-    sheet.getRange(remarkRow, 1).setValue('비고: ' + manualRemark);
-    sheet.getRange(remarkRow, 1, 1, excelHeader.length).merge();
+    sheet.getRange(currentRow, 1).setValue('비 고');
+    sheet.getRange(currentRow, 1)
+      .setFontWeight('bold')
+      .setBackground('#f3f4f6')
+      .setHorizontalAlignment('center')
+      .setBorder(true, true, true, true, false, false, '#ddd', SpreadsheetApp.BorderStyle.SOLID);
+
+    sheet.getRange(currentRow, 2, 1, 7).merge();
+    sheet.getRange(currentRow, 2).setValue(manualRemark);
+    sheet.getRange(currentRow, 2)
+      .setBorder(true, true, true, true, false, false, '#ddd', SpreadsheetApp.BorderStyle.SOLID)
+      .setWrap(true);
+
+    sheet.setRowHeight(currentRow, 80);
   }
 
-  // 열 너비 자동 조정
-  for (var col = 1; col <= excelHeader.length; col++) {
-    sheet.autoResizeColumn(col);
-  }
+  // 열 너비 설정
+  sheet.setColumnWidth(1, 50);   // No
+  sheet.setColumnWidth(2, 120);  // 코드
+  sheet.setColumnWidth(3, 250);  // 품명
+  sheet.setColumnWidth(4, 80);   // 규격
+  sheet.setColumnWidth(5, 70);   // 수량
+  sheet.setColumnWidth(6, 90);   // 단가
+  sheet.setColumnWidth(7, 100);  // 금액
+  sheet.setColumnWidth(8, 80);   // 비고
+
+  // 폰트 설정
+  sheet.getRange(1, 1, currentRow, 8).setFontFamily('Noto Sans KR').setFontSize(8);
 
   // Excel Blob 생성
   SpreadsheetApp.flush();
@@ -2183,7 +2372,7 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
   try {
     var outputFolder = DriveApp.getFolderById(OUTPUT_FOLDER_ID);
     outputFolder.createFile(excelBlob);
-    Logger.log('[generateExcelOutput_] Excel 저장 완료: ' + excelBlob.getName());
+    Logger.log('[generateTemplateStyleExcel_] Excel 저장 완료: ' + excelBlob.getName());
 
     return {
       success: true,
@@ -2191,7 +2380,7 @@ function generateExcelOutput_(orderCodes, rows, header, options) {
       folderUrl: 'https://drive.google.com/drive/folders/' + OUTPUT_FOLDER_ID
     };
   } catch (err) {
-    Logger.log('[generateExcelOutput_] 저장 실패: ' + err.message);
+    Logger.log('[generateTemplateStyleExcel_] 저장 실패: ' + err.message);
     return {
       success: false,
       error: '파일 저장 중 오류: ' + err.message
