@@ -97,6 +97,9 @@
     color: #000;
     font-size: 8pt;
   }
+  .list-table tfoot td {
+    border-bottom: none;
+  }
   .list-table th, .list-table td { border-left: none; border-right: none; }
   .list-table td.code-col { color: #000 !important; font-family: 'Courier New', monospace !important; white-space: nowrap !important; }
 
@@ -222,6 +225,8 @@
       </span>
     </div>
 
+    <div style="height: 20px;"></div>
+
     <table class="list-table">
       <colgroup>
         <col style="width: 40px;">
@@ -249,7 +254,7 @@
         <? for (var i = 0; i < firstPageItems; i++) {
              var it = items[i]; ?>
           <tr>
-            <td class="tc" style="color:#000;"><?= i + 1 ?></td>
+            <td class="tc" style="color:#000 !important;"><?= i + 1 ?></td>
             <td class="tc code-col"><?= it.code || '' ?></td>
             <td class="tl"><?= it.name || '' ?></td>
             <td class="tc" style="color:#000;"><?= it.spec || '' ?></td>
@@ -350,7 +355,7 @@
         <? for (var k = startIdx; k < endIdx; k++) {
              var it = items[k]; ?>
           <tr>
-            <td class="tc" style="color:#000;"><?= k + 1 ?></td>
+            <td class="tc" style="color:#000 !important;"><?= k + 1 ?></td>
             <td class="tc code-col"><?= it.code || '' ?></td>
             <td class="tl"><?= it.name || '' ?></td>
             <td class="tc" style="color:#000;"><?= it.spec || '' ?></td>
