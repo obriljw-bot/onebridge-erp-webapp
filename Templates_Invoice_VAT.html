@@ -125,17 +125,13 @@
   .t-bold { font-weight: 600; }
   .col-bg { background-color: #fcfcfc; }
 
-  /* ===== 5. 하단 정보 (부가세, 비고) ===== */
-  .bottom-layout { margin-top: 10px; }
+  /* ===== 5. 하단 정보 (비고) ===== */
+  .bottom-layout { margin-top: 20px; }
 
   .summary-table { border: 1px solid #ddd; margin-bottom: 0; }
   .summary-table td { padding: 6px 8px; border: 1px solid #ddd; font-size: 8pt; }
   .summary-table .label { background: #f3f4f6; width: 80px; text-align: center; font-weight: 600; color: #000; }
   .summary-table .content { min-height: 60px; vertical-align: top; line-height: 1.5; white-space: pre-line; color: #000; word-wrap: break-word; word-break: break-word; }
-
-  /* 공급가액 요약 테이블 */
-  .vat-summary-table { border-collapse: collapse; border-spacing: 0; }
-  .vat-summary-table td { font-size: 8pt; }
 
   /* ===== 6. 푸터 및 인쇄 설정 ===== */
   .footer {
@@ -293,43 +289,30 @@
         <tr style="border-top: 2px solid #333;">
           <td colspan="4" class="tr" style="font-weight: 700; padding: 8px 10px;">합계수량</td>
           <td class="tr" style="font-weight: 700; padding: 8px 10px;"><?= totalQty || '' ?></td>
-          <td colspan="3"></td>
+          <? if (totalVatNum >= 0) { ?>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">공급가액</td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">₩<?= totalSupply ?></td>
+          <? } else { ?>
+          <td colspan="2"></td>
+          <? } ?>
+          <td style="border-bottom: 1px solid #eee;"></td>
         </tr>
-      </tfoot>
-    </table>
-
-    <!-- 공급가액 정보 (품목 테이블과 열 맞춤) -->
-    <? if (totalVatNum >= 0) { ?>
-    <table class="vat-summary-table" style="margin-top: -15px; margin-bottom: 20px;">
-      <colgroup>
-        <col style="width: 40px;">
-        <col style="width: 75px;">
-        <col style="width: auto;">
-        <col style="width: 50px;">
-        <col style="width: 45px;">
-        <col style="width: 75px;">
-        <col style="width: 100px;">
-        <col style="width: 50px;">
-      </colgroup>
-      <tbody>
+        <? if (totalVatNum >= 0) { ?>
         <tr>
-          <td colspan="6" class="tr" style="font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #eee;">공급가액</td>
-          <td class="tr" style="font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #eee;">₩<?= totalSupply ?></td>
+          <td colspan="5"></td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">부가세 (10%)</td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">₩<?= totalVat ?></td>
           <td style="border-bottom: 1px solid #eee;"></td>
         </tr>
         <tr>
-          <td colspan="6" class="tr" style="font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #eee;">부가세 (10%)</td>
-          <td class="tr" style="font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #eee;">₩<?= totalVat ?></td>
-          <td style="border-bottom: 1px solid #eee;"></td>
-        </tr>
-        <tr>
-          <td colspan="6" class="tr" style="font-weight: 700; padding: 8px 10px; border-top: 1px dashed #000; background: #f9f9f9;">합 계</td>
+          <td colspan="5"></td>
+          <td class="tr" style="font-weight: 700; padding: 8px 10px; border-top: 1px dashed #000; background: #f9f9f9;">합 계</td>
           <td class="tr" style="font-weight: 700; padding: 8px 10px; border-top: 1px dashed #000; background: #f9f9f9;">₩<?= totalAmount ?></td>
           <td style="border-top: 1px dashed #000; background: #f9f9f9;"></td>
         </tr>
-      </tbody>
+        <? } ?>
+      </tfoot>
     </table>
-    <? } ?>
   </div>
 
   <!-- 5. 하단 정보 (비고란) -->
