@@ -78,25 +78,7 @@
   .clean-table td.label { width: 60px; color: #000; font-weight: 600; background: #fff; font-size: 8pt; }
   .clean-table td.value { color: #000; font-weight: 500; font-size: 8pt; word-break: break-all; }
 
-  /* ===== 3. 금액 합계 (가장 강조) ===== */
-  .total-wrapper {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px 12px;
-    margin-bottom: 15px;
-    max-width: 380px;
-    margin-left: auto;
-  }
-
-  .total-title { font-size: 9pt; font-weight: 600; color: #000; margin-right: 10px; }
-  .total-price { font-size: 14pt; font-weight: 800; color: #000; letter-spacing: -0.5px; }
-  .total-text { font-size: 8pt; color: #000; margin-left: 4px; font-weight: 500; }
-
-  /* ===== 4. 품목 리스트 (가독성 중심) ===== */
+  /* ===== 3. 품목 리스트 (가독성 중심) ===== */
   .items-section { margin-bottom: 50px; }
   .section-title { font-size: 9pt; font-weight: 700; color: #000; margin-bottom: 6px; border-left: 3px solid #333; padding-left: 6px; line-height: 1; }
 
@@ -161,7 +143,7 @@
 
     .page { max-width: 100%; margin: 0; padding: 0; }
     .page-break { page-break-after: always; }
-    .info-title, .total-wrapper, .list-table th, .summary-table .label { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .info-title, .list-table th, .summary-table .label { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
@@ -231,13 +213,6 @@
     </div>
   </div>
 
-  <!-- 3. 합계 금액 강조 -->
-  <div class="total-wrapper">
-    <span class="total-title">합계금액 (VAT포함)</span>
-    <span class="total-price">₩<?= totalAmount ?></span>
-    <span class="total-text">(<?= amountHangul ?>)</span>
-  </div>
-
   <!-- 4. 품목 내역 -->
   <div class="items-section">
     <div class="section-title">
@@ -286,29 +261,29 @@
         <? } ?>
       </tbody>
       <tfoot>
-        <tr style="border-top: 2px solid #333;">
-          <td colspan="4" class="tr" style="font-weight: 700; padding: 8px 10px;">합계수량</td>
-          <td class="tr" style="font-weight: 700; padding: 8px 10px;"><?= totalQty || '' ?></td>
+        <tr style="border-top: 1px solid #ccc;">
+          <td colspan="4" class="tr" style="font-weight: 700; padding: 8px 10px; border-bottom: 1px solid #ccc;">합계수량</td>
+          <td class="tr" style="font-weight: 700; padding: 8px 10px; border-bottom: 1px solid #ccc;"><?= totalQty || '' ?></td>
           <? if (totalVatNum >= 0) { ?>
-          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">공급가액</td>
-          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">₩<?= totalSupply ?></td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #ccc;">공급가액</td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #ccc;">₩<?= totalSupply ?></td>
           <? } else { ?>
-          <td colspan="2"></td>
+          <td colspan="2" style="border-bottom: 1px solid #ccc;"></td>
           <? } ?>
-          <td style="border-bottom: 1px solid #eee;"></td>
+          <td style="border-bottom: 1px solid #ccc;"></td>
         </tr>
         <? if (totalVatNum >= 0) { ?>
         <tr>
-          <td colspan="5"></td>
-          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">부가세 (10%)</td>
-          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #eee;">₩<?= totalVat ?></td>
-          <td style="border-bottom: 1px solid #eee;"></td>
+          <td colspan="5" style="border-bottom: 1px solid #ccc;"></td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #ccc;">부가세 (10%)</td>
+          <td class="tr" style="font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #ccc;">₩<?= totalVat ?></td>
+          <td style="border-bottom: 1px solid #ccc;"></td>
         </tr>
         <tr>
-          <td colspan="5"></td>
-          <td class="tr" style="font-weight: 700; padding: 8px 10px; border-top: 1px dashed #000; background: #f9f9f9;">합 계</td>
-          <td class="tr" style="font-weight: 700; padding: 8px 10px; border-top: 1px dashed #000; background: #f9f9f9;">₩<?= totalAmount ?></td>
-          <td style="border-top: 1px dashed #000; background: #f9f9f9;"></td>
+          <td colspan="5" style="border-bottom: 1px solid #ccc;"></td>
+          <td class="tr" style="font-weight: 700; padding: 8px 10px; border-bottom: 1px solid #ccc; background: #f9f9f9;">합 계</td>
+          <td class="tr" style="font-weight: 700; padding: 8px 10px; border-bottom: 1px solid #ccc; background: #f9f9f9;">₩<?= totalAmount ?></td>
+          <td style="border-bottom: 1px solid #ccc; background: #f9f9f9;"></td>
         </tr>
         <? } ?>
       </tfoot>
