@@ -77,7 +77,7 @@ function generateInvoiceZip(params) {
   // ========================================
   if (outputFormat === 'EXCEL') {
     Logger.log('[generateInvoiceZip] Excel 출력 모드');
-    return generateExcelOutput_(orderCodes, rows, header, {
+    var excelResult = generateExcelOutput_(orderCodes, rows, header, {
       docType: docType,
       printMode: printMode,
       modesByOrder: modesByOrder,
@@ -86,6 +86,13 @@ function generateInvoiceZip(params) {
       deliveryDate: deliveryDate,
       manualRemark: manualRemark
     });
+
+    // Excel 출력 성공 시 자동 상태 변경
+    if (excelResult.success && docType === 'ORDER_PURCHASE') {
+      updateOrderStatusAfterOutput_(orderCodes, 'buyOrder', '발주완료');
+    }
+
+    return excelResult;
   }
 
   // ========================================
@@ -338,6 +345,13 @@ function generateInvoiceZip(params) {
       outputFolder.createFile(pdfBlobs[i]);
     }
     Logger.log('[generateInvoiceZip] ' + pdfBlobs.length + '개 파일 저장 완료');
+
+    // ========================================
+    // 발주서 출력 시 자동 상태 변경
+    // ========================================
+    if (docType === 'ORDER_PURCHASE') {
+      updateOrderStatusAfterOutput_(orderCodes, 'buyOrder', '발주완료');
+    }
 
     return {
       success: true,
@@ -2472,4 +2486,74 @@ function generateCustomTemplateExcel_(docType, orderCodes, rows, header, options
       error: '파일 저장 중 오류: ' + err.message
     };
   }
+}
+
+/**
+ * ============================================================
+ * 발주서 출력 후 자동 상태 변경 헬퍼 함수
+ * ============================================================
+ * @param {string[]} orderCodes 발주번호 배열
+ * @param {string} statusType 상태 유형 ('buyOrder', 'payBuy', 'paySell', 'ship')
+ * @param {string} newStatus 변경할 상태 값 (예: '발주완료', '결제완료')
+ */
+function updateOrderStatusAfterOutput_(orderCodes, statusType, newStatus) {
+  if (!orderCodes || !orderCodes.length) {
+    return;
+  }
+
+  Logger.log('[updateOrderStatusAfterOutput_] 상태 자동 변경 시작: ' + orderCodes.length + '건');
+
+  var statusLabels = {
+    'buyOrder': '매입발주',
+    'payBuy': '매입결제',
+    'paySell': '매출결제',
+    'ship': '출고'
+  };
+
+  var statusLabel = statusLabels[statusType] || statusType;
+
+  orderCodes.forEach(function(orderCode) {
+    try {
+      // 현재 상태 조회
+      var currentStatus = getOrderStatus(orderCode, statusType);
+
+      if (!currentStatus) {
+        Logger.log('[updateOrderStatusAfterOutput_] 발주번호 ' + orderCode + '의 상태를 찾을 수 없습니다.');
+        return;
+      }
+
+      // "미처리" 또는 "미결제"인 경우에만 변경
+      var shouldUpdate = false;
+      if (statusType === 'buyOrder' && currentStatus === '미처리') {
+        shouldUpdate = true;
+      } else if ((statusType === 'payBuy' || statusType === 'paySell') && currentStatus === '미결제') {
+        shouldUpdate = true;
+      } else if (statusType === 'ship' && currentStatus === '미출고') {
+        shouldUpdate = true;
+      }
+
+      if (shouldUpdate) {
+        // 상태 변경
+        var updateData = {};
+        updateData[statusType] = newStatus;
+
+        var result = updateOrderStatus(orderCode, updateData);
+
+        if (result.success) {
+          Logger.log('[updateOrderStatusAfterOutput_] ✅ ' + orderCode + ': ' + statusLabel + ' "' + currentStatus + '" → "' + newStatus + '"');
+        } else {
+          Logger.log('[updateOrderStatusAfterOutput_] ❌ ' + orderCode + ': 상태 변경 실패 - ' + result.error);
+        }
+      } else {
+        // 이미 완료 상태 - 재출력
+        Logger.log('[updateOrderStatusAfterOutput_] 🔄 ' + orderCode + ': ' + statusLabel + ' "' + currentStatus + '" (재출력, 변경 없음)');
+      }
+
+    } catch (err) {
+      Logger.log('[updateOrderStatusAfterOutput_] ⚠️ ' + orderCode + ': 상태 변경 중 오류 - ' + err.message);
+      // 에러 발생해도 출력 자체는 성공했으므로 계속 진행
+    }
+  });
+
+  Logger.log('[updateOrderStatusAfterOutput_] 상태 자동 변경 완료');
 }

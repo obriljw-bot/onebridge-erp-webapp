@@ -339,8 +339,68 @@ function getOrderDetail(orderId) {
 
 /**
  * ============================================================
+ * 발주 상태 조회
+ * ============================================================
+ * @param {string} orderId 발주번호
+ * @param {string} statusType 상태 유형 ('buyOrder', 'payBuy', 'paySell', 'ship')
+ * @return {string|null} 상태 값
+ */
+function getOrderStatus(orderId, statusType) {
+  try {
+    if (!orderId || !statusType) {
+      return null;
+    }
+
+    var sheet = getOrderMergedSheet();
+    var data = sheet.getDataRange().getValues();
+
+    var header = data[0];
+    var colOrderCode = header.indexOf('발주번호');
+
+    // 상태 컬럼 매핑
+    var statusColumnMap = {
+      'buyOrder': '매입발주',
+      'payBuy': '매입결제',
+      'paySell': '매출결제',
+      'ship': '출고'
+    };
+
+    var colName = statusColumnMap[statusType];
+    if (!colName) {
+      Logger.log('[getOrderStatus] 알 수 없는 상태 유형: ' + statusType);
+      return null;
+    }
+
+    var colStatus = header.indexOf(colName);
+    if (colStatus < 0) {
+      Logger.log('[getOrderStatus] 상태 컬럼을 찾을 수 없습니다: ' + colName);
+      return null;
+    }
+
+    // 발주번호로 행 찾기 (첫 번째 매칭 행의 상태 반환)
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][colOrderCode]) === String(orderId)) {
+        return data[i][colStatus] || '';
+      }
+    }
+
+    return null;
+
+  } catch (err) {
+    Logger.log('[getOrderStatus Error] ' + err.message);
+    return null;
+  }
+}
+
+/**
+ * ============================================================
  * 발주 상태 업데이트
  * ============================================================
+ * @param {string} orderId 발주번호
+ * @param {Object|string} status 상태 (객체 또는 문자열)
+ *   - 객체 형태: { buyOrder: '발주완료', payBuy: '결제완료', ... }
+ *   - 문자열 (하위 호환): 단일 상태 값
+ * @return {Object} 결과 객체
  */
 function updateOrderStatus(orderId, status) {
   try {
@@ -350,35 +410,82 @@ function updateOrderStatus(orderId, status) {
         error: '발주번호와 상태가 필요합니다.'
       };
     }
-    
+
     var sheet = getOrderMergedSheet();
     var data = sheet.getDataRange().getValues();
-    
+
     var header = data[0];
     var colOrderCode = header.indexOf('발주번호');
-    var colStatus = header.indexOf('출고'); // 또는 다른 상태 컬럼
-    
-    if (colStatus < 0) {
+
+    if (colOrderCode < 0) {
       return {
         success: false,
-        error: '상태 컬럼을 찾을 수 없습니다.'
+        error: '발주번호 컬럼을 찾을 수 없습니다.'
       };
     }
-    
+
+    // 상태 컬럼 매핑
+    var statusColumnMap = {
+      'buyOrder': '매입발주',
+      'payBuy': '매입결제',
+      'paySell': '매출결제',
+      'ship': '출고'
+    };
+
     var updated = 0;
-    
+    var updatedFields = [];
+
+    // 발주번호로 모든 해당 행 찾기
     for (var i = 1; i < data.length; i++) {
-      if (data[i][colOrderCode] === orderId) {
-        sheet.getRange(i + 1, colStatus + 1).setValue(status);
+      if (String(data[i][colOrderCode]) === String(orderId)) {
+
+        // 객체 형태의 상태 업데이트
+        if (typeof status === 'object' && status !== null) {
+          for (var key in status) {
+            if (status.hasOwnProperty(key)) {
+              var colName = statusColumnMap[key];
+              if (!colName) continue;
+
+              var colIndex = header.indexOf(colName);
+              if (colIndex < 0) continue;
+
+              var newValue = status[key];
+              if (newValue) {
+                sheet.getRange(i + 1, colIndex + 1).setValue(newValue);
+                if (updatedFields.indexOf(colName) === -1) {
+                  updatedFields.push(colName);
+                }
+              }
+            }
+          }
+        } else {
+          // 하위 호환: 문자열 형태 (출고 컬럼에 설정)
+          var colStatus = header.indexOf('출고');
+          if (colStatus >= 0) {
+            sheet.getRange(i + 1, colStatus + 1).setValue(status);
+            if (updatedFields.indexOf('출고') === -1) {
+              updatedFields.push('출고');
+            }
+          }
+        }
+
         updated++;
       }
     }
-    
+
+    if (updated === 0) {
+      return {
+        success: false,
+        error: '발주번호를 찾을 수 없습니다: ' + orderId
+      };
+    }
+
     return {
       success: true,
-      updated: updated
+      updated: updated,
+      fields: updatedFields
     };
-    
+
   } catch (err) {
     Logger.log('[updateOrderStatus Error] ' + err.message);
     return {
