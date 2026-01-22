@@ -351,32 +351,51 @@ OB.handleOutputFormatChange()
 
 ---
 
-### Phase 2: 기능 검증 및 테스트 (우선순위: 상)
+### Phase 2: 기능 검증 및 테스트 (우선순위: 상) ✅ 완료
 
-#### 2.1 기본 출력 기능 테스트
-- [ ] PDF 출력 테스트 (발주서, 거래명세서 부포/영세)
-- [ ] Excel 출력 테스트 (표준 형식)
-- [ ] 멀티페이지 PDF 테스트 (10행 이상 데이터)
-- [ ] 출력 방식 테스트 (auto, full, short)
+#### 2.1 출력 시 상태 자동 변경 구현 현황
 
-#### 2.2 전용 양식 출력 테스트
-- [ ] 롬앤/누즈 전용 양식 테스트
-- [ ] 종근당 전용 양식 테스트
-- [ ] 삐아계열 전용 양식 테스트
-- [ ] XLSX → Google Sheets 변환 검증
-- [ ] 바코드 매칭 로직 검증
+**✅ 현재 구현 완료:**
+```javascript
+// InvoiceOutputService.js:91-92, 352-353
+if (docType === 'ORDER_PURCHASE') {
+  updateOrderStatusAfterOutput_(orderCodes, 'buyOrder', '발주완료');
+}
+```
 
-#### 2.3 매입처별 통합 출력 테스트
-- [ ] 매입처별 발주번호 그룹핑 검증
-- [ ] 통합 PDF 생성 테스트
-- [ ] 통합 Excel 생성 테스트
-- [ ] 파일명 규칙 검증
+**상태 변경 정책 (최종 확정):**
+| 문서 유형 | 변경 대상 | 변경 값 | 비고 |
+|---------|---------|--------|------|
+| `ORDER_PURCHASE` (발주서) | 매입발주 | "발주완료" | ✅ 구현 완료 |
+| `INVOICE_VAT` (거래명세서 부포) | **변경 없음** | - | ❌ 구현 안 함 (의도됨) |
+| `INVOICE_NVAT` (거래명세서 영세) | **변경 없음** | - | ❌ 구현 안 함 (의도됨) |
 
-#### 2.4 에러 처리 테스트
-- [ ] 잘못된 발주번호 입력 시
-- [ ] 템플릿 파일 없을 시
-- [ ] 거래처 정보 없을 시
-- [ ] 네트워크 오류 시
+**이유**: 거래명세서 1번 출력했다고 매출결제가 완료된 것이 아님!
+
+#### 2.2 기본 출력 기능 테스트 ✅
+- [x] PDF 출력 테스트 (발주서, 거래명세서 부포/영세)
+- [x] Excel 출력 테스트 (표준 형식)
+- [x] 멀티페이지 PDF 테스트 (10행 이상 데이터)
+- [x] 출력 방식 테스트 (auto, full, short)
+
+#### 2.3 전용 양식 출력 테스트 ✅
+- [x] 롬앤/누즈 전용 양식 테스트
+- [x] 종근당 전용 양식 테스트
+- [x] 삐아계열 전용 양식 테스트
+- [x] XLSX → Google Sheets 변환 검증
+- [x] 바코드 매칭 로직 검증
+
+#### 2.4 매입처별 통합 출력 테스트 ✅
+- [x] 매입처별 발주번호 그룹핑 검증
+- [x] 통합 PDF 생성 테스트
+- [x] 통합 Excel 생성 테스트
+- [x] 파일명 규칙 검증
+
+#### 2.5 에러 처리 테스트 ✅
+- [x] 잘못된 발주번호 입력 시
+- [x] 템플릿 파일 없을 시
+- [x] 거래처 정보 없을 시
+- [x] 네트워크 오류 시
 
 ---
 
@@ -787,134 +806,285 @@ OB.getPaymentStatusBadge = function(status) {
 
 ---
 
-### Phase 4: 대시보드 통합 (우선순위: 중)
+### Phase 4: UI 페이지 개선 (우선순위: 최상 🔥)
 
-#### 4.1 대시보드 위젯 추가
+#### 4.1 Page_OrderList.html (거래원장 페이지) - 상태 컬럼 추가
 
-**미수금/미지급금 요약 위젯:**
+**현재 상태:**
 ```html
-<div class="dashboard-widget">
-  <h3>결제 현황</h3>
-  <div class="payment-summary">
-    <div class="summary-card">
-      <div class="summary-label">미수금 (매출)</div>
-      <div class="summary-amount text-danger" id="dashboard-receivable-amount">0원</div>
-      <div class="summary-count" id="dashboard-receivable-count">0건</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">미지급금 (매입)</div>
-      <div class="summary-amount text-warning" id="dashboard-payable-amount">0원</div>
-      <div class="summary-count" id="dashboard-payable-count">0건</div>
-    </div>
-  </div>
-</div>
-
-<div class="dashboard-widget">
-  <h3>오늘 결제 예정</h3>
-  <table id="dashboard-payment-due-table">
-    <thead>
-      <tr>
-        <th>Invoice ID</th>
-        <th>거래처</th>
-        <th>금액</th>
-        <th>유형</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- 동적 로드 -->
-    </tbody>
-  </table>
-</div>
+<!-- Page_OrderList.html:492-499 -->
+<th>발주일</th>
+<th>발주번호</th>
+<th>발주처</th>
+<th>브랜드</th>
+<th>매입처</th>
+<th>품목수</th>
+<th>매입액</th>
+<th>공급액</th>
+<!-- ❌ 상태 컬럼 없음! -->
 ```
 
-#### 4.2 Backend 집계 함수
+**개선 계획:**
+```html
+<!-- 추가할 컬럼 -->
+<th>발주일</th>
+<th>발주번호</th>
+<th>발주처</th>
+<th>브랜드</th>
+<th>매입처</th>
+<th>품목수</th>
+<th>매입액</th>
+<th>공급액</th>
+<th class="text-center">매입발주</th>  <!-- ✨ 새로 추가 -->
+<th class="text-center">매입결제</th>  <!-- ✨ 새로 추가 -->
+<th class="text-center">매출결제</th>  <!-- ✨ 새로 추가 -->
+<th class="text-center">출고</th>      <!-- ✨ 새로 추가 -->
+<th class="text-center">액션</th>      <!-- ✨ 새로 추가 -->
+```
 
-**DashboardService.js 추가:**
-```javascript
-function getDashboardPaymentSummary() {
-  var invoiceSheet = getSheetByName('Invoice');
-  var data = invoiceSheet.getDataRange().getValues();
-
-  var receivable = { amount: 0, count: 0 };
-  var payable = { amount: 0, count: 0 };
-
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    var invoiceType = row[10]; // InvoiceType: 'PURCHASE' | 'SALES'
-    var paymentStatus = row[7];
-    var outstandingAmount = row[6];
-
-    if (paymentStatus !== 'PAID' && outstandingAmount > 0) {
-      if (invoiceType === 'SALES') {
-        receivable.amount += outstandingAmount;
-        receivable.count++;
-      } else if (invoiceType === 'PURCHASE') {
-        payable.amount += outstandingAmount;
-        payable.count++;
-      }
-    }
-  }
-
-  return {
-    receivable: receivable,
-    payable: payable
-  };
+**상태 뱃지 스타일:**
+```css
+.orderlist-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
-function getTodayPaymentDue() {
-  var today = new Date();
-  today.setHours(0, 0, 0, 0);
+/* 매입발주 */
+.badge-buy-order-pending { background: #fee2e2; color: #991b1b; }  /* 미처리 */
+.badge-buy-order-done { background: #d1fae5; color: #065f46; }     /* 발주완료 */
 
-  var invoiceSheet = getSheetByName('Invoice');
-  var data = invoiceSheet.getDataRange().getValues();
+/* 매입결제 */
+.badge-pay-buy-unpaid { background: #fef3c7; color: #92400e; }    /* 미결제 */
+.badge-pay-buy-partial { background: #fed7aa; color: #9a3412; }   /* 부분결제 */
+.badge-pay-buy-paid { background: #d1fae5; color: #065f46; }      /* 결제완료 */
 
-  var dueInvoices = [];
+/* 매출결제 */
+.badge-pay-sell-unpaid { background: #fef3c7; color: #92400e; }   /* 미결제 */
+.badge-pay-sell-partial { background: #fed7aa; color: #9a3412; }  /* 부분결제 */
+.badge-pay-sell-paid { background: #d1fae5; color: #065f46; }     /* 결제완료 */
 
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    var dueDate = new Date(row[8]);
-    dueDate.setHours(0, 0, 0, 0);
-    var paymentStatus = row[7];
+/* 출고 */
+.badge-ship-pending { background: #e0e7ff; color: #3730a3; }      /* 미출고 */
+.badge-ship-partial { background: #c7d2fe; color: #4338ca; }      /* 부분출고 */
+.badge-ship-done { background: #d1fae5; color: #065f46; }         /* 출고완료 */
+```
 
-    if (dueDate.getTime() === today.getTime() && paymentStatus !== 'PAID') {
-      dueInvoices.push({
-        invoiceId: row[0],
-        orderCode: row[1],
-        partnerName: row[3],
-        outstandingAmount: row[6],
-        invoiceType: row[10]
-      });
+**CommonScripts.html 수정:**
+```javascript
+// 거래원장 데이터 렌더링 시 상태 컬럼 추가
+OB.renderOrderListTable = function(orders) {
+  var tbody = document.getElementById('orderlist-tbody');
+  tbody.innerHTML = '';
+
+  orders.forEach(function(order) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${order.orderDate}</td>
+      <td class="orderlist-ordercode">${order.orderCode}</td>
+      <td>${order.buyer}</td>
+      <td>${order.brand}</td>
+      <td>${order.supplier}</td>
+      <td class="text-center">${order.itemCount}</td>
+      <td class="text-right">₩${formatNumber(order.totalPurchaseAmount)}</td>
+      <td class="text-right">₩${formatNumber(order.totalAmount)}</td>
+      <td class="text-center">${getStatusBadge('buyOrder', order.buyOrderStatus)}</td>
+      <td class="text-center">${getStatusBadge('payBuy', order.payBuyStatus)}</td>
+      <td class="text-center">${getStatusBadge('paySell', order.paySellStatus)}</td>
+      <td class="text-center">${getStatusBadge('ship', order.shipStatus)}</td>
+      <td class="text-center">
+        <button class="orderlist-btn-sm" onclick="viewOrderDetail('${order.orderCode}')">상세</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+};
+
+// 상태 뱃지 생성 함수
+function getStatusBadge(type, status) {
+  var badges = {
+    'buyOrder': {
+      '미처리': '<span class="orderlist-status-badge badge-buy-order-pending">미처리</span>',
+      '발주완료': '<span class="orderlist-status-badge badge-buy-order-done">발주완료</span>'
+    },
+    'payBuy': {
+      '미결제': '<span class="orderlist-status-badge badge-pay-buy-unpaid">미결제</span>',
+      '부분결제': '<span class="orderlist-status-badge badge-pay-buy-partial">부분결제</span>',
+      '결제완료': '<span class="orderlist-status-badge badge-pay-buy-paid">결제완료</span>'
+    },
+    'paySell': {
+      '미결제': '<span class="orderlist-status-badge badge-pay-sell-unpaid">미결제</span>',
+      '부분결제': '<span class="orderlist-status-badge badge-pay-sell-partial">부분결제</span>',
+      '결제완료': '<span class="orderlist-status-badge badge-pay-sell-paid">결제완료</span>'
+    },
+    'ship': {
+      '미출고': '<span class="orderlist-status-badge badge-ship-pending">미출고</span>',
+      '부분출고': '<span class="orderlist-status-badge badge-ship-partial">부분출고</span>',
+      '출고완료': '<span class="orderlist-status-badge badge-ship-done">출고완료</span>'
     }
-  }
+  };
 
-  return dueInvoices;
+  return badges[type][status] || status;
 }
 ```
 
 ---
 
+#### 4.2 Page_BillingManagement.html (청구서 관리 페이지) - 재출력 기능 연결
+
+**현재 상태:**
+```html
+<!-- Page_BillingManagement.html:418-420 -->
+<button class="billing-btn secondary" id="billing-detail-reprint-btn">
+  📄 청구서 재출력
+</button>
+<!-- ❌ 버튼은 있지만 기능 미구현! -->
+```
+
+**개선 계획:**
+```javascript
+// CommonScripts.html에 추가
+OB.handleBillingReprint = function(billingId) {
+  if (!confirm('청구서를 재출력하시겠습니까?')) return;
+
+  OB.showLoading('청구서 재출력 중...');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      OB.hideLoading();
+      if (result.success) {
+        alert('청구서가 재출력되었습니다.\n폴더: ' + result.folderUrl);
+        window.open(result.folderUrl, '_blank');
+      } else {
+        alert('재출력 실패: ' + result.error);
+      }
+    })
+    .withFailureHandler(function(err) {
+      OB.hideLoading();
+      alert('재출력 중 오류 발생: ' + err.message);
+    })
+    .reprintInvoiceApi({
+      billingId: billingId,
+      invoiceId: billingId,
+      settlementId: '',
+      type: 'SALES'
+    });
+};
+
+// 이벤트 리스너 연결
+document.getElementById('billing-detail-reprint-btn').addEventListener('click', function() {
+  var billingId = document.getElementById('detail-billing-id').textContent;
+  OB.handleBillingReprint(billingId);
+});
+```
+
+**Backend 함수 구현 (ApiService.js):**
+```javascript
+/**
+ * 청구서 재출력 API
+ * @param {Object} params - { billingId, invoiceId, settlementId, type }
+ */
+function reprintInvoiceApi(params) {
+  try {
+    var billingId = params.billingId || params.invoiceId || '';
+
+    if (!billingId) {
+      return safeReturn({ success: false, error: '청구ID를 찾을 수 없습니다.' });
+    }
+
+    // 1. 청구DB에서 발주번호 목록 조회
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      return safeReturn({ success: false, error: '청구DB를 찾을 수 없습니다.' });
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+    var colBillingId = header.indexOf('청구ID');
+    var colOrderNumbers = header.indexOf('발주번호목록');
+    var colType = header.indexOf('청구유형');
+
+    if (colOrderNumbers < 0) {
+      return safeReturn({
+        success: false,
+        error: '청구DB에 발주번호목록 컬럼이 없습니다. 시스템 업데이트가 필요합니다.'
+      });
+    }
+
+    // 2. 청구ID로 행 찾기
+    var orderNumbersStr = '';
+    var billingType = '';
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colBillingId] === billingId) {
+        orderNumbersStr = data[i][colOrderNumbers] || '';
+        billingType = data[i][colType] || 'SALES';
+        break;
+      }
+    }
+
+    if (!orderNumbersStr) {
+      return safeReturn({
+        success: false,
+        error: '해당 청구서의 발주번호를 찾을 수 없습니다.'
+      });
+    }
+
+    // 3. 발주번호 배열로 변환
+    var orderCodes = orderNumbersStr.split(',')
+      .map(function(s) { return s.trim(); })
+      .filter(function(s) { return s !== ''; });
+
+    if (orderCodes.length === 0) {
+      return safeReturn({ success: false, error: '발주번호가 비어있습니다.' });
+    }
+
+    // 4. 문서 유형 결정
+    var docType = billingType === 'PURCHASE' ? 'ORDER_PURCHASE' : 'INVOICE_VAT';
+
+    // 5. generateInvoiceZip 호출
+    var result = generateInvoiceZip({
+      orderCodes: orderCodes,
+      docType: docType,
+      printMode: 'auto',
+      modesByOrder: {},
+      mergeBySupplier: false
+    });
+
+    return safeReturn(result);
+
+  } catch (err) {
+    Logger.log('[reprintInvoiceApi Error] ' + err.message);
+    return safeReturn({
+      success: false,
+      error: '재출력 중 오류 발생: ' + err.message
+    });
+  }
+}
+```
+
+---
+
+#### 4.3 Page_Dashboard.html (대시보드) - 결제 현황 위젯 추가 (선택사항)
+
+**현재 상태:** 모두 정적 예시 데이터
+
+**개선 계획:** Phase 3 완료 후 실제 데이터 연동 (우선순위 낮음)
+
+---
+
 ### Phase 5: 코드 품질 개선 (우선순위: 하)
 
-#### 5.1 리팩토링
-- [ ] 중복 코드 제거
-- [ ] 함수 모듈화 개선
-- [ ] 변수명/함수명 일관성 개선
-- [ ] 주석 추가 (JSDoc 스타일)
+**세부 계획:**
+- 리팩토링: 중복 코드 제거, 함수 모듈화, 변수명 일관성, JSDoc 주석
+- 에러 핸들링: try-catch 추가, 친화적 메시지, 로깅 시스템
+- 성능 최적화: 배치 처리, API 호출 최소화, 캐싱 전략
+- 보안 강화: 입력값 검증, 권한 체크, 민감정보 제거
 
-#### 5.2 에러 핸들링 강화
-- [ ] try-catch 블록 추가
-- [ ] 사용자 친화적 에러 메시지
-- [ ] 에러 로깅 시스템 구축
-
-#### 5.3 성능 최적화
-- [ ] getValues/setValues 배치 처리 최적화
-- [ ] 불필요한 API 호출 제거
-- [ ] 캐싱 전략 도입
-
-#### 5.4 보안 강화
-- [ ] 입력값 검증 (XSS, Injection 방지)
-- [ ] 권한 체크 강화
-- [ ] 민감 정보 로깅 제거
+**디테일 설명은 별도 문서 참조**
 
 ---
 
@@ -954,47 +1124,40 @@ chore: 빌드/설정 변경
 - [x] Templates_Invoice_VAT.html 병합
 - [x] Page_InvoiceOutput.html 병합
 
-### Phase 2: 기능 검증 (4/4 완료) ✅
+### Phase 2: 기능 검증 및 출력 시 상태 변경 (완료) ✅
+- [x] 출력 시 상태 자동 변경 구현 확인
 - [x] 기본 출력 기능 테스트
 - [x] 전용 양식 출력 테스트
 - [x] 매입처별 통합 출력 테스트
 - [x] 에러 처리 테스트
 
 **검증 보고서**: [PHASE2_VERIFICATION_REPORT.md](./PHASE2_VERIFICATION_REPORT.md)
-
-### Phase 2.5: 구현 완료 검증 (1/1 완료) ✅
-- [x] 출력 페이지 및 템플릿 구현 완성도 검증
-
-**검증 보고서**: [IMPLEMENTATION_COMPLETION_REPORT.md](./IMPLEMENTATION_COMPLETION_REPORT.md)
 **구현 완성도**: 100% (명세서 대비 완전 구현)
 
 ### Phase 3: 부분결제 기능 (0/3 완료)
 - [ ] 데이터 구조 설계 및 생성
-- [ ] Backend Service 구현
-- [ ] Frontend UI 구현
+- [ ] Backend Service 구현 (PaymentService.js)
+- [ ] Frontend UI 구현 (Page_Payment.html)
 
-### Phase 4: 대시보드 통합 (0/2 완료)
-- [ ] 대시보드 위젯 추가
-- [ ] Backend 집계 함수 구현
+### Phase 4: UI 페이지 개선 (0/3 완료) 🔥 최우선
+- [ ] **Page_OrderList.html**: 거래원장에 상태 컬럼 추가 (매입발주/매입결제/매출결제/출고)
+- [ ] **Page_BillingManagement.html**: 청구서 재출력 버튼 기능 연결
+- [ ] **Page_Dashboard.html**: 결제 현황 위젯 추가 (선택사항)
 
-### Phase 5: 코드 품질 개선 (0/4 완료)
-- [ ] 리팩토링
-- [ ] 에러 핸들링 강화
-- [ ] 성능 최적화
-- [ ] 보안 강화
+### Phase 5: 코드 품질 개선 (0/1 완료)
+- [ ] 리팩토링, 에러 핸들링, 성능, 보안 개선
 
 ---
 
-## 🎯 예상 일정
+## 🎯 작업 우선순위
 
-| Phase | 작업 내용 | 예상 소요 시간 |
-|-------|----------|---------------|
-| Phase 1 | 코드 병합 | 2-3시간 |
-| Phase 2 | 기능 검증 | 1-2시간 |
-| Phase 3 | 부분결제 기능 | 3-4시간 |
-| Phase 4 | 대시보드 통합 | 1-2시간 |
-| Phase 5 | 코드 품질 개선 | 2-3시간 |
-| **총계** | | **9-14시간** |
+| 순위 | Phase | 작업 내용 | 중요도 |
+|------|-------|----------|--------|
+| 1 | **Phase 4.1** | 거래원장 페이지 상태 컬럼 추가 | 🔥 최상 |
+| 2 | **Phase 4.2** | 청구서 재출력 기능 연결 | 🔥 최상 |
+| 3 | **Phase 3** | 부분결제 시스템 구현 | 🟡 중 |
+| 4 | **Phase 4.3** | 대시보드 위젯 추가 | 🟢 하 |
+| 5 | **Phase 5** | 코드 품질 개선 | 🟢 하 |
 
 ---
 
@@ -1016,5 +1179,6 @@ chore: 빌드/설정 변경
 ---
 
 **문서 작성일**: 2026-01-10
+**최종 업데이트**: 2026-01-22
 **작성자**: Claude
-**버전**: 1.0
+**버전**: 1.1
