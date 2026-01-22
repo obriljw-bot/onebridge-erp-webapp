@@ -1,0 +1,347 @@
+<style>
+  .payment-wrap { padding: 20px; }
+  .payment-header { margin-bottom: 16px; }
+  .payment-header h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: #111827; }
+  .payment-header p { margin: 0; color: #6b7280; font-size: 13px; }
+
+  /* 탭 네비게이션 */
+  .payment-tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+  .payment-tab { padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 14px; font-weight: 600; color: #6b7280; transition: all 0.2s; margin-bottom: -2px; }
+  .payment-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+  .payment-tab:hover { color: #1d4ed8; }
+
+  /* 탭 컨텐츠 */
+  .payment-tab-content { display: none; }
+  .payment-tab-content.active { display: block; }
+
+  .payment-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 14px; margin-bottom: 14px; }
+  .payment-panel h2 { margin: 0 0 10px; font-size: 16px; color: #0f172a; }
+  .payment-flex { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .payment-field { display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .payment-field label { font-size: 12px; font-weight: 600; color: #475569; }
+  .payment-field input, .payment-field select { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-width: 160px; }
+  .payment-field.wide { flex: 1; min-width: 200px; }
+
+  /* 자동완성 드롭다운 */
+  .autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 200px; overflow-y: auto; z-index: 1000; display: none; margin-top: 2px; }
+  .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+  .autocomplete-item:hover { background: #f3f4f6; }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+  .payment-btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .payment-btn.primary { background: #2563eb; color: #fff; }
+  .payment-btn.secondary { background: #e5e7eb; color: #1f2937; }
+  .payment-btn.success { background: #10b981; color: #fff; }
+  .payment-btn.danger { background: #ef4444; color: #fff; }
+  .payment-btn.warning { background: #f59e0b; color: #fff; }
+  .payment-btn.primary:hover { background: #1d4ed8; }
+  .payment-btn.secondary:hover { background: #d1d5db; }
+  .payment-btn.success:hover { background: #059669; }
+  .payment-btn.danger:hover { background: #dc2626; }
+  .payment-btn.warning:hover { background: #d97706; }
+  .payment-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .payment-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+  .payment-summary-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; }
+  .payment-summary-card.income { border-left: 4px solid #10b981; }
+  .payment-summary-card.expense { border-left: 4px solid #ef4444; }
+  .payment-summary-card.profit { border-left: 4px solid #2563eb; }
+  .payment-summary-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .payment-summary-value { font-size: 18px; font-weight: 700; color: #0f172a; }
+
+  .payment-table-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: auto; max-height: 640px; }
+  .payment-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .payment-table th, .payment-table td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; white-space: nowrap; }
+  .payment-table th { background: #f8fafc; position: sticky; top: 0; z-index: 1; font-weight: 700; }
+  .payment-table td.num { text-align: right; }
+  .payment-table td.actions { text-align: center; }
+  .payment-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+  .payment-badge.income { background: #d1fae5; color: #065f46; }
+  .payment-badge.expense { background: #fee2e2; color: #991b1b; }
+  .payment-badge.deleted { background: #f3f4f6; color: #6b7280; text-decoration: line-through; }
+  .payment-empty { text-align: center; padding: 40px 12px; color: #94a3b8; }
+
+  .payment-btn-small { padding: 4px 8px; font-size: 11px; margin: 0 2px; }
+
+  /* SPEC_04: 결제 예정 알림 위젯 */
+  .payment-alert-widget { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .payment-alert-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 16px; border-left: 4px solid #2563eb; transition: all 0.2s; }
+  .payment-alert-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); transform: translateY(-2px); }
+  .payment-alert-card.purchase { border-left-color: #dc2626; }
+  .payment-alert-card.sales { border-left-color: #10b981; }
+  .payment-alert-icon { font-size: 36px; }
+  .payment-alert-content { flex: 1; }
+  .payment-alert-label { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+  .payment-alert-value { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .payment-alert-amount { font-size: 16px; font-weight: 600; color: #2563eb; }
+  .payment-alert-card.purchase .payment-alert-amount { color: #dc2626; }
+  .payment-alert-card.sales .payment-alert-amount { color: #10b981; }
+  .payment-alert-btn { padding: 8px 16px; background: #f1f5f9; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: #475569; transition: all 0.2s; }
+  .payment-alert-btn:hover { background: #e2e8f0; color: #1e293b; }
+
+</style>
+
+<div class="payment-wrap">
+  <div class="payment-header">
+    <h1>결제관리</h1>
+    <p>입출금 내역 및 회사비용을 관리합니다.</p>
+  </div>
+
+  <!-- SPEC_04: 오늘 결제 예정 위젯 -->
+  <div class="payment-alert-widget" id="payment-alert-widget" style="display:none;">
+    <div class="payment-alert-card purchase">
+      <div class="payment-alert-icon">💳</div>
+      <div class="payment-alert-content">
+        <div class="payment-alert-label">오늘 결제 예정 (매입)</div>
+        <div class="payment-alert-value" id="alert-purchase-count">0건</div>
+        <div class="payment-alert-amount" id="alert-purchase-amount">₩0</div>
+      </div>
+      <button class="payment-alert-btn" id="alert-purchase-view-btn" onclick="viewUpcomingPayments('매입')">
+        상세보기 →
+      </button>
+    </div>
+
+    <div class="payment-alert-card sales">
+      <div class="payment-alert-icon">💰</div>
+      <div class="payment-alert-content">
+        <div class="payment-alert-label">오늘 입금 예정 (매출)</div>
+        <div class="payment-alert-value" id="alert-sales-count">0건</div>
+        <div class="payment-alert-amount" id="alert-sales-amount">₩0</div>
+      </div>
+      <button class="payment-alert-btn" id="alert-sales-view-btn" onclick="viewUpcomingPayments('매출')">
+        상세보기 →
+      </button>
+    </div>
+  </div>
+
+  <!-- 탭 네비게이션 -->
+  <div class="payment-tabs">
+    <button class="payment-tab active" data-tab="payments">입출금 관리</button>
+    <button class="payment-tab" data-tab="expenses">회사비용 관리</button>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 탭 1: 입출금 관리 -->
+  <!-- ============================================================ -->
+  <div class="payment-tab-content active" id="tab-payments">
+
+    <!-- 입출금 추가 (모달 방식) -->
+    <div class="payment-panel">
+      <h2>입출금 내역 추가</h2>
+      <p style="font-size: 13px; color: #6b7280; margin: 8px 0 12px;">
+        💡 청구서를 기반으로 입출금 기록을 추가합니다. (4단계 프로세스: 결제유형 선택 → 청구서 검색 → 상세 확인 → 결제 정보 입력)
+      </p>
+      <button class="payment-btn primary" onclick="openPaymentModal()" style="font-size: 14px; padding: 10px 20px;">
+        💰 신규 입출금 기록 추가
+      </button>
+    </div>
+
+    <!-- 입출금 통계 -->
+    <div class="payment-summary" id="payment-summary">
+      <div class="payment-summary-card income">
+        <div class="payment-summary-label">총 입금</div>
+        <div class="payment-summary-value" id="payment-total-income">₩0</div>
+      </div>
+      <div class="payment-summary-card expense">
+        <div class="payment-summary-label">총 출금</div>
+        <div class="payment-summary-value" id="payment-total-expense">₩0</div>
+      </div>
+      <div class="payment-summary-card profit">
+        <div class="payment-summary-label">순이익</div>
+        <div class="payment-summary-value" id="payment-net-profit">₩0</div>
+      </div>
+    </div>
+
+    <!-- 입출금 목록 -->
+    <div class="payment-panel">
+      <h2>입출금 내역 조회</h2>
+      <div class="payment-flex">
+        <div class="payment-field">
+          <label for="payment-filter-type">결제유형</label>
+          <select id="payment-filter-type">
+            <option value="">전체</option>
+            <option value="입금">입금</option>
+            <option value="출금">출금</option>
+          </select>
+        </div>
+        <div class="payment-field">
+          <label for="payment-filter-company">거래처</label>
+          <input type="text" id="payment-filter-company" placeholder="거래처명" />
+        </div>
+        <div class="payment-field">
+          <label for="payment-filter-start">시작일</label>
+          <input type="date" id="payment-filter-start" />
+        </div>
+        <div class="payment-field">
+          <label for="payment-filter-end">종료일</label>
+          <input type="date" id="payment-filter-end" />
+        </div>
+        <div class="payment-field">
+          <label for="payment-filter-docnum">문서번호</label>
+          <input type="text" id="payment-filter-docnum" placeholder="문서번호" />
+        </div>
+        <div class="payment-field">
+          <label for="payment-filter-deleted">삭제 포함</label>
+          <select id="payment-filter-deleted">
+            <option value="false">미포함</option>
+            <option value="true">포함</option>
+          </select>
+        </div>
+        <button class="payment-btn primary" id="payment-search-btn">조회</button>
+        <button class="payment-btn secondary" id="payment-filter-reset-btn">초기화</button>
+        <button class="payment-btn success" id="payment-download-excel-btn" onclick="downloadPaymentExcel()">📥 엑셀 다운로드</button>
+      </div>
+
+      <div class="payment-table-wrap" style="margin-top:10px;">
+        <table class="payment-table">
+          <thead>
+            <tr>
+              <th>결제ID</th>
+              <th>결제일</th>
+              <th>유형</th>
+              <th>거래처</th>
+              <th class="num">금액</th>
+              <th>결제수단</th>
+              <th>문서번호</th>
+              <th>발주번호</th>
+              <th>비고</th>
+              <th>입력일시</th>
+              <th class="actions">액션</th>
+            </tr>
+          </thead>
+          <tbody id="payment-list-tbody">
+            <tr><td colspan="11" class="payment-empty">조회된 입출금 내역이 없습니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 탭 2: 회사비용 관리 -->
+  <!-- ============================================================ -->
+  <div class="payment-tab-content" id="tab-expenses">
+
+    <!-- 회사비용 추가 -->
+    <div class="payment-panel">
+      <h2>회사비용 추가</h2>
+      <div class="payment-flex">
+        <div class="payment-field">
+          <label for="expense-date">비용일 *</label>
+          <input type="date" id="expense-date" required />
+        </div>
+        <div class="payment-field">
+          <label for="expense-category">비용항목 *</label>
+          <select id="expense-category" required>
+            <option value="">선택하세요</option>
+            <option value="인건비">인건비</option>
+            <option value="임차료">임차료</option>
+            <option value="통신비">통신비</option>
+            <option value="교통비">교통비</option>
+            <option value="소모품비">소모품비</option>
+            <option value="접대비">접대비</option>
+            <option value="광고선전비">광고선전비</option>
+            <option value="식비">식비</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="payment-field">
+          <label for="expense-amount">금액 *</label>
+          <input type="number" id="expense-amount" min="0" placeholder="금액을 입력" required />
+        </div>
+        <div class="payment-field">
+          <label for="expense-method">결제수단 *</label>
+          <select id="expense-method" required>
+            <option value="">선택하세요</option>
+            <option value="현금">현금</option>
+            <option value="카드">카드</option>
+            <option value="계좌이체">계좌이체</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="payment-field wide">
+          <label for="expense-notes">비고</label>
+          <input type="text" id="expense-notes" placeholder="선택사항" />
+        </div>
+        <button class="payment-btn success" id="expense-add-btn">추가</button>
+        <button class="payment-btn secondary" id="expense-reset-btn">초기화</button>
+      </div>
+    </div>
+
+    <!-- 회사비용 통계 -->
+    <div class="payment-summary" id="expense-summary">
+      <div class="payment-summary-card expense">
+        <div class="payment-summary-label">총 비용</div>
+        <div class="payment-summary-value" id="expense-total">₩0</div>
+      </div>
+      <div class="payment-summary-card" id="expense-by-category">
+        <div class="payment-summary-label">항목별 집계</div>
+        <div class="payment-summary-value" style="font-size: 12px; font-weight: 400;" id="expense-breakdown">-</div>
+      </div>
+    </div>
+
+    <!-- 회사비용 목록 -->
+    <div class="payment-panel">
+      <h2>회사비용 내역 조회</h2>
+      <div class="payment-flex">
+        <div class="payment-field">
+          <label for="expense-filter-category">비용항목</label>
+          <select id="expense-filter-category">
+            <option value="">전체</option>
+            <option value="인건비">인건비</option>
+            <option value="임차료">임차료</option>
+            <option value="통신비">통신비</option>
+            <option value="교통비">교통비</option>
+            <option value="소모품비">소모품비</option>
+            <option value="접대비">접대비</option>
+            <option value="광고선전비">광고선전비</option>
+            <option value="식비">식비</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="payment-field">
+          <label for="expense-filter-start">시작일</label>
+          <input type="date" id="expense-filter-start" />
+        </div>
+        <div class="payment-field">
+          <label for="expense-filter-end">종료일</label>
+          <input type="date" id="expense-filter-end" />
+        </div>
+        <div class="payment-field">
+          <label for="expense-filter-deleted">삭제 포함</label>
+          <select id="expense-filter-deleted">
+            <option value="false">미포함</option>
+            <option value="true">포함</option>
+          </select>
+        </div>
+        <button class="payment-btn primary" id="expense-search-btn">조회</button>
+        <button class="payment-btn secondary" id="expense-filter-reset-btn">초기화</button>
+        <button class="payment-btn success" id="expense-download-excel-btn" onclick="downloadExpenseExcel()">📥 엑셀 다운로드</button>
+      </div>
+
+      <div class="payment-table-wrap" style="margin-top:10px;">
+        <table class="payment-table">
+          <thead>
+            <tr>
+              <th>비용ID</th>
+              <th>비용일</th>
+              <th>비용항목</th>
+              <th class="num">금액</th>
+              <th>결제수단</th>
+              <th>비고</th>
+              <th>입력일시</th>
+              <th class="actions">액션</th>
+            </tr>
+          </thead>
+          <tbody id="expense-list-tbody">
+            <tr><td colspan="8" class="payment-empty">조회된 회사비용 내역이 없습니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
