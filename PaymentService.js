@@ -262,14 +262,93 @@ function addPaymentRecord(params) {
       }
     }
 
-    // 거래원장 연동: 청구서 기반 결제인 경우 거래원장의 결제 상태 업데이트
+    // 청구서 기반 결제인 경우: 청구서 + 거래원장 업데이트
     if (params.docNumber && params.docNumber !== '') {
-      var ledgerUpdateResult = updateLedgerPaymentStatus(params.docNumber, params.type, '결제완료');
-      if (ledgerUpdateResult.success) {
-        Logger.log('[addPaymentRecord] ✅ 거래원장 업데이트 성공: ' + ledgerUpdateResult.message);
+      var invoiceSheet = ss.getSheetByName(INVOICE_SHEET_NAME);
+
+      if (invoiceSheet) {
+        var invoiceData = invoiceSheet.getDataRange().getValues();
+        var invoiceHeaders = invoiceData[0];
+
+        var colInvoiceId = invoiceHeaders.indexOf('청구ID');
+        var colAmount = invoiceHeaders.indexOf('청구금액');
+        var colStatus = invoiceHeaders.indexOf('청구상태');
+        var colPaidAmount = invoiceHeaders.indexOf('결제완료금액');
+        var colRemainingBalance = invoiceHeaders.indexOf('미수금');
+        var colLastPaymentDate = invoiceHeaders.indexOf('최종결제일');
+
+        // 부분 결제 기능 지원 여부 확인
+        var supportsPartialPayment = (colPaidAmount !== -1 && colRemainingBalance !== -1);
+
+        if (colInvoiceId !== -1 && colAmount !== -1 && colStatus !== -1) {
+          // 청구서 찾기
+          for (var i = 1; i < invoiceData.length; i++) {
+            if (invoiceData[i][colInvoiceId] === params.docNumber) {
+              var invoiceRowIndex = i + 1;
+              var 청구금액 = Number(invoiceData[i][colAmount]) || 0;
+              var 현재결제완료금액 = supportsPartialPayment ? (Number(invoiceData[i][colPaidAmount]) || 0) : 0;
+              var 현재미수금 = supportsPartialPayment ? (Number(invoiceData[i][colRemainingBalance]) || 청구금액) : 청구금액;
+
+              // 결제 금액이 미수금을 초과하는지 확인
+              if (amount > 현재미수금) {
+                Logger.log('[addPaymentRecord] ⚠️ 결제 금액(' + amount.toLocaleString() + '원)이 미수금(' + 현재미수금.toLocaleString() + '원)을 초과합니다.');
+                // 초과하더라도 처리는 계속 진행 (경고만)
+              }
+
+              // 새로운 결제완료금액 및 미수금 계산
+              var 신규결제완료금액 = 현재결제완료금액 + amount;
+              var 신규미수금 = Math.max(0, 청구금액 - 신규결제완료금액);
+
+              // 청구서 상태 결정
+              var 신규상태 = 'ISSUED';
+              var 거래원장상태 = '미결제';
+
+              if (신규미수금 === 0) {
+                신규상태 = 'PAID';
+                거래원장상태 = '결제완료';
+              } else if (신규결제완료금액 > 0) {
+                신규상태 = 'PAID_PARTIAL';
+                거래원장상태 = '부분결제';
+              }
+
+              Logger.log('[addPaymentRecord] 청구서 ' + params.docNumber + ' 업데이트:');
+              Logger.log('   - 청구금액: ' + 청구금액.toLocaleString() + '원');
+              Logger.log('   - 결제금액: ' + amount.toLocaleString() + '원');
+              Logger.log('   - 결제완료금액: ' + 현재결제완료금액.toLocaleString() + ' → ' + 신규결제완료금액.toLocaleString() + '원');
+              Logger.log('   - 미수금: ' + 현재미수금.toLocaleString() + ' → ' + 신규미수금.toLocaleString() + '원');
+              Logger.log('   - 상태: ' + invoiceData[i][colStatus] + ' → ' + 신규상태);
+
+              // 청구서 업데이트
+              invoiceSheet.getRange(invoiceRowIndex, colStatus + 1).setValue(신규상태);
+
+              if (supportsPartialPayment) {
+                invoiceSheet.getRange(invoiceRowIndex, colPaidAmount + 1).setValue(신규결제완료금액);
+                invoiceSheet.getRange(invoiceRowIndex, colRemainingBalance + 1).setValue(신규미수금);
+
+                // 최종결제일 업데이트
+                if (colLastPaymentDate !== -1) {
+                  invoiceSheet.getRange(invoiceRowIndex, colLastPaymentDate + 1).setValue(paymentDate);
+                }
+              }
+
+              Logger.log('[addPaymentRecord] ✅ 청구서 업데이트 완료');
+
+              // 거래원장 연동: 부분결제 또는 결제완료 상태로 업데이트
+              var ledgerUpdateResult = updateLedgerPaymentStatus(params.docNumber, params.type, 거래원장상태);
+              if (ledgerUpdateResult.success) {
+                Logger.log('[addPaymentRecord] ✅ 거래원장 업데이트 성공: ' + ledgerUpdateResult.message);
+              } else {
+                Logger.log('[addPaymentRecord] ⚠️ 거래원장 업데이트 실패: ' + ledgerUpdateResult.error);
+              }
+
+              break;
+            }
+          }
+        } else {
+          Logger.log('[addPaymentRecord] ⚠️ 청구DB에서 필요한 컬럼을 찾을 수 없습니다.');
+        }
       } else {
-        Logger.log('[addPaymentRecord] ⚠️ 거래원장 업데이트 실패: ' + ledgerUpdateResult.error);
-        // 거래원장 업데이트 실패해도 입출금 추가는 성공으로 처리
+        Logger.log('[addPaymentRecord] ⚠️ 청구DB 시트를 찾을 수 없습니다.');
       }
     }
 

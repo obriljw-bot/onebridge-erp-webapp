@@ -1109,6 +1109,12 @@ function updateBillingStatus(params) {
       sheet.getRange(rowIndex, 13).setValue(now);
     }
 
+    // PAID_PARTIAL (부분 결제) 상태는 addPaymentRecord에서 자동으로 설정됨
+    // 수동으로 PAID_PARTIAL 상태로 변경할 경우에도 지원
+    if (status === 'PAID_PARTIAL') {
+      Logger.log('[updateBillingStatus] 부분 결제 상태로 변경됨. 결제완료금액과 미수금은 별도로 업데이트해야 합니다.');
+    }
+
     Logger.log('[updateBillingStatus] 청구서 상태 업데이트: ' + billingId + ' -> ' + status);
 
     return {
