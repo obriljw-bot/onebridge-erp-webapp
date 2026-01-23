@@ -989,7 +989,14 @@ function getBillings(params) {
     }
 
     var data = sheet.getDataRange().getValues();
+    var headers = data[0];
     var billings = [];
+
+    // 헤더 기반 컬럼 인덱스 매핑
+    var colMap = {};
+    headers.forEach(function(h, idx) {
+      colMap[h] = idx;
+    });
 
     var parseDate = function(d) {
       if (!d) return null;
@@ -1000,38 +1007,77 @@ function getBillings(params) {
     var start = startDate ? parseDate(startDate) : null;
     var end = endDate ? parseDate(endDate) : null;
 
+    // 필수 컬럼 인덱스 (없으면 폴백)
+    var idxBillingId = colMap['청구ID'] !== undefined ? colMap['청구ID'] : 0;
+    var idxType = colMap['청구유형'] !== undefined ? colMap['청구유형'] : 1;
+    var idxCompany = colMap['업체명'] !== undefined ? colMap['업체명'] : 2;
+    var idxSettlementId = colMap['마감ID'] !== undefined ? colMap['마감ID'] : 3;
+    var idxBillingDate = colMap['청구일'] !== undefined ? colMap['청구일'] : 4;
+    var idxAmount = colMap['청구금액'] !== undefined ? colMap['청구금액'] : 5;
+    var idxStatus = colMap['청구상태'] !== undefined ? colMap['청구상태'] : 6;
+    var idxNotes = colMap['비고'] !== undefined ? colMap['비고'] : (colMap['notes'] || 9);
+    var idxCreatedAt = colMap['생성일시'] !== undefined ? colMap['생성일시'] : (colMap['createdAt'] || 10);
+    var idxCreatedBy = colMap['생성자'] !== undefined ? colMap['생성자'] : (colMap['createdBy'] || 11);
+    var idxIssuedAt = colMap['발행일시'] !== undefined ? colMap['발행일시'] : (colMap['issuedAt'] || 12);
+    var idxIssuedBy = colMap['발행자'] !== undefined ? colMap['발행자'] : (colMap['issuedBy'] || 13);
+    var idxPaidAt = colMap['결제일시'] !== undefined ? colMap['결제일시'] : (colMap['paidAt'] || 14);
+
+    // 신규 컬럼 (Phase 5)
+    var idxOrderNumbers = colMap['orderNumbers'];
+    var idxPaidAmount = colMap['결제완료금액'];
+    var idxRemainingBalance = colMap['미수금'];
+    var idxChangeHistory = colMap['변경이력'];
+
     for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
       // 타입 필터
-      if (type && data[i][1] !== type) continue;
+      if (type && row[idxType] !== type) continue;
 
       // 거래처 필터
-      if (company && data[i][2].indexOf(company) === -1) continue;
+      if (company && String(row[idxCompany] || '').indexOf(company) === -1) continue;
 
       // 상태 필터
-      if (status && data[i][6] !== status) continue;
+      if (status && row[idxStatus] !== status) continue;
 
       // 날짜 필터
       if (start || end) {
-        var billingDate = parseDate(data[i][4]);
+        var billingDate = parseDate(row[idxBillingDate]);
         if (start && billingDate < start) continue;
         if (end && billingDate > end) continue;
       }
 
-      billings.push({
-        billingId: data[i][0],
-        type: data[i][1],
-        company: data[i][2],
-        settlementId: data[i][3],
-        billingDate: formatDateString(data[i][4]),
-        amount: data[i][5],
-        status: data[i][6],
-        notes: data[i][7],
-        createdAt: formatDateString(data[i][8]),
-        createdBy: data[i][9],
-        issuedAt: formatDateString(data[i][10]),
-        issuedBy: data[i][11],
-        paidAt: formatDateString(data[i][12])
-      });
+      var billing = {
+        billingId: row[idxBillingId],
+        type: row[idxType],
+        company: row[idxCompany],
+        settlementId: row[idxSettlementId],
+        billingDate: formatDateString(row[idxBillingDate]),
+        amount: Number(row[idxAmount]) || 0,
+        status: row[idxStatus],
+        notes: row[idxNotes] || '',
+        createdAt: formatDateString(row[idxCreatedAt]),
+        createdBy: row[idxCreatedBy] || '',
+        issuedAt: formatDateString(row[idxIssuedAt]),
+        issuedBy: row[idxIssuedBy] || '',
+        paidAt: formatDateString(row[idxPaidAt])
+      };
+
+      // 신규 필드 추가 (Phase 5)
+      if (idxOrderNumbers !== undefined) {
+        billing.orderNumbers = row[idxOrderNumbers] || '[]';
+      }
+      if (idxPaidAmount !== undefined) {
+        billing.paidAmount = Number(row[idxPaidAmount]) || 0;
+      }
+      if (idxRemainingBalance !== undefined) {
+        billing.remainingBalance = Number(row[idxRemainingBalance]) || 0;
+      }
+      if (idxChangeHistory !== undefined) {
+        billing.changeHistory = row[idxChangeHistory] || '[]';
+      }
+
+      billings.push(billing);
     }
 
     return {
@@ -1515,5 +1561,304 @@ function aggregateInvoiceData(params) {
       success: false,
       error: error.message
     };
+  }
+}
+
+/**
+ * ============================================================
+ * 청구서 금액 동기화 및 변경이력 관리
+ * ============================================================
+ */
+
+/**
+ * 발주번호 목록으로 거래원장에서 총 금액 계산
+ * @param {string[]} orderNumbers - 발주번호 배열
+ * @returns {Object} { success, totalAmount, details }
+ */
+function calculateAmountFromLedger(orderNumbers) {
+  try {
+    if (!orderNumbers || orderNumbers.length === 0) {
+      return { success: false, error: '발주번호가 없습니다.', totalAmount: 0 };
+    }
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_ORDER_LEDGER_SHEET);
+
+    if (!sheet) {
+      return { success: false, error: '거래원장 시트를 찾을 수 없습니다.', totalAmount: 0 };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+
+    var idx발주번호 = headers.indexOf('발주번호');
+    var idx확정수량 = headers.indexOf('확정수량');
+    var idx공급가 = headers.indexOf('공급가');
+
+    if (idx발주번호 === -1 || idx확정수량 === -1 || idx공급가 === -1) {
+      return { success: false, error: '필요한 컬럼을 찾을 수 없습니다.', totalAmount: 0 };
+    }
+
+    var totalAmount = 0;
+    var details = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var 발주번호 = String(row[idx발주번호] || '');
+
+      if (orderNumbers.indexOf(발주번호) !== -1) {
+        var 확정수량 = Number(row[idx확정수량]) || 0;
+        var 공급가 = Number(row[idx공급가]) || 0;
+        var 공급액 = 확정수량 * 공급가;
+
+        totalAmount += 공급액;
+        details.push({
+          orderNumber: 발주번호,
+          confirmedQty: 확정수량,
+          supplyPrice: 공급가,
+          amount: 공급액
+        });
+      }
+    }
+
+    Logger.log('[calculateAmountFromLedger] 발주 ' + orderNumbers.length + '건, 총 금액: ' + totalAmount);
+
+    return {
+      success: true,
+      totalAmount: totalAmount,
+      details: details
+    };
+
+  } catch (error) {
+    Logger.log('[calculateAmountFromLedger] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message, totalAmount: 0 };
+  }
+}
+
+/**
+ * 청구서 ID로 청구서 정보 조회
+ * @param {string} billingId - 청구서 ID
+ * @returns {Object|null} 청구서 정보 또는 null
+ */
+function getBillingById(billingId) {
+  try {
+    if (!billingId) return null;
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) return null;
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+
+    var colMap = {};
+    headers.forEach(function(h, idx) {
+      colMap[h] = idx;
+    });
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colMap['청구ID']] === billingId) {
+        var billing = {
+          rowIndex: i + 1,
+          billingId: data[i][colMap['청구ID']],
+          type: data[i][colMap['청구유형']],
+          company: data[i][colMap['업체명']],
+          billingDate: data[i][colMap['청구일']],
+          amount: Number(data[i][colMap['청구금액']]) || 0,
+          status: data[i][colMap['청구상태']],
+          orderNumbers: data[i][colMap['orderNumbers']] || '[]',
+          paidAmount: Number(data[i][colMap['결제완료금액']]) || 0,
+          remainingBalance: Number(data[i][colMap['미수금']]) || 0,
+          changeHistory: data[i][colMap['변경이력']] || '[]'
+        };
+
+        // orderNumbers JSON 파싱
+        try {
+          if (typeof billing.orderNumbers === 'string') {
+            billing.orderNumbersArray = JSON.parse(billing.orderNumbers);
+          } else {
+            billing.orderNumbersArray = [];
+          }
+        } catch (e) {
+          billing.orderNumbersArray = [];
+        }
+
+        return billing;
+      }
+    }
+
+    return null;
+
+  } catch (error) {
+    Logger.log('[getBillingById] ❌ 오류: ' + error.message);
+    return null;
+  }
+}
+
+/**
+ * 청구서 금액 동기화 (거래원장 기준)
+ * @param {string} billingId - 청구서 ID
+ * @param {number} newAmount - 새 금액 (거래원장 계산값)
+ * @returns {Object} { success, updated, changeLog }
+ */
+function syncBillingAmount(billingId, newAmount) {
+  try {
+    Logger.log('[syncBillingAmount] 시작 - billingId: ' + billingId + ', newAmount: ' + newAmount);
+
+    if (!billingId) {
+      return { success: false, error: '청구서 ID가 없습니다.', updated: false };
+    }
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      return { success: false, error: '청구DB 시트를 찾을 수 없습니다.', updated: false };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+
+    var colMap = {};
+    headers.forEach(function(h, idx) {
+      colMap[h] = idx;
+    });
+
+    // 필수 컬럼 확인
+    if (colMap['청구ID'] === undefined || colMap['청구금액'] === undefined) {
+      return { success: false, error: '필수 컬럼을 찾을 수 없습니다.', updated: false };
+    }
+
+    // 청구서 행 찾기
+    var billingRowIndex = -1;
+    var currentAmount = 0;
+    var currentPaidAmount = 0;
+    var currentHistory = '[]';
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colMap['청구ID']] === billingId) {
+        billingRowIndex = i + 1; // 1-based row index
+        currentAmount = Number(data[i][colMap['청구금액']]) || 0;
+        currentPaidAmount = Number(data[i][colMap['결제완료금액']]) || 0;
+        if (colMap['변경이력'] !== undefined) {
+          currentHistory = data[i][colMap['변경이력']] || '[]';
+        }
+        break;
+      }
+    }
+
+    if (billingRowIndex === -1) {
+      return { success: false, error: '청구서를 찾을 수 없습니다.', updated: false };
+    }
+
+    // 금액 비교
+    if (currentAmount === newAmount) {
+      Logger.log('[syncBillingAmount] 금액 동일 - 업데이트 불필요');
+      return { success: true, updated: false, message: '금액이 동일하여 업데이트하지 않았습니다.' };
+    }
+
+    // 변경이력 추가
+    var historyArray = [];
+    try {
+      historyArray = JSON.parse(currentHistory);
+      if (!Array.isArray(historyArray)) historyArray = [];
+    } catch (e) {
+      historyArray = [];
+    }
+
+    var now = new Date();
+    var user = Session.getActiveUser().getEmail() || 'system';
+
+    historyArray.push({
+      date: Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
+      before: currentAmount,
+      after: newAmount,
+      by: user
+    });
+
+    // 미수금 재계산
+    var newRemainingBalance = Math.max(0, newAmount - currentPaidAmount);
+
+    // 청구DB 업데이트
+    sheet.getRange(billingRowIndex, colMap['청구금액'] + 1).setValue(newAmount);
+
+    if (colMap['미수금'] !== undefined) {
+      sheet.getRange(billingRowIndex, colMap['미수금'] + 1).setValue(newRemainingBalance);
+    }
+
+    if (colMap['변경이력'] !== undefined) {
+      sheet.getRange(billingRowIndex, colMap['변경이력'] + 1).setValue(JSON.stringify(historyArray));
+    }
+
+    Logger.log('[syncBillingAmount] ✅ 금액 동기화 완료: ' + currentAmount + ' → ' + newAmount);
+
+    return {
+      success: true,
+      updated: true,
+      changeLog: {
+        before: currentAmount,
+        after: newAmount,
+        newRemainingBalance: newRemainingBalance,
+        date: Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')
+      }
+    };
+
+  } catch (error) {
+    Logger.log('[syncBillingAmount] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message, updated: false };
+  }
+}
+
+/**
+ * 발주번호로 연결된 청구서 ID 조회
+ * @param {string[]} orderNumbers - 발주번호 배열
+ * @returns {string|null} 청구서 ID 또는 null
+ */
+function findBillingByOrderNumbers(orderNumbers) {
+  try {
+    if (!orderNumbers || orderNumbers.length === 0) return null;
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) return null;
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+
+    var colBillingId = headers.indexOf('청구ID');
+    var colOrderNumbers = headers.indexOf('orderNumbers');
+    var colStatus = headers.indexOf('청구상태');
+
+    if (colBillingId === -1 || colOrderNumbers === -1) return null;
+
+    // 발주번호 정렬하여 비교
+    var sortedInput = orderNumbers.slice().sort().join(',');
+
+    for (var i = 1; i < data.length; i++) {
+      var status = data[i][colStatus] || '';
+      // 취소된 청구서는 제외
+      if (status === 'CANCELLED') continue;
+
+      var storedOrderNumbers = data[i][colOrderNumbers] || '[]';
+      try {
+        var parsedNumbers = JSON.parse(storedOrderNumbers);
+        if (Array.isArray(parsedNumbers)) {
+          var sortedStored = parsedNumbers.slice().sort().join(',');
+          if (sortedInput === sortedStored) {
+            return data[i][colBillingId];
+          }
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    return null;
+
+  } catch (error) {
+    Logger.log('[findBillingByOrderNumbers] ❌ 오류: ' + error.message);
+    return null;
   }
 }

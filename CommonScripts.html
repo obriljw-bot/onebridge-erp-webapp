@@ -3168,8 +3168,6 @@
 
     var detailModal = document.getElementById('billing-detail-modal');
     var modalCloseBtn = document.getElementById('billing-modal-close-btn');
-    var detailReprintBtn = document.getElementById('billing-detail-reprint-btn');
-    var detailChangeStatusBtn = document.getElementById('billing-detail-change-status-btn');
 
     // 현재 선택된 청구서
     var currentBilling = null;
@@ -3335,10 +3333,11 @@
       }
     }
 
-    // 상세보기 모달 열기
+    // 상세보기 모달 열기 (Phase 5: 변경이력 표시 추가)
     function showDetailModal(billing) {
       currentBilling = billing;
 
+      // 기본 정보
       document.getElementById('detail-billing-id').textContent = billing.billingId || '-';
       document.getElementById('detail-type').textContent = billing.type === 'PURCHASE' ? '매입' : '매출';
       document.getElementById('detail-company').textContent = billing.company || '-';
@@ -3348,114 +3347,134 @@
       document.getElementById('detail-status').textContent = getStatusText(billing.status);
       document.getElementById('detail-notes').textContent = billing.notes || '-';
 
+      // 발행 정보
       document.getElementById('detail-created-at').textContent = billing.createdAt || '-';
       document.getElementById('detail-created-by').textContent = billing.createdBy || '-';
       document.getElementById('detail-issued-at').textContent = billing.issuedAt || '-';
       document.getElementById('detail-issued-by').textContent = billing.issuedBy || '-';
       document.getElementById('detail-paid-at').textContent = billing.paidAt || '-';
 
+      // 결제 정보
+      var totalAmountEl = document.getElementById('detail-total-amount');
+      var paidAmountEl = document.getElementById('detail-paid-amount');
+      var remainingEl = document.getElementById('detail-remaining-balance');
+
+      if (totalAmountEl) {
+        totalAmountEl.textContent = '₩' + OB.formatNumber(billing.amount || 0);
+      }
+      if (paidAmountEl) {
+        paidAmountEl.textContent = '₩' + OB.formatNumber(billing.paidAmount || 0);
+      }
+      if (remainingEl) {
+        var remaining = (billing.amount || 0) - (billing.paidAmount || 0);
+        if (billing.remainingBalance !== undefined) {
+          remaining = billing.remainingBalance;
+        }
+        remainingEl.textContent = '₩' + OB.formatNumber(remaining);
+      }
+
+      // 변경이력 표시
+      var historySection = document.getElementById('detail-change-history-section');
+      var historyContent = document.getElementById('detail-change-history-content');
+
+      if (historySection && historyContent) {
+        var historyData = [];
+
+        // changeHistory 파싱
+        if (billing.changeHistory) {
+          try {
+            if (typeof billing.changeHistory === 'string') {
+              historyData = JSON.parse(billing.changeHistory);
+            } else if (Array.isArray(billing.changeHistory)) {
+              historyData = billing.changeHistory;
+            }
+          } catch (e) {
+            console.warn('변경이력 파싱 오류:', e);
+          }
+        }
+
+        if (historyData && historyData.length > 0) {
+          historySection.style.display = 'block';
+
+          var tableHtml = '<table class="billing-history-table">' +
+            '<thead><tr>' +
+            '<th>변경일시</th>' +
+            '<th class="num">변경 전</th>' +
+            '<th class="num">변경 후</th>' +
+            '<th>변경자</th>' +
+            '</tr></thead><tbody>';
+
+          historyData.forEach(function(h) {
+            tableHtml += '<tr>' +
+              '<td>' + (h.date || '-') + '</td>' +
+              '<td class="num">₩' + OB.formatNumber(h.before || 0) + '</td>' +
+              '<td class="num">₩' + OB.formatNumber(h.after || 0) + '</td>' +
+              '<td>' + (h.by || '-') + '</td>' +
+              '</tr>';
+          });
+
+          tableHtml += '</tbody></table>';
+          historyContent.innerHTML = tableHtml;
+        } else {
+          historySection.style.display = 'none';
+          historyContent.innerHTML = '';
+        }
+      }
+
+      // 연결 발주번호 표시
+      var orderNumbersSection = document.getElementById('detail-order-numbers-section');
+      var orderNumbersDiv = document.getElementById('detail-order-numbers');
+
+      if (orderNumbersSection && orderNumbersDiv) {
+        var orderNumbers = [];
+
+        if (billing.orderNumbers) {
+          try {
+            if (typeof billing.orderNumbers === 'string') {
+              orderNumbers = JSON.parse(billing.orderNumbers);
+            } else if (Array.isArray(billing.orderNumbers)) {
+              orderNumbers = billing.orderNumbers;
+            }
+          } catch (e) {
+            console.warn('발주번호 파싱 오류:', e);
+          }
+        }
+
+        if (orderNumbers && orderNumbers.length > 0) {
+          orderNumbersSection.style.display = 'block';
+          var tagsHtml = orderNumbers.map(function(num) {
+            return '<span class="billing-order-tag">' + num + '</span>';
+          }).join('');
+          orderNumbersDiv.innerHTML = tagsHtml;
+        } else {
+          orderNumbersSection.style.display = 'none';
+          orderNumbersDiv.innerHTML = '';
+        }
+      }
+
       detailModal.classList.add('active');
     }
 
     // 모달 닫기
-    modalCloseBtn.addEventListener('click', function() {
+    function closeDetailModal() {
       detailModal.classList.remove('active');
       currentBilling = null;
-    });
+    }
+
+    modalCloseBtn.addEventListener('click', closeDetailModal);
 
     // 모달 배경 클릭 시 닫기
     detailModal.addEventListener('click', function(e) {
       if (e.target === detailModal) {
-        detailModal.classList.remove('active');
-        currentBilling = null;
+        closeDetailModal();
       }
     });
 
-    // 재출력 버튼
-    detailReprintBtn.addEventListener('click', function() {
-      if (!currentBilling) return;
-
-      var invoiceId = currentBilling.invoiceId || currentBilling.billingId;
-      if (!invoiceId) {
-        alert('청구ID를 찾을 수 없습니다.');
-        return;
-      }
-
-      OB.showLoading('청구서 재출력 중...');
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          OB.hideLoading();
-
-          if (!result || !result.success) {
-            alert('재출력 실패: ' + (result ? result.error : '알 수 없는 오류'));
-            return;
-          }
-
-          var url = 'https://drive.google.com/uc?export=download&id=' + result.fileId;
-          window.open(url, '_blank');
-          alert('PDF 재출력이 완료되었습니다!\n파일: ' + result.fileName);
-        })
-        .withFailureHandler(function(error) {
-          OB.hideLoading();
-          alert('재출력 실패: ' + error.message);
-        })
-        .reprintInvoiceApi({
-          invoiceId: invoiceId,
-          billingId: invoiceId,
-          settlementId: currentBilling.settlementId,
-          type: currentBilling.type
-        });
-    });
-
-    // 상태 변경 버튼
-    detailChangeStatusBtn.addEventListener('click', function() {
-      if (!currentBilling) return;
-
-      var nextStatus = '';
-      var nextStatusText = '';
-
-      if (currentBilling.status === 'DRAFT') {
-        nextStatus = 'ISSUED';
-        nextStatusText = '발행완료';
-      } else if (currentBilling.status === 'ISSUED') {
-        nextStatus = 'PAID';
-        nextStatusText = '입금완료';
-      } else {
-        alert('더 이상 변경할 수 없는 상태입니다.');
-        return;
-      }
-
-      var confirmMsg = '청구서 상태를 "' + nextStatusText + '"로 변경하시겠습니까?';
-      if (!confirm(confirmMsg)) return;
-
-      OB.showLoading('상태 변경 중...');
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          OB.hideLoading();
-
-          if (!result || !result.success) {
-            alert('상태 변경 실패: ' + (result ? result.error : '알 수 없는 오류'));
-            return;
-          }
-
-          alert('상태가 변경되었습니다!');
-          detailModal.classList.remove('active');
-          currentBilling = null;
-
-          // 목록 새로고침
-          searchBtn.click();
-        })
-        .withFailureHandler(function(error) {
-          OB.hideLoading();
-          alert('상태 변경 실패: ' + error.message);
-        })
-        .updateBillingStatusApi({
-          billingId: currentBilling.billingId,
-          status: nextStatus
-        });
-    });
+    // 하단 닫기 버튼 (Phase 5: 기존 버튼 대체)
+    var footerCloseBtn = document.getElementById('billing-detail-close-footer-btn');
+    if (footerCloseBtn) {
+      footerCloseBtn.addEventListener('click', closeDetailModal);
+    }
 
     console.log('✅ BillingManagement 페이지 초기화 완료');
   };
@@ -4686,7 +4705,7 @@
       });
     }
 
-    // 일괄 청구서 생성 버튼
+    // 일괄 청구서 생성 버튼 - 모달 기반 통합 버전 (Phase 4)
     if (bulkInvoiceBtn) {
       bulkInvoiceBtn.addEventListener('click', function() {
         var checkboxes = document.querySelectorAll('.ledger-row-checkbox:checked');
@@ -4695,163 +4714,410 @@
           return;
         }
 
-        // 청구서 유형 선택 (매출/매입)
-        var invoiceType = confirm(
-          '청구서 유형을 선택하세요:\n\n' +
-          '[확인] 매출청구서 (발주처에게 청구)\n' +
-          '[취소] 매입청구서 (매입처에게 지불)'
-        ) ? 'SALES' : 'PURCHASE';
+        // 선택된 발주 정보 수집
+        var selectedOrders = [];
+        var companies = {};
+        var suppliers = {};
+        var totalSupplyAmt = 0;
+        var totalPurchaseAmt = 0;
 
-        var typeLabel = invoiceType === 'SALES' ? '매출' : '매입';
-        var companyLabel = invoiceType === 'SALES' ? '발주처' : '매입처';
+        checkboxes.forEach(function(cb) {
+          var orderNum = cb.dataset.orderNumber;
+          var buyer = cb.dataset.buyer;
+          var supplier = cb.dataset.supplier;
+          var supplyAmt = parseFloat(cb.dataset.supplyAmt) || 0;
+          var purchaseAmt = parseFloat(cb.dataset.purchaseAmt) || 0;
 
-        // ====================================
-        // 매출청구서: 단일 발주처 검증
-        // ====================================
-        if (invoiceType === 'SALES') {
-          var orderNumbers = [];
-          var companies = {};
-          var totalAmount = 0;
-
-          checkboxes.forEach(function(cb) {
-            orderNumbers.push(cb.dataset.orderNumber);
-            var company = cb.dataset.buyer;
-            companies[company] = true;
-            var amount = parseFloat(cb.dataset.supplyAmt) || 0;
-            totalAmount += amount;
+          selectedOrders.push({
+            orderNumber: orderNum,
+            buyer: buyer,
+            supplier: supplier,
+            supplyAmt: supplyAmt,
+            purchaseAmt: purchaseAmt
           });
 
-          // 단일 발주처 검증
-          var companyList = Object.keys(companies);
-          if (companyList.length > 1) {
-            alert('매출청구서는 동일한 발주처의 발주만 선택해야 합니다.\n선택된 발주처: ' + companyList.join(', '));
+          companies[buyer] = true;
+          suppliers[supplier] = true;
+          totalSupplyAmt += supplyAmt;
+          totalPurchaseAmt += purchaseAmt;
+        });
+
+        var companyList = Object.keys(companies);
+        var supplierList = Object.keys(suppliers);
+
+        // 청구서 생성/출력 모달 표시
+        showInvoiceCreationModal({
+          selectedOrders: selectedOrders,
+          companies: companyList,
+          suppliers: supplierList,
+          totalSupplyAmt: totalSupplyAmt,
+          totalPurchaseAmt: totalPurchaseAmt,
+          checkboxes: checkboxes
+        });
+      });
+    }
+
+    // 청구서 생성/출력 통합 모달 (Phase 4)
+    function showInvoiceCreationModal(data) {
+      var modal = document.createElement('div');
+      modal.id = 'invoice-creation-modal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+      var orderNumbers = data.selectedOrders.map(function(o) { return o.orderNumber; });
+
+      modal.innerHTML = '' +
+        '<div style="background:white;border-radius:12px;width:500px;max-width:90%;max-height:85vh;overflow:auto;box-shadow:0 4px 16px rgba(0,0,0,0.2);">' +
+        '  <div style="padding:20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">' +
+        '    <h3 style="margin:0;font-size:18px;font-weight:700;">청구서 생성/출력</h3>' +
+        '    <button id="inv-modal-close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;">×</button>' +
+        '  </div>' +
+        '  <div style="padding:20px;">' +
+        '    <!-- 선택 정보 요약 -->' +
+        '    <div style="background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
+        '      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">' +
+        '        <span style="color:#64748b;">선택 발주</span>' +
+        '        <span style="font-weight:600;">' + data.selectedOrders.length + '건</span>' +
+        '      </div>' +
+        '      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">' +
+        '        <span style="color:#64748b;">발주처</span>' +
+        '        <span style="font-weight:600;">' + data.companies.join(', ') + '</span>' +
+        '      </div>' +
+        '      <div style="display:flex;justify-content:space-between;">' +
+        '        <span style="color:#64748b;">매입처</span>' +
+        '        <span style="font-weight:600;">' + data.suppliers.join(', ') + '</span>' +
+        '      </div>' +
+        '    </div>' +
+        '    <!-- 청구서 유형 선택 -->' +
+        '    <div style="margin-bottom:16px;">' +
+        '      <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">청구서 유형</label>' +
+        '      <div style="display:flex;gap:12px;">' +
+        '        <label style="flex:1;display:flex;align-items:center;padding:12px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;" id="inv-type-sales-label">' +
+        '          <input type="radio" name="inv-type" value="SALES" id="inv-type-sales" checked style="margin-right:8px;">' +
+        '          <div>' +
+        '            <div style="font-weight:600;color:#1e293b;">매출청구서</div>' +
+        '            <div style="font-size:12px;color:#64748b;">₩' + OB.formatNumber(data.totalSupplyAmt) + '</div>' +
+        '          </div>' +
+        '        </label>' +
+        '        <label style="flex:1;display:flex;align-items:center;padding:12px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;" id="inv-type-purchase-label">' +
+        '          <input type="radio" name="inv-type" value="PURCHASE" id="inv-type-purchase" style="margin-right:8px;">' +
+        '          <div>' +
+        '            <div style="font-weight:600;color:#1e293b;">매입청구서</div>' +
+        '            <div style="font-size:12px;color:#64748b;">₩' + OB.formatNumber(data.totalPurchaseAmt) + '</div>' +
+        '          </div>' +
+        '        </label>' +
+        '      </div>' +
+        (data.companies.length > 1 ? '<div style="color:#f59e0b;font-size:12px;margin-top:8px;">※ 매출청구서는 동일 발주처만 선택 필요</div>' : '') +
+        '    </div>' +
+        '    <!-- 출력 옵션 -->' +
+        '    <div style="margin-bottom:16px;">' +
+        '      <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">출력 옵션</label>' +
+        '      <div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+        '        <label style="display:flex;align-items:center;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;font-size:13px;">' +
+        '          <input type="checkbox" id="inv-output-pdf" checked style="margin-right:6px;">PDF 출력' +
+        '        </label>' +
+        '        <label style="display:flex;align-items:center;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;font-size:13px;">' +
+        '          <input type="checkbox" id="inv-save-db" checked style="margin-right:6px;">DB 저장' +
+        '        </label>' +
+        '      </div>' +
+        '    </div>' +
+        '    <!-- 기존 청구서 확인 상태 -->' +
+        '    <div id="inv-existing-status" style="background:#fff7ed;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;display:none;">' +
+        '      <div style="color:#9a3412;font-weight:600;">기존 청구서 발견</div>' +
+        '      <div id="inv-existing-info" style="color:#c2410c;margin-top:4px;"></div>' +
+        '    </div>' +
+        '  </div>' +
+        '  <div style="padding:16px 20px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end;">' +
+        '    <button id="inv-modal-cancel" style="padding:10px 20px;border:1px solid #d1d5db;background:white;border-radius:6px;cursor:pointer;font-size:14px;">취소</button>' +
+        '    <button id="inv-modal-confirm" style="padding:10px 20px;border:none;background:#2563eb;color:white;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">생성 및 출력</button>' +
+        '  </div>' +
+        '</div>';
+
+      document.body.appendChild(modal);
+
+      // 이벤트 바인딩
+      var closeBtn = document.getElementById('inv-modal-close');
+      var cancelBtn = document.getElementById('inv-modal-cancel');
+      var confirmBtn = document.getElementById('inv-modal-confirm');
+      var salesRadio = document.getElementById('inv-type-sales');
+      var purchaseRadio = document.getElementById('inv-type-purchase');
+      var salesLabel = document.getElementById('inv-type-sales-label');
+      var purchaseLabel = document.getElementById('inv-type-purchase-label');
+
+      function closeModal() {
+        if (modal.parentNode) modal.parentNode.removeChild(modal);
+      }
+
+      closeBtn.addEventListener('click', closeModal);
+      cancelBtn.addEventListener('click', closeModal);
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+      });
+
+      // 유형 선택 스타일 변경
+      function updateTypeStyle() {
+        salesLabel.style.borderColor = salesRadio.checked ? '#2563eb' : '#e5e7eb';
+        salesLabel.style.background = salesRadio.checked ? '#eff6ff' : 'white';
+        purchaseLabel.style.borderColor = purchaseRadio.checked ? '#2563eb' : '#e5e7eb';
+        purchaseLabel.style.background = purchaseRadio.checked ? '#eff6ff' : 'white';
+      }
+
+      salesRadio.addEventListener('change', updateTypeStyle);
+      purchaseRadio.addEventListener('change', updateTypeStyle);
+      updateTypeStyle();
+
+      // 확인 버튼 클릭
+      confirmBtn.addEventListener('click', function() {
+        var invoiceType = salesRadio.checked ? 'SALES' : 'PURCHASE';
+        var outputPdf = document.getElementById('inv-output-pdf').checked;
+        var saveDb = document.getElementById('inv-save-db').checked;
+
+        // 매출청구서: 단일 발주처 검증
+        if (invoiceType === 'SALES' && data.companies.length > 1) {
+          alert('매출청구서는 동일한 발주처의 발주만 선택해야 합니다.');
+          return;
+        }
+
+        closeModal();
+
+        // 통합 처리 함수 호출
+        processInvoiceCreation({
+          orderNumbers: orderNumbers,
+          selectedOrders: data.selectedOrders,
+          invoiceType: invoiceType,
+          company: invoiceType === 'SALES' ? data.companies[0] : null,
+          suppliers: data.suppliers,
+          totalAmount: invoiceType === 'SALES' ? data.totalSupplyAmt : data.totalPurchaseAmt,
+          outputPdf: outputPdf,
+          saveDb: saveDb,
+          checkboxes: data.checkboxes
+        });
+      });
+    }
+
+    // 청구서 생성/출력 통합 처리 (Phase 4)
+    function processInvoiceCreation(params) {
+      var orderNumbers = params.orderNumbers;
+      var invoiceType = params.invoiceType;
+      var outputPdf = params.outputPdf;
+      var saveDb = params.saveDb;
+
+      OB.showLoading('청구서 처리 중...');
+
+      // 1. 기존 청구서 확인 및 금액 동기화
+      google.script.run
+        .withSuccessHandler(function(syncRes) {
+          console.log('[InvoiceCreation] syncBillingBeforeOutput 결과:', syncRes);
+
+          if (syncRes && syncRes.exists) {
+            // 기존 청구서 있음 - 금액 동기화 완료
+            console.log('[InvoiceCreation] 기존 청구서 금액 동기화 완료:', syncRes.billingId);
+
+            if (syncRes.syncResult && syncRes.syncResult.updated) {
+              console.log('[InvoiceCreation] 금액 변경됨:', syncRes.syncResult.changeLog);
+            }
+
+            // PDF 출력 (요청된 경우)
+            if (outputPdf) {
+              generateInvoicePdf(orderNumbers, invoiceType, params.checkboxes);
+            } else {
+              OB.hideLoading();
+              alert('기존 청구서 금액이 동기화되었습니다.\n청구ID: ' + syncRes.billingId);
+              params.checkboxes.forEach(function(cb) { cb.checked = false; });
+              updateBulkButtons();
+            }
+          } else {
+            // 기존 청구서 없음 - 신규 생성
+            if (saveDb) {
+              if (invoiceType === 'SALES') {
+                // 매출청구서 단일 생성
+                createSingleInvoice({
+                  orderNumbers: orderNumbers,
+                  type: 'SALES',
+                  company: params.company,
+                  amount: params.totalAmount,
+                  outputPdf: outputPdf,
+                  checkboxes: params.checkboxes
+                });
+              } else {
+                // 매입청구서 매입처별 분리 생성
+                createPurchaseInvoices(params);
+              }
+            } else if (outputPdf) {
+              // DB 저장 없이 PDF만 출력
+              generateInvoicePdf(orderNumbers, invoiceType, params.checkboxes);
+            } else {
+              OB.hideLoading();
+              alert('출력 옵션을 선택해주세요.');
+            }
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.error('[InvoiceCreation] 동기화 확인 실패:', err);
+          // 동기화 실패해도 생성 진행
+          if (saveDb) {
+            if (invoiceType === 'SALES') {
+              createSingleInvoice({
+                orderNumbers: orderNumbers,
+                type: 'SALES',
+                company: params.company,
+                amount: params.totalAmount,
+                outputPdf: outputPdf,
+                checkboxes: params.checkboxes
+              });
+            } else {
+              createPurchaseInvoices(params);
+            }
+          } else if (outputPdf) {
+            generateInvoicePdf(orderNumbers, invoiceType, params.checkboxes);
+          } else {
+            OB.hideLoading();
+            alert('처리 실패: ' + err.message);
+          }
+        })
+        .syncBillingBeforeOutputApi({ orderNumbers: orderNumbers });
+    }
+
+    // 단일 청구서 생성 (매출용)
+    function createSingleInvoice(params) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !res.success) {
+            OB.hideLoading();
+            alert('청구서 생성 실패: ' + (res ? res.error : '알 수 없는 오류'));
             return;
           }
 
-          var company = companyList[0];
+          console.log('[InvoiceCreation] 청구서 생성 완료:', res.invoiceId);
 
-          if (confirm(
-            '매출청구서를 생성하시겠습니까?\n\n' +
-            '발주처: ' + company + '\n' +
-            '발주 건수: ' + orderNumbers.length + '건\n' +
-            '총 금액: ₩' + totalAmount.toLocaleString()
-          )) {
-            OB.showLoading('매출청구서 생성 중...');
-
-            google.script.run
-              .withSuccessHandler(function(res) {
-                OB.hideLoading();
-                if (!res || !res.success) {
-                  alert('청구서 생성 실패: ' + (res ? res.error : '알 수 없는 오류'));
-                  return;
-                }
-                alert('✅ 매출청구서가 생성되었습니다!\n\n청구ID: ' + res.invoiceId);
-                checkboxes.forEach(function(cb) { cb.checked = false; });
-                updateBulkButtons();
-                OB.loadPage('invoiceManagement');
-              })
-              .withFailureHandler(function(err) {
-                OB.hideLoading();
-                alert('청구서 생성 실패: ' + err.message);
-              })
-              .createDirectBillingApi({
-                orderNumbers: orderNumbers,
-                type: 'SALES',
-                company: company,
-                amount: totalAmount
-              });
+          if (params.outputPdf) {
+            generateInvoicePdf(params.orderNumbers, 'SALES', params.checkboxes);
+          } else {
+            OB.hideLoading();
+            alert('청구서가 생성되었습니다!\n청구ID: ' + res.invoiceId);
+            params.checkboxes.forEach(function(cb) { cb.checked = false; });
+            updateBulkButtons();
           }
+        })
+        .withFailureHandler(function(err) {
+          OB.hideLoading();
+          alert('청구서 생성 실패: ' + err.message);
+        })
+        .createDirectBillingApi({
+          orderNumbers: params.orderNumbers,
+          type: params.type,
+          company: params.company,
+          amount: params.amount
+        });
+    }
+
+    // 매입청구서 매입처별 분리 생성
+    function createPurchaseInvoices(params) {
+      // 매입처별 그룹핑
+      var supplierGroups = {};
+      params.selectedOrders.forEach(function(order) {
+        var supplier = order.supplier;
+        if (!supplierGroups[supplier]) {
+          supplierGroups[supplier] = {
+            orderNumbers: [],
+            totalAmount: 0
+          };
         }
-        // ====================================
-        // 매입청구서: 매입처별 자동 분리 생성
-        // ====================================
-        else {
-          // 매입처별 그룹핑
-          var supplierGroups = {};
-
-          checkboxes.forEach(function(cb) {
-            var supplier = cb.dataset.supplier;
-            var orderNumber = cb.dataset.orderNumber;
-            var amount = parseFloat(cb.dataset.purchaseAmt) || 0;
-
-            if (!supplierGroups[supplier]) {
-              supplierGroups[supplier] = {
-                orderNumbers: [],
-                totalAmount: 0
-              };
-            }
-
-            supplierGroups[supplier].orderNumbers.push(orderNumber);
-            supplierGroups[supplier].totalAmount += amount;
-          });
-
-          var supplierList = Object.keys(supplierGroups);
-          var totalInvoices = supplierList.length;
-          var grandTotal = 0;
-          var summary = '';
-
-          supplierList.forEach(function(supplier) {
-            var group = supplierGroups[supplier];
-            grandTotal += group.totalAmount;
-            summary += '\n- ' + supplier + ': ' + group.orderNumbers.length + '건, ₩' + group.totalAmount.toLocaleString();
-          });
-
-          if (confirm(
-            '매입처별로 ' + totalInvoices + '개의 매입청구서를 생성하시겠습니까?\n' +
-            summary + '\n\n' +
-            '총 금액: ₩' + grandTotal.toLocaleString()
-          )) {
-            OB.showLoading(totalInvoices + '개 매입청구서 생성 중...');
-
-            // 순차 생성
-            var createdInvoices = [];
-            var currentIndex = 0;
-
-            function createNext() {
-              if (currentIndex >= supplierList.length) {
-                // 모두 완료
-                OB.hideLoading();
-                var resultMsg = '✅ ' + createdInvoices.length + '개의 매입청구서가 생성되었습니다!\n\n';
-                createdInvoices.forEach(function(inv) {
-                  resultMsg += '- ' + inv.invoiceId + ' (' + inv.company + ')\n';
-                });
-                alert(resultMsg);
-                checkboxes.forEach(function(cb) { cb.checked = false; });
-                updateBulkButtons();
-                OB.loadPage('invoiceManagement');
-                return;
-              }
-
-              var supplier = supplierList[currentIndex];
-              var group = supplierGroups[supplier];
-
-              google.script.run
-                .withSuccessHandler(function(res) {
-                  if (res && res.success) {
-                    createdInvoices.push({
-                      invoiceId: res.invoiceId,
-                      company: supplier
-                    });
-                  }
-                  currentIndex++;
-                  createNext();
-                })
-                .withFailureHandler(function(err) {
-                  OB.hideLoading();
-                  alert('청구서 생성 실패 (' + supplier + '): ' + err.message);
-                })
-                .createDirectBillingApi({
-                  orderNumbers: group.orderNumbers,
-                  type: 'PURCHASE',
-                  company: supplier,
-                  amount: group.totalAmount
-                });
-            }
-
-            createNext();
-          }
-        }
+        supplierGroups[supplier].orderNumbers.push(order.orderNumber);
+        supplierGroups[supplier].totalAmount += order.purchaseAmt;
       });
+
+      var supplierList = Object.keys(supplierGroups);
+      var createdInvoices = [];
+      var currentIndex = 0;
+
+      function createNextPurchaseInvoice() {
+        if (currentIndex >= supplierList.length) {
+          // 모두 완료
+          if (params.outputPdf && createdInvoices.length > 0) {
+            // 첫 번째 그룹의 발주번호로 PDF 출력
+            var firstGroup = supplierGroups[supplierList[0]];
+            generateInvoicePdf(firstGroup.orderNumbers, 'PURCHASE', params.checkboxes);
+          } else {
+            OB.hideLoading();
+            var resultMsg = createdInvoices.length + '개의 매입청구서가 생성되었습니다!\n\n';
+            createdInvoices.forEach(function(inv) {
+              resultMsg += '- ' + inv.invoiceId + ' (' + inv.company + ')\n';
+            });
+            alert(resultMsg);
+            params.checkboxes.forEach(function(cb) { cb.checked = false; });
+            updateBulkButtons();
+          }
+          return;
+        }
+
+        var supplier = supplierList[currentIndex];
+        var group = supplierGroups[supplier];
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.success) {
+              createdInvoices.push({ invoiceId: res.invoiceId, company: supplier });
+            }
+            currentIndex++;
+            createNextPurchaseInvoice();
+          })
+          .withFailureHandler(function(err) {
+            console.error('[InvoiceCreation] 매입청구서 생성 실패:', supplier, err);
+            currentIndex++;
+            createNextPurchaseInvoice();
+          })
+          .createDirectBillingApi({
+            orderNumbers: group.orderNumbers,
+            type: 'PURCHASE',
+            company: supplier,
+            amount: group.totalAmount
+          });
+      }
+
+      createNextPurchaseInvoice();
+    }
+
+    // PDF 출력 (거래명세서 템플릿 사용)
+    function generateInvoicePdf(orderNumbers, invoiceType, checkboxes) {
+      OB.showLoading('거래명세서(부) PDF 생성 중...');
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          OB.hideLoading();
+
+          if (!res || !res.success) {
+            alert('PDF 생성 실패: ' + (res ? res.error : '알 수 없는 오류'));
+            return;
+          }
+
+          // 다운로드 처리
+          if (res.downloadUrl) {
+            window.open(res.downloadUrl, '_blank');
+          } else if (res.base64) {
+            // Base64 다운로드
+            var link = document.createElement('a');
+            link.href = 'data:application/pdf;base64,' + res.base64;
+            link.download = res.fileName || 'invoice.pdf';
+            link.click();
+          }
+
+          alert('PDF가 생성되었습니다!\n' + (res.fileName || ''));
+
+          if (checkboxes) {
+            checkboxes.forEach(function(cb) { cb.checked = false; });
+            updateBulkButtons();
+          }
+        })
+        .withFailureHandler(function(err) {
+          OB.hideLoading();
+          alert('PDF 생성 실패: ' + err.message);
+        })
+        .generateInvoiceZipApi({
+          orderCodes: orderNumbers,
+          docType: 'INVOICE_VAT',  // 거래명세서(부) 템플릿
+          outputFormat: 'PDF',
+          printMode: 'short'
+        });
     }
 
     // 일괄 상태 변경 버튼

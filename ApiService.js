@@ -931,7 +931,7 @@ function checkInvoiceExistsApi(params) {
  * 청구서 목록 조회
  */
 function getInvoicesApi(params) {
-  var result = getInvoices(params);
+  var result = getBillings(params);  // getInvoices -> getBillings 연결 (SettlementService.js)
   return safeReturn(result);
 }
 
@@ -983,6 +983,93 @@ function getBillingsApi(params) {
  */
 function updateBillingStatusApi(params) {
   return updateInvoiceStatusApi(params);
+}
+
+/**
+ * ============================================================
+ * 청구서 금액 동기화 API (거래원장 ↔ 청구DB)
+ * ============================================================
+ */
+
+/**
+ * 발주번호로 기존 청구서 ID 조회
+ * @param {Object} params - { orderNumbers: string[] }
+ */
+function findBillingByOrderNumbersApi(params) {
+  var orderNumbers = params.orderNumbers || [];
+  var billingId = findBillingByOrderNumbers(orderNumbers);
+  return safeReturn({ success: true, billingId: billingId });
+}
+
+/**
+ * 거래원장 기준 금액 계산
+ * @param {Object} params - { orderNumbers: string[] }
+ */
+function calculateAmountFromLedgerApi(params) {
+  var orderNumbers = params.orderNumbers || [];
+  var result = calculateAmountFromLedger(orderNumbers);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 금액 동기화 (변경이력 포함)
+ * @param {Object} params - { billingId: string, newAmount: number }
+ */
+function syncBillingAmountApi(params) {
+  var billingId = params.billingId;
+  var newAmount = params.newAmount || 0;
+  var result = syncBillingAmount(billingId, newAmount);
+  return safeReturn(result);
+}
+
+/**
+ * 청구서 출력 전 금액 동기화 통합 함수
+ * - 기존 청구서가 있으면 금액 비교 후 업데이트
+ * - 없으면 null 반환 (신규 생성 필요)
+ * @param {Object} params - { orderNumbers: string[] }
+ */
+function syncBillingBeforeOutputApi(params) {
+  try {
+    var orderNumbers = params.orderNumbers || [];
+
+    if (!orderNumbers.length) {
+      return safeReturn({ success: false, error: '발주번호가 없습니다.' });
+    }
+
+    // 1. 기존 청구서 조회
+    var billingId = findBillingByOrderNumbers(orderNumbers);
+
+    if (!billingId) {
+      // 청구서 없음 - 신규 생성 필요
+      return safeReturn({
+        success: true,
+        exists: false,
+        message: '기존 청구서가 없습니다. 신규 생성이 필요합니다.'
+      });
+    }
+
+    // 2. 거래원장에서 현재 금액 계산
+    var calcResult = calculateAmountFromLedger(orderNumbers);
+
+    if (!calcResult.success) {
+      return safeReturn({ success: false, error: calcResult.error });
+    }
+
+    // 3. 금액 동기화
+    var syncResult = syncBillingAmount(billingId, calcResult.totalAmount);
+
+    return safeReturn({
+      success: true,
+      exists: true,
+      billingId: billingId,
+      syncResult: syncResult,
+      calculatedAmount: calcResult.totalAmount
+    });
+
+  } catch (error) {
+    Logger.log('[syncBillingBeforeOutputApi] ❌ 오류: ' + error.message);
+    return safeReturn({ success: false, error: error.message });
+  }
 }
 
 /**

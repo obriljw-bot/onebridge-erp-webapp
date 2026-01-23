@@ -481,3 +481,58 @@ function setupAlertSettings() {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * ============================================================
+ * 청구DB 변경이력 컬럼 추가
+ * ============================================================
+ */
+
+/**
+ * 청구DB에 변경이력 컬럼 추가
+ * 금액 변경 시 이력을 JSON 형태로 저장
+ */
+function addChangeHistoryColumn() {
+  try {
+    var ss = SpreadsheetApp.openById(PAYMENT_SS_ID);
+    var sheet = ss.getSheetByName('청구DB');
+
+    if (!sheet) {
+      Logger.log('[addChangeHistoryColumn] ❌ 청구DB 시트를 찾을 수 없습니다.');
+      return { success: false, error: '청구DB 시트를 찾을 수 없습니다.' };
+    }
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var currentColCount = headers.length;
+
+    Logger.log('[addChangeHistoryColumn] 현재 컬럼 수: ' + currentColCount);
+
+    // 이미 변경이력 컬럼이 있는지 확인
+    if (headers.indexOf('변경이력') !== -1) {
+      Logger.log('[addChangeHistoryColumn] ⚠️ 이미 "변경이력" 컬럼이 존재합니다.');
+      return { success: true, message: '이미 변경이력 컬럼이 존재합니다.' };
+    }
+
+    // 변경이력 컬럼 추가
+    sheet.getRange(1, currentColCount + 1).setValue('변경이력');
+    sheet.getRange(1, currentColCount + 1)
+      .setBackground('#e0f2fe')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center');
+
+    // 컬럼 너비 설정 (JSON 데이터이므로 넓게)
+    sheet.setColumnWidth(currentColCount + 1, 300);
+
+    Logger.log('[addChangeHistoryColumn] ✅ 변경이력 컬럼 추가 완료');
+
+    return {
+      success: true,
+      message: '변경이력 컬럼이 추가되었습니다.',
+      newColumnIndex: currentColCount + 1
+    };
+
+  } catch (error) {
+    Logger.log('[addChangeHistoryColumn] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}

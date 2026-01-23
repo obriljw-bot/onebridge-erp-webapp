@@ -155,6 +155,49 @@
   background:#d1fae5;
   color:#10b981;
 }
+.billing-status-badge.PAID_PARTIAL{
+  background:#fef3c7;
+  color:#d97706;
+}
+
+/* 변경이력 테이블 */
+.billing-history-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+.billing-history-table th,
+.billing-history-table td{
+  padding:8px 10px;
+  border:1px solid #e5e7eb;
+  text-align:left;
+}
+.billing-history-table th{
+  background:#f8fafc;
+  font-weight:600;
+  color:#475569;
+}
+.billing-history-table .num{
+  text-align:right;
+  font-family:monospace;
+}
+.billing-history-empty{
+  text-align:center;
+  color:#94a3b8;
+  padding:20px;
+  font-size:13px;
+}
+
+/* 발주번호 태그 */
+.billing-order-tag{
+  display:inline-block;
+  padding:4px 10px;
+  background:#e0f2fe;
+  color:#0369a1;
+  border-radius:4px;
+  font-size:12px;
+  font-weight:500;
+}
 
 /* 모달 */
 .billing-modal{
@@ -412,14 +455,47 @@
           </div>
         </div>
       </div>
+
+      <!-- 결제 정보 -->
+      <div class="billing-detail-section">
+        <h3>💰 결제 정보</h3>
+        <div class="billing-detail-grid">
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">청구금액</div>
+            <div class="billing-detail-item-value" id="detail-total-amount" style="color:#2563eb;font-weight:700;">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">결제완료금액</div>
+            <div class="billing-detail-item-value" id="detail-paid-amount" style="color:#10b981;font-weight:700;">-</div>
+          </div>
+          <div class="billing-detail-item">
+            <div class="billing-detail-item-label">미수금</div>
+            <div class="billing-detail-item-value" id="detail-remaining-balance" style="color:#f59e0b;font-weight:700;">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 변경이력 섹션 -->
+      <div class="billing-detail-section" id="detail-change-history-section" style="display:none;">
+        <h3>📝 금액 변경이력</h3>
+        <div id="detail-change-history-content" style="max-height:200px;overflow-y:auto;">
+          <!-- 변경이력 테이블 동적 생성 -->
+        </div>
+      </div>
+
+      <!-- 연결 발주번호 -->
+      <div class="billing-detail-section" id="detail-order-numbers-section" style="display:none;">
+        <h3>📦 연결 발주번호</h3>
+        <div id="detail-order-numbers" style="display:flex;flex-wrap:wrap;gap:8px;">
+          <!-- 발주번호 태그 동적 생성 -->
+        </div>
+      </div>
     </div>
 
     <div class="billing-modal-footer">
-      <button class="billing-btn secondary" id="billing-detail-reprint-btn">
-        📄 청구서 재출력
-      </button>
-      <button class="billing-btn primary" id="billing-detail-change-status-btn">
-        ✏️ 상태 변경
+      <span style="font-size:12px;color:#64748b;">※ 상태 변경은 결제관리 페이지에서, 청구서 출력은 거래원장에서 가능합니다.</span>
+      <button class="billing-btn secondary" id="billing-detail-close-footer-btn">
+        닫기
       </button>
     </div>
   </div>
