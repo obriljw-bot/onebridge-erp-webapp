@@ -1007,6 +1007,10 @@ function getBillings(params) {
     var start = startDate ? parseDate(startDate) : null;
     var end = endDate ? parseDate(endDate) : null;
 
+    Logger.log('[getBillings] 필터 조건 - type: ' + type + ', company: ' + company + ', status: ' + status);
+    Logger.log('[getBillings] 날짜 범위 - start: ' + startDate + ', end: ' + endDate);
+    Logger.log('[getBillings] 데이터 행 수: ' + (data.length - 1));
+
     // 필수 컬럼 인덱스 (없으면 폴백)
     var idxBillingId = colMap['청구ID'] !== undefined ? colMap['청구ID'] : 0;
     var idxType = colMap['청구유형'] !== undefined ? colMap['청구유형'] : 1;
@@ -1031,6 +1035,9 @@ function getBillings(params) {
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
 
+      // 빈 행 건너뛰기 (청구ID가 없는 행)
+      if (!row[idxBillingId]) continue;
+
       // 타입 필터
       if (type && row[idxType] !== type) continue;
 
@@ -1040,11 +1047,14 @@ function getBillings(params) {
       // 상태 필터
       if (status && row[idxStatus] !== status) continue;
 
-      // 날짜 필터
+      // 날짜 필터 (billingDate가 없거나 파싱 실패시 필터 통과)
       if (start || end) {
         var billingDate = parseDate(row[idxBillingDate]);
-        if (start && billingDate < start) continue;
-        if (end && billingDate > end) continue;
+        if (billingDate) {
+          if (start && billingDate < start) continue;
+          if (end && billingDate > end) continue;
+        }
+        // billingDate가 없는 경우 필터 통과 (데이터 손실 방지)
       }
 
       var billing = {
@@ -1079,6 +1089,8 @@ function getBillings(params) {
 
       billings.push(billing);
     }
+
+    Logger.log('[getBillings] 조회 결과: ' + billings.length + '건');
 
     return {
       success: true,
