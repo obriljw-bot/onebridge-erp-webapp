@@ -298,6 +298,15 @@
   <!-- 검색 바 -->
   <div class="billing-search">
     <div class="billing-search-field">
+      <label>유형</label>
+      <select id="billing-mgmt-type">
+        <option value="">전체</option>
+        <option value="SALES">청구서 (매출)</option>
+        <option value="PURCHASE">지급요청서 (매입)</option>
+      </select>
+    </div>
+
+    <div class="billing-search-field">
       <label>거래처</label>
       <input type="text" id="billing-mgmt-company" placeholder="거래처명 입력">
     </div>
@@ -307,8 +316,11 @@
       <select id="billing-mgmt-status">
         <option value="">전체</option>
         <option value="DRAFT">임시저장</option>
-        <option value="ISSUED">발행완료</option>
-        <option value="PAID">입금완료</option>
+        <option value="ISSUED">발행완료 (매출)</option>
+        <option value="REQUESTED">지급요청 (매입)</option>
+        <option value="PAID_PARTIAL">부분결제</option>
+        <option value="PAID">결제완료</option>
+        <option value="LOCKED">마감완료</option>
       </select>
     </div>
 

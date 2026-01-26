@@ -63,6 +63,8 @@
 .monthly-btn.danger:hover{background:#dc2626;}
 .monthly-btn.success{background:#10b981;color:white;}
 .monthly-btn.success:hover{background:#059669;}
+.monthly-btn.secondary{background:#e5e7eb;color:#1e293b;}
+.monthly-btn.secondary:hover{background:#d1d5db;}
 
 /* 현재 상태 카드 */
 .monthly-status{
@@ -80,51 +82,98 @@
   font-size:16px;
   font-weight:600;
   color:#1e293b;
-  margin-bottom:12px;
-}
-
-.monthly-status-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
-  gap:16px;
   margin-bottom:16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
 }
 
-.monthly-status-item{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-.monthly-status-label{
+.monthly-status-badge{
+  padding:4px 12px;
+  border-radius:4px;
   font-size:12px;
-  color:#64748b;
+  font-weight:600;
 }
-.monthly-status-value{
+.monthly-status-badge.open{background:#d1fae5;color:#065f46;}
+.monthly-status-badge.closed{background:#fee2e2;color:#991b1b;}
+
+/* 매출/매입 섹션 */
+.monthly-section{
+  margin-bottom:20px;
+  padding:16px;
+  background:#f8fafc;
+  border-radius:8px;
+}
+.monthly-section-title{
+  font-size:14px;
+  font-weight:600;
+  color:#475569;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.monthly-section-title .icon{font-size:18px;}
+
+.monthly-stats-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:12px;
+}
+
+.monthly-stat-item{
+  background:white;
+  padding:12px;
+  border-radius:6px;
+  text-align:center;
+}
+.monthly-stat-label{
+  font-size:11px;
+  color:#64748b;
+  margin-bottom:4px;
+}
+.monthly-stat-value{
   font-size:18px;
   font-weight:700;
   color:#1e293b;
 }
-.monthly-status-value.status{
-  padding:4px 12px;
-  border-radius:4px;
-  font-size:14px;
-  display:inline-block;
-  width:fit-content;
-}
-.monthly-status-value.status.open{background:#d1fae5;color:#065f46;}
-.monthly-status-value.status.closed{background:#fee2e2;color:#991b1b;}
+.monthly-stat-value.primary{color:#2563eb;}
+.monthly-stat-value.success{color:#10b981;}
+.monthly-stat-value.warning{color:#f59e0b;}
+.monthly-stat-value.danger{color:#ef4444;}
 
+/* 손익 요약 */
+.monthly-profit-summary{
+  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding:16px;
+  border-radius:8px;
+  color:white;
+  text-align:center;
+  margin-bottom:16px;
+}
+.monthly-profit-label{
+  font-size:13px;
+  opacity:0.9;
+  margin-bottom:4px;
+}
+.monthly-profit-value{
+  font-size:24px;
+  font-weight:700;
+}
+
+/* 액션 바 */
 .monthly-status-actions{
   display:flex;
   gap:8px;
-  padding-top:12px;
+  padding-top:16px;
   border-top:1px solid #e2e8f0;
+  margin-top:16px;
 }
 
 /* 마감 내역 테이블 */
 .monthly-table-wrap{
   overflow:auto;
-  max-height:500px;
+  max-height:400px;
   background:white;
   border-radius:8px;
   box-shadow:0 1px 4px rgba(0,0,0,0.1);
@@ -171,13 +220,20 @@
 .monthly-empty-text{
   font-size:14px;
 }
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .monthly-stats-grid{
+    grid-template-columns:repeat(2, 1fr);
+  }
+}
 </style>
 
 <div class="monthly-closing-wrap">
   <!-- 페이지 헤더 -->
   <div class="monthly-closing-header">
     <h1>📅 월별 마감</h1>
-    <p>월 단위로 매입/매출 마감을 확정하고 관리합니다</p>
+    <p>월 단위로 청구서/지급요청서를 확정하고 관리합니다 (발생주의 기준)</p>
   </div>
 
   <!-- 월 선택 -->
@@ -202,37 +258,77 @@
 
   <!-- 현재 상태 -->
   <div class="monthly-status" id="monthly-closing-status">
-    <div class="monthly-status-title" id="monthly-status-title">2025년 1월 마감 상태</div>
+    <div class="monthly-status-title">
+      <span id="monthly-status-title-text">2025년 01월 마감 현황</span>
+      <span class="monthly-status-badge" id="monthly-status-badge">OPEN</span>
+    </div>
 
-    <div class="monthly-status-grid">
-      <div class="monthly-status-item">
-        <div class="monthly-status-label">마감 상태</div>
-        <div class="monthly-status-value status" id="monthly-status-value">OPEN</div>
+    <!-- 매출 (청구서) 섹션 -->
+    <div class="monthly-section">
+      <div class="monthly-section-title">
+        <span class="icon">💰</span>
+        <span>매출 (청구서)</span>
       </div>
-
-      <div class="monthly-status-item">
-        <div class="monthly-status-label">총 매입 건수</div>
-        <div class="monthly-status-value" id="monthly-purchase-count">0</div>
-      </div>
-
-      <div class="monthly-status-item">
-        <div class="monthly-status-label">총 매입액</div>
-        <div class="monthly-status-value" id="monthly-purchase-amount">₩0</div>
-      </div>
-
-      <div class="monthly-status-item">
-        <div class="monthly-status-label">총 매출 건수</div>
-        <div class="monthly-status-value" id="monthly-sales-count">0</div>
-      </div>
-
-      <div class="monthly-status-item">
-        <div class="monthly-status-label">총 매출액</div>
-        <div class="monthly-status-value" id="monthly-sales-amount">₩0</div>
+      <div class="monthly-stats-grid">
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">건수</div>
+          <div class="monthly-stat-value" id="monthly-sales-count">0</div>
+        </div>
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">청구액</div>
+          <div class="monthly-stat-value primary" id="monthly-sales-amount">₩0</div>
+        </div>
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">입금액</div>
+          <div class="monthly-stat-value success" id="monthly-sales-paid">₩0</div>
+        </div>
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">미수금</div>
+          <div class="monthly-stat-value warning" id="monthly-sales-unpaid">₩0</div>
+        </div>
       </div>
     </div>
 
-    <div class="monthly-status-info" id="monthly-status-info" style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:4px;font-size:13px;color:#64748b;display:none;">
-      <div id="monthly-closed-info"></div>
+    <!-- 매입 (지급요청서) 섹션 -->
+    <div class="monthly-section">
+      <div class="monthly-section-title">
+        <span class="icon">📦</span>
+        <span>매입 (지급요청서)</span>
+      </div>
+      <div class="monthly-stats-grid">
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">건수</div>
+          <div class="monthly-stat-value" id="monthly-purchase-count">0</div>
+        </div>
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">요청액</div>
+          <div class="monthly-stat-value primary" id="monthly-purchase-amount">₩0</div>
+        </div>
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">지급액</div>
+          <div class="monthly-stat-value success" id="monthly-purchase-paid">₩0</div>
+        </div>
+        <div class="monthly-stat-item">
+          <div class="monthly-stat-label">미지급금</div>
+          <div class="monthly-stat-value warning" id="monthly-purchase-unpaid">₩0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 손익 요약 -->
+    <div class="monthly-profit-summary">
+      <div class="monthly-profit-label">매출 - 매입 = 예상 이익</div>
+      <div class="monthly-profit-value" id="monthly-profit-value">₩0</div>
+    </div>
+
+    <!-- 액션 버튼 -->
+    <div class="monthly-status-actions">
+      <button class="monthly-btn secondary" id="monthly-export-summary-btn">
+        📥 요약 엑셀
+      </button>
+      <button class="monthly-btn secondary" id="monthly-export-detail-btn">
+        📥 상세 엑셀
+      </button>
     </div>
   </div>
 
@@ -243,13 +339,13 @@
         <tr>
           <th>년월</th>
           <th class="status">상태</th>
-          <th class="num">매입 건수</th>
-          <th class="num">매입액</th>
-          <th class="num">매출 건수</th>
+          <th class="num">매출건수</th>
           <th class="num">매출액</th>
+          <th class="num">미수금</th>
+          <th class="num">매입건수</th>
+          <th class="num">매입액</th>
+          <th class="num">미지급금</th>
           <th>마감일시</th>
-          <th>마감자</th>
-          <th>해제일시</th>
         </tr>
       </thead>
       <tbody id="monthly-closing-tbody">

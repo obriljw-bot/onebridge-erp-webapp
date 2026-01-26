@@ -1449,3 +1449,67 @@ function api_getAgingReport(params) {
     return safeReturn({ success: false, error: error.message });
   }
 }
+
+/**
+ * ============================================================
+ * 지급요청서 API (PURCHASE)
+ * ============================================================
+ */
+
+/**
+ * 지급요청서 생성 (매입가 기준)
+ * @param {Object} params - { supplier, orderNumbers, requestDate, notes }
+ */
+function createPaymentRequestApi(params) {
+  var result = createPaymentRequest(params);
+  return safeReturn(result);
+}
+
+/**
+ * 매입가 기준 금액 계산
+ * @param {Object} params - { orderNumbers }
+ */
+function calculatePurchaseAmountApi(params) {
+  var orderNumbers = params.orderNumbers || [];
+  var result = calculatePurchaseAmountFromLedger(orderNumbers);
+  return safeReturn(result);
+}
+
+/**
+ * ============================================================
+ * 월마감 V2 API (청구DB 대상, 발생주의)
+ * ============================================================
+ */
+
+/**
+ * 월마감 실행 V2 (청구DB 대상)
+ */
+function executeMonthlyClosingV2Api(params) {
+  var result = executeMonthlyClosingV2(params);
+  return safeReturn(result);
+}
+
+/**
+ * 월마감 해제 V2 (청구DB 대상)
+ */
+function unlockMonthlyClosingV2Api(params) {
+  var result = unlockMonthlyClosingV2(params);
+  return safeReturn(result);
+}
+
+/**
+ * 월마감 상세 조회 (청구DB 기반 실시간 집계)
+ */
+function getMonthlyClosingDetailApi(params) {
+  var result = getMonthlyClosingDetail(params);
+  return safeReturn(result);
+}
+
+/**
+ * 월마감 엑셀 데이터 조회
+ * @param {Object} params - { yearMonth, type: 'summary' | 'detail' }
+ */
+function getMonthlyClosingExcelDataApi(params) {
+  var result = getMonthlyClosingExcelData(params);
+  return safeReturn(result);
+}

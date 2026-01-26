@@ -2887,7 +2887,7 @@
   };
 
   OB.initMonthlyClosingPage = function() {
-    console.log('🔧 MonthlyClosing 페이지 초기화 시작');
+    console.log('🔧 MonthlyClosing 페이지 초기화 시작 (V2 - 청구DB 기반)');
 
     var state = OB.monthlyClosingState;
 
@@ -2898,6 +2898,8 @@
     var unlockBtn = document.getElementById('monthly-closing-unlock-btn');
     var statusDiv = document.getElementById('monthly-closing-status');
     var tbody = document.getElementById('monthly-closing-tbody');
+    var exportSummaryBtn = document.getElementById('monthly-export-summary-btn');
+    var exportDetailBtn = document.getElementById('monthly-export-detail-btn');
 
     // 기본 월 설정 (이번 달)
     setDefaultMonth();
@@ -2943,10 +2945,10 @@
       });
     }
 
-    // 마감 실행 버튼
+    // 마감 실행 버튼 (V2 API)
     if (executeBtn) {
       executeBtn.addEventListener('click', function() {
-        if (!confirm('월 마감을 실행하시겠습니까?\n마감 후에는 해당 월의 CONFIRMED 상태인 모든 마감이 LOCKED 됩니다.')) {
+        if (!confirm('월 마감을 실행하시겠습니까?\n\n발생주의 기준:\n- 청구서(SALES): ISSUED, PAID, PAID_PARTIAL → LOCKED\n- 지급요청서(PURCHASE): REQUESTED, PAID, PAID_PARTIAL → LOCKED\n- DRAFT 상태는 제외됩니다.')) {
           return;
         }
 
@@ -2973,16 +2975,16 @@
             console.error('❌ 마감 실패:', error);
             alert('마감 실패: ' + error.message);
           })
-          .executeMonthlyClosingApi({
+          .executeMonthlyClosingV2Api({
             yearMonth: state.currentMonth
           });
       });
     }
 
-    // 마감 해제 버튼
+    // 마감 해제 버튼 (V2 API)
     if (unlockBtn) {
       unlockBtn.addEventListener('click', function() {
-        if (!confirm('월 마감을 해제하시겠습니까?\n해당 월의 모든 LOCKED 마감이 CONFIRMED로 변경됩니다.')) {
+        if (!confirm('월 마감을 해제하시겠습니까?\n해당 월의 모든 LOCKED 청구서/지급요청서가 이전 상태로 복원됩니다.')) {
           return;
         }
 
@@ -3009,86 +3011,162 @@
             console.error('❌ 해제 실패:', error);
             alert('해제 실패: ' + error.message);
           })
-          .unlockMonthlyClosingApi({
+          .unlockMonthlyClosingV2Api({
             yearMonth: state.currentMonth
           });
       });
     }
 
-    // 월 상태 확인
-    function checkMonthStatus(yearMonth) {
-      // 마감 내역에서 해당 월 찾기
-      var closing = null;
-      for (var i = 0; i < state.closingsList.length; i++) {
-        if (state.closingsList[i].yearMonth === yearMonth) {
-          closing = state.closingsList[i];
-          break;
+    // 엑셀 출력 - 요약
+    if (exportSummaryBtn) {
+      exportSummaryBtn.addEventListener('click', function() {
+        if (!state.currentMonth) {
+          alert('먼저 월을 선택하고 조회해주세요.');
+          return;
         }
-      }
-
-      state.currentStatus = closing;
-      renderStatus(closing, yearMonth);
-      updateButtons(closing);
+        exportToExcel('summary');
+      });
     }
 
-    // 상태 렌더링
-    function renderStatus(closing, yearMonth) {
+    // 엑셀 출력 - 상세
+    if (exportDetailBtn) {
+      exportDetailBtn.addEventListener('click', function() {
+        if (!state.currentMonth) {
+          alert('먼저 월을 선택하고 조회해주세요.');
+          return;
+        }
+        exportToExcel('detail');
+      });
+    }
+
+    // 엑셀 출력 함수
+    function exportToExcel(type) {
+      OB.showLoading('엑셀 데이터 준비 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            alert('데이터 조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          var headers = result.headers;
+          var rows = result.rows;
+
+          // CSV 생성
+          var csvContent = '\uFEFF'; // BOM for UTF-8
+          csvContent += headers.join(',') + '\n';
+
+          rows.forEach(function(row) {
+            var rowData = row.map(function(cell) {
+              if (cell === null || cell === undefined) return '';
+              var str = String(cell);
+              if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+                str = '"' + str.replace(/"/g, '""') + '"';
+              }
+              return str;
+            });
+            csvContent += rowData.join(',') + '\n';
+          });
+
+          // 다운로드
+          var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          var link = document.createElement('a');
+          var url = URL.createObjectURL(blob);
+          var fileName = '월마감_' + state.currentMonth + '_' + type + '.csv';
+
+          link.setAttribute('href', url);
+          link.setAttribute('download', fileName);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          console.log('✅ 엑셀 다운로드 완료:', fileName);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('❌ 엑셀 데이터 조회 실패:', error);
+          alert('엑셀 다운로드 실패: ' + error.message);
+        })
+        .getMonthlyClosingExcelDataApi({
+          yearMonth: state.currentMonth,
+          type: type
+        });
+    }
+
+    // 월 상태 확인 (V2 API - 실시간 집계)
+    function checkMonthStatus(yearMonth) {
+      OB.showLoading('월별 현황 조회 중...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            console.error('월 상태 조회 실패:', result);
+            alert('조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          state.currentStatus = result;
+          renderStatus(result, yearMonth);
+          updateButtons(result.status);
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('월 상태 조회 실패:', error);
+          alert('조회 실패: ' + error.message);
+        })
+        .getMonthlyClosingDetailApi({
+          yearMonth: yearMonth
+        });
+    }
+
+    // 상태 렌더링 (V2 - 매출/매입 상세 표시)
+    function renderStatus(data, yearMonth) {
       var year = yearMonth.substring(0, 4);
       var month = yearMonth.substring(4, 6);
 
-      document.getElementById('monthly-status-title').textContent =
-        year + '년 ' + parseInt(month) + '월 마감 상태';
+      // 타이틀
+      document.getElementById('monthly-status-title-text').textContent =
+        year + '년 ' + parseInt(month) + '월 마감 현황';
 
-      if (closing) {
-        // 마감 완료
-        document.getElementById('monthly-status-value').textContent = closing.status;
-        document.getElementById('monthly-status-value').className =
-          'monthly-status-value status ' + closing.status.toLowerCase();
+      // 상태 뱃지
+      var badge = document.getElementById('monthly-status-badge');
+      badge.textContent = data.status;
+      badge.className = 'monthly-status-badge ' + data.status.toLowerCase();
 
-        document.getElementById('monthly-purchase-count').textContent =
-          OB.formatNumber(closing.purchaseCount || 0);
-        document.getElementById('monthly-purchase-amount').textContent =
-          '₩' + OB.formatNumber(closing.purchaseAmount || 0);
-        document.getElementById('monthly-sales-count').textContent =
-          OB.formatNumber(closing.salesCount || 0);
-        document.getElementById('monthly-sales-amount').textContent =
-          '₩' + OB.formatNumber(closing.salesAmount || 0);
+      // 실시간 집계 데이터
+      var sales = data.realtime.sales;
+      var purchase = data.realtime.purchase;
 
-        statusDiv.className = 'monthly-status ' + closing.status.toLowerCase();
+      // 매출 (청구서)
+      document.getElementById('monthly-sales-count').textContent = sales.count + '건';
+      document.getElementById('monthly-sales-amount').textContent = '₩' + OB.formatNumber(sales.totalAmount);
+      document.getElementById('monthly-sales-paid').textContent = '₩' + OB.formatNumber(sales.paidAmount);
+      document.getElementById('monthly-sales-unpaid').textContent = '₩' + OB.formatNumber(sales.unpaidAmount);
 
-        // 마감 정보 표시
-        var infoDiv = document.getElementById('monthly-status-info');
-        var infoText = '';
-        if (closing.status === 'CLOSED') {
-          infoText = '📌 마감일시: ' + closing.closedAt + ' (마감자: ' + closing.closedBy + ')';
-        } else if (closing.status === 'OPEN') {
-          infoText = '🔓 마감 해제일시: ' + closing.unlockedAt + ' (해제자: ' + closing.unlockedBy + ')';
-        }
-        document.getElementById('monthly-closed-info').textContent = infoText;
-        infoDiv.style.display = infoText ? 'block' : 'none';
+      // 매입 (지급요청서)
+      document.getElementById('monthly-purchase-count').textContent = purchase.count + '건';
+      document.getElementById('monthly-purchase-amount').textContent = '₩' + OB.formatNumber(purchase.totalAmount);
+      document.getElementById('monthly-purchase-paid').textContent = '₩' + OB.formatNumber(purchase.paidAmount);
+      document.getElementById('monthly-purchase-unpaid').textContent = '₩' + OB.formatNumber(purchase.unpaidAmount);
 
-      } else {
-        // 마감 전
-        document.getElementById('monthly-status-value').textContent = 'OPEN';
-        document.getElementById('monthly-status-value').className =
-          'monthly-status-value status open';
+      // 손익 요약
+      var profit = sales.totalAmount - purchase.totalAmount;
+      document.getElementById('monthly-profit-value').textContent = '₩' + OB.formatNumber(profit);
 
-        document.getElementById('monthly-purchase-count').textContent = '-';
-        document.getElementById('monthly-purchase-amount').textContent = '-';
-        document.getElementById('monthly-sales-count').textContent = '-';
-        document.getElementById('monthly-sales-amount').textContent = '-';
-
-        statusDiv.className = 'monthly-status open';
-
-        document.getElementById('monthly-status-info').style.display = 'none';
-      }
-
+      // 상태 div 스타일
+      statusDiv.className = 'monthly-status ' + data.status.toLowerCase();
       statusDiv.style.display = 'block';
     }
 
     // 버튼 업데이트
-    function updateButtons(closing) {
-      if (closing && closing.status === 'CLOSED') {
+    function updateButtons(status) {
+      if (status === 'CLOSED') {
         executeBtn.style.display = 'none';
         unlockBtn.style.display = 'inline-block';
       } else {
@@ -3097,7 +3175,7 @@
       }
     }
 
-    // 마감 내역 테이블 렌더링
+    // 마감 내역 테이블 렌더링 (V2 - 미수금/미지급금 포함)
     function renderClosingsTable(closings) {
       if (!closings || closings.length === 0) {
         tbody.innerHTML =
@@ -3117,6 +3195,7 @@
 
       closings.forEach(function(closing) {
         var tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
 
         var year = closing.yearMonth.substring(0, 4);
         var month = closing.yearMonth.substring(4, 6);
@@ -3126,22 +3205,30 @@
           closing.status.toLowerCase() + '">' +
           closing.status + '</span>';
 
+        // V2 컬럼 (미수금/미지급금 포함)
         tr.innerHTML =
           '<td>' + displayMonth + '</td>' +
           '<td class="status">' + statusBadge + '</td>' +
-          '<td class="num">' + OB.formatNumber(closing.purchaseCount || 0) + '</td>' +
-          '<td class="num">₩' + OB.formatNumber(closing.purchaseAmount || 0) + '</td>' +
           '<td class="num">' + OB.formatNumber(closing.salesCount || 0) + '</td>' +
           '<td class="num">₩' + OB.formatNumber(closing.salesAmount || 0) + '</td>' +
-          '<td>' + (closing.closedAt || '-') + '</td>' +
-          '<td>' + (closing.closedBy || '-') + '</td>' +
-          '<td>' + (closing.unlockedAt || '-') + '</td>';
+          '<td class="num">₩' + OB.formatNumber(closing.salesUnpaidAmount || 0) + '</td>' +
+          '<td class="num">' + OB.formatNumber(closing.purchaseCount || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(closing.purchaseAmount || 0) + '</td>' +
+          '<td class="num">₩' + OB.formatNumber(closing.purchaseUnpaidAmount || 0) + '</td>' +
+          '<td>' + (closing.closedAt || '-') + '</td>';
+
+        // 행 클릭 시 해당 월 조회
+        tr.addEventListener('click', function() {
+          monthInput.value = year + '-' + month;
+          state.currentMonth = closing.yearMonth;
+          checkMonthStatus(closing.yearMonth);
+        });
 
         tbody.appendChild(tr);
       });
     }
 
-    console.log('✅ MonthlyClosing 페이지 초기화 완료');
+    console.log('✅ MonthlyClosing 페이지 초기화 완료 (V2)');
   };
 
   // ========================================
@@ -3151,6 +3238,7 @@
     console.log('🔄 BillingManagement 페이지 초기화 시작...');
 
     // DOM 요소
+    var typeSelect = document.getElementById('billing-mgmt-type');
     var companyInput = document.getElementById('billing-mgmt-company');
     var statusSelect = document.getElementById('billing-mgmt-status');
     var startDateInput = document.getElementById('billing-mgmt-start-date');
@@ -3189,12 +3277,13 @@
 
     // 검색 버튼 클릭
     searchBtn.addEventListener('click', function() {
+      var type = typeSelect.value;
       var company = companyInput.value.trim();
       var status = statusSelect.value;
       var startDate = startDateInput.value;
       var endDate = endDateInput.value;
 
-      console.log('📋 청구서 조회:', { company: company, status: status, startDate: startDate, endDate: endDate });
+      console.log('📋 청구서 조회:', { type: type, company: company, status: status, startDate: startDate, endDate: endDate });
 
       OB.showLoading('청구서 조회 중...');
 
@@ -3217,7 +3306,7 @@
           alert('청구서 조회 실패: ' + error.message);
         })
         .getBillingsApi({
-          type: '',
+          type: type,
           company: company,
           status: status,
           startDate: startDate,
@@ -3227,6 +3316,7 @@
 
     // 초기화 버튼 클릭
     resetBtn.addEventListener('click', function() {
+      typeSelect.value = '';
       companyInput.value = '';
       statusSelect.value = '';
       startDateInput.value = formatDateInput(firstDay);
@@ -3251,18 +3341,20 @@
 
       var totalCount = billings.length;
       var totalAmount = 0;
-      var issuedAmount = 0;
-      var paidAmount = 0;
+      var issuedAmount = 0;  // 발행/요청된 금액 (DRAFT 제외)
+      var paidAmount = 0;    // 결제완료 금액
 
       billings.forEach(function(billing) {
         var amount = Number(billing.amount) || 0;
         totalAmount += amount;
 
-        if (billing.status === 'ISSUED' || billing.status === 'PAID') {
+        // 발행/요청 이상 상태 (DRAFT 제외)
+        if (billing.status !== 'DRAFT') {
           issuedAmount += amount;
         }
 
-        if (billing.status === 'PAID') {
+        // 결제완료 또는 마감완료 (부분결제 제외)
+        if (billing.status === 'PAID' || billing.status === 'LOCKED') {
           paidAmount += amount;
         }
       });
@@ -3328,7 +3420,10 @@
       switch (status) {
         case 'DRAFT': return '임시저장';
         case 'ISSUED': return '발행완료';
-        case 'PAID': return '입금완료';
+        case 'REQUESTED': return '지급요청';
+        case 'PAID_PARTIAL': return '부분결제';
+        case 'PAID': return '결제완료';
+        case 'LOCKED': return '마감완료';
         default: return status;
       }
     }
