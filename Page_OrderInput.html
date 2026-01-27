@@ -391,43 +391,6 @@
     margin-left: 8px;
   }
 
-  /* 로딩 오버레이 */
-  .ob-loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-  }
-
-  .ob-loading-spinner {
-    background: white;
-    padding: 24px 32px;
-    border-radius: 8px;
-    text-align: center;
-  }
-
-  .ob-loading-spinner::before {
-    content: '';
-    display: block;
-    width: 32px;
-    height: 32px;
-    margin: 0 auto 12px;
-    border: 3px solid #e5e7eb;
-    border-top-color: #3b82f6;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
   /* 입력 모드 탭 */
   .ob-input-mode-tabs {
     display: flex;
