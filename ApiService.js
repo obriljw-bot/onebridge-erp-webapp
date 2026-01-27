@@ -1130,6 +1130,29 @@ function updateBulkOrderStatusApi(params) {
 
 /**
  * ============================================================
+ * 웹 발주 직접 입력 API (OrderParsingService)
+ * ============================================================
+ */
+
+/**
+ * 웹 발주 입력용 마스터 데이터 조회
+ * - 거래처 목록, 브랜드 목록, 브랜드→매입처 매핑, 품목 인덱스
+ */
+function getOrderInputMasterDataApi() {
+  var result = getOrderInputMasterData();
+  return safeReturn(result);
+}
+
+/**
+ * 웹 발주 직접 입력 저장
+ */
+function saveWebOrderInputApi(params) {
+  var result = saveWebOrderInput(params);
+  return safeReturn(result);
+}
+
+/**
+ * ============================================================
  * 결제관리 API (PaymentService) - Phase 2
  * ============================================================
  */

@@ -1,0 +1,630 @@
+<!-- Page_OrderInput.html : 발주 직접 입력 (웹 인터페이스) -->
+
+<style>
+  #ob-orderinput-wrap {
+    font-size: 13px;
+  }
+
+  /* 기본 정보 섹션 */
+  .ob-orderinput-header {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .ob-orderinput-header h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #374151;
+    font-weight: 600;
+  }
+
+  .ob-form-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .ob-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 150px;
+  }
+
+  .ob-form-group.flex-1 {
+    flex: 1;
+  }
+
+  .ob-form-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .ob-form-label .required {
+    color: #ef4444;
+    margin-left: 2px;
+  }
+
+  .ob-form-input,
+  .ob-form-select {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+  }
+
+  .ob-form-input:focus,
+  .ob-form-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+
+  .ob-form-input.error {
+    border-color: #ef4444;
+  }
+
+  /* 품목 입력 섹션 */
+  .ob-orderinput-item-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .ob-orderinput-item-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #374151;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ob-search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .ob-search-input {
+    flex: 1;
+    max-width: 400px;
+  }
+
+  .ob-item-form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr auto;
+    gap: 12px;
+    align-items: end;
+  }
+
+  @media (max-width: 1200px) {
+    .ob-item-form-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  /* 버튼 스타일 */
+  .ob-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ob-btn-sm {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .ob-btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .ob-btn-primary:hover {
+    background: #2563eb;
+  }
+
+  .ob-btn-success {
+    background: #10b981;
+    color: white;
+  }
+
+  .ob-btn-success:hover {
+    background: #059669;
+  }
+
+  .ob-btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+
+  .ob-btn-secondary:hover {
+    background: #4b5563;
+  }
+
+  .ob-btn-danger {
+    background: #ef4444;
+    color: white;
+  }
+
+  .ob-btn-danger:hover {
+    background: #dc2626;
+  }
+
+  .ob-btn-outline {
+    background: white;
+    border: 1px solid #d1d5db;
+    color: #374151;
+  }
+
+  .ob-btn-outline:hover {
+    background: #f9fafb;
+  }
+
+  .ob-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* 품목 목록 테이블 */
+  .ob-orderinput-list {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .ob-orderinput-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .ob-orderinput-list-header h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #374151;
+    font-weight: 600;
+  }
+
+  .ob-orderinput-list-header .count {
+    background: #3b82f6;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-left: 8px;
+  }
+
+  .ob-table-wrapper {
+    overflow-x: auto;
+  }
+
+  #ob-orderinput-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  #ob-orderinput-table th {
+    background: #f9fafb;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #6b7280;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+  }
+
+  #ob-orderinput-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+  }
+
+  #ob-orderinput-table tr:hover {
+    background: #f9fafb;
+  }
+
+  #ob-orderinput-table .text-right {
+    text-align: right;
+  }
+
+  #ob-orderinput-table .text-center {
+    text-align: center;
+  }
+
+  .ob-item-delete-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .ob-item-delete-btn:hover {
+    background: #fecaca;
+  }
+
+  /* 합계 영역 */
+  .ob-orderinput-summary {
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .ob-summary-item {
+    text-align: right;
+    margin-left: 32px;
+  }
+
+  .ob-summary-item:first-child {
+    margin-left: 0;
+  }
+
+  .ob-summary-label {
+    font-size: 11px;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .ob-summary-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .ob-summary-value.highlight {
+    color: #3b82f6;
+  }
+
+  /* 액션 버튼 영역 */
+  .ob-orderinput-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+
+  .ob-orderinput-actions .ob-btn {
+    min-width: 120px;
+    justify-content: center;
+  }
+
+  /* 빈 상태 */
+  .ob-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #9ca3af;
+  }
+
+  .ob-empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  .ob-empty-state p {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  /* 품목 검색 자동완성 */
+  .ob-autocomplete-wrapper {
+    position: relative;
+  }
+
+  .ob-autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: none;
+  }
+
+  .ob-autocomplete-list.show {
+    display: block;
+  }
+
+  .ob-autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 12px;
+  }
+
+  .ob-autocomplete-item:hover {
+    background: #f3f4f6;
+  }
+
+  .ob-autocomplete-item .barcode {
+    color: #6b7280;
+    font-size: 11px;
+  }
+
+  .ob-autocomplete-item .name {
+    color: #374151;
+    font-weight: 500;
+  }
+
+  .ob-autocomplete-item .brand {
+    color: #3b82f6;
+    font-size: 11px;
+    margin-left: 8px;
+  }
+
+  /* 로딩 오버레이 */
+  .ob-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .ob-loading-spinner {
+    background: white;
+    padding: 24px 32px;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .ob-loading-spinner::before {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 32px;
+    margin: 0 auto 12px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* 입력 모드 탭 */
+  .ob-input-mode-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .ob-input-mode-tab {
+    padding: 8px 16px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: #6b7280;
+    transition: all 0.2s;
+  }
+
+  .ob-input-mode-tab.active {
+    background: white;
+    border-bottom-color: white;
+    color: #3b82f6;
+    font-weight: 600;
+  }
+
+  .ob-input-mode-tab:hover:not(.active) {
+    background: #e5e7eb;
+  }
+</style>
+
+<div id="ob-orderinput-wrap">
+  <!-- 기본 정보 -->
+  <div class="ob-orderinput-header">
+    <h3>기본 정보</h3>
+    <div class="ob-form-row">
+      <div class="ob-form-group">
+        <label class="ob-form-label">발주일 <span class="required">*</span></label>
+        <input type="date" id="ob-orderinput-date" class="ob-form-input">
+      </div>
+      <div class="ob-form-group flex-1">
+        <label class="ob-form-label">발주처 <span class="required">*</span></label>
+        <select id="ob-orderinput-customer" class="ob-form-select">
+          <option value="">-- 발주처 선택 --</option>
+        </select>
+      </div>
+      <div class="ob-form-group flex-1">
+        <label class="ob-form-label">브랜드 <span class="required">*</span></label>
+        <select id="ob-orderinput-brand" class="ob-form-select">
+          <option value="">-- 브랜드 선택 --</option>
+        </select>
+      </div>
+      <div class="ob-form-group flex-1">
+        <label class="ob-form-label">매입처</label>
+        <input type="text" id="ob-orderinput-supplier" class="ob-form-input" placeholder="브랜드 선택 시 자동입력">
+      </div>
+    </div>
+  </div>
+
+  <!-- 품목 입력 -->
+  <div class="ob-orderinput-item-section">
+    <h3>
+      품목 추가
+      <span style="font-weight: normal; font-size: 11px; color: #9ca3af;">
+        품목DB 검색 또는 직접 입력
+      </span>
+    </h3>
+
+    <!-- 입력 모드 탭 -->
+    <div class="ob-input-mode-tabs">
+      <div class="ob-input-mode-tab active" data-mode="search">품목 검색</div>
+      <div class="ob-input-mode-tab" data-mode="direct">직접 입력</div>
+    </div>
+
+    <!-- 품목 검색 (기본) -->
+    <div id="ob-search-mode" class="ob-search-row">
+      <div class="ob-form-group ob-search-input ob-autocomplete-wrapper">
+        <label class="ob-form-label">품목 검색 (바코드 또는 제품명)</label>
+        <input type="text" id="ob-product-search" class="ob-form-input" placeholder="검색어 입력...">
+        <div id="ob-product-autocomplete" class="ob-autocomplete-list"></div>
+      </div>
+    </div>
+
+    <!-- 품목 입력 폼 -->
+    <div class="ob-item-form-grid">
+      <div class="ob-form-group">
+        <label class="ob-form-label">제품명 <span class="required">*</span></label>
+        <input type="text" id="ob-item-name" class="ob-form-input" placeholder="제품명">
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-form-label">품목코드 <span class="required">*</span></label>
+        <input type="text" id="ob-item-code" class="ob-form-input" placeholder="바코드/품목코드">
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-form-label">수량 <span class="required">*</span></label>
+        <input type="number" id="ob-item-qty" class="ob-form-input" placeholder="0" min="1">
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-form-label">매입가 <span class="required">*</span></label>
+        <input type="number" id="ob-item-buyprice" class="ob-form-input" placeholder="0" min="0">
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-form-label">공급가 <span class="required">*</span></label>
+        <input type="number" id="ob-item-supplyprice" class="ob-form-input" placeholder="0" min="0">
+      </div>
+      <div class="ob-form-group">
+        <label class="ob-form-label">공급액</label>
+        <input type="text" id="ob-item-amount" class="ob-form-input" readonly placeholder="자동계산">
+      </div>
+      <div class="ob-form-group" style="justify-content: flex-end;">
+        <button type="button" id="ob-add-item-btn" class="ob-btn ob-btn-primary">
+          + 추가
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 입력된 품목 목록 -->
+  <div class="ob-orderinput-list">
+    <div class="ob-orderinput-list-header">
+      <h3>
+        입력된 품목 목록
+        <span id="ob-item-count" class="count">0</span>
+      </h3>
+      <button type="button" id="ob-clear-all-btn" class="ob-btn ob-btn-outline ob-btn-sm" style="display: none;">
+        전체 삭제
+      </button>
+    </div>
+
+    <div class="ob-table-wrapper">
+      <table id="ob-orderinput-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;">No</th>
+            <th>제품명</th>
+            <th>품목코드</th>
+            <th class="text-right" style="width: 80px;">수량</th>
+            <th class="text-right" style="width: 100px;">매입가</th>
+            <th class="text-right" style="width: 100px;">공급가</th>
+            <th class="text-right" style="width: 120px;">공급액</th>
+            <th class="text-right" style="width: 120px;">마진액</th>
+            <th class="text-center" style="width: 60px;">삭제</th>
+          </tr>
+        </thead>
+        <tbody id="ob-orderinput-tbody">
+          <tr id="ob-empty-row">
+            <td colspan="9">
+              <div class="ob-empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <p>품목을 추가해주세요</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 합계 영역 -->
+    <div class="ob-orderinput-summary" id="ob-summary-area" style="display: none;">
+      <div class="ob-summary-item">
+        <div class="ob-summary-label">총 품목수</div>
+        <div class="ob-summary-value" id="ob-total-items">0</div>
+      </div>
+      <div class="ob-summary-item">
+        <div class="ob-summary-label">총 수량</div>
+        <div class="ob-summary-value" id="ob-total-qty">0</div>
+      </div>
+      <div class="ob-summary-item">
+        <div class="ob-summary-label">총 매입액</div>
+        <div class="ob-summary-value" id="ob-total-buy">0</div>
+      </div>
+      <div class="ob-summary-item">
+        <div class="ob-summary-label">총 공급액</div>
+        <div class="ob-summary-value highlight" id="ob-total-supply">0</div>
+      </div>
+      <div class="ob-summary-item">
+        <div class="ob-summary-label">총 마진액</div>
+        <div class="ob-summary-value" id="ob-total-margin">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 액션 버튼 -->
+  <div class="ob-orderinput-actions">
+    <button type="button" id="ob-reset-btn" class="ob-btn ob-btn-secondary">
+      초기화
+    </button>
+    <button type="button" id="ob-save-btn" class="ob-btn ob-btn-success" disabled>
+      발주 저장
+    </button>
+  </div>
+</div>
+
+<script>
+  // 페이지 초기화
+  if (typeof OB !== 'undefined' && OB.initOrderInputPage) {
+    OB.initOrderInputPage();
+  }
+</script>

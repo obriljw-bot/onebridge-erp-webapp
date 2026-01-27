@@ -906,3 +906,331 @@ function checkTodayDuplicateOrder(customer, dateStr) {
     };
   }
 }
+
+/* ============================================================
+ * 웹 직접 입력용 마스터 데이터 조회
+ * ============================================================ */
+
+/**
+ * 웹 발주 입력에 필요한 마스터 데이터 조회
+ * - 거래처 목록 (발주처용)
+ * - 브랜드 목록
+ * - 브랜드→매입처 매핑
+ * - 품목 인덱스 (바코드/제품명 검색용)
+ */
+function getOrderInputMasterData() {
+  try {
+    Logger.log('[getOrderInputMasterData] 마스터 데이터 조회 시작');
+
+    var ss = SpreadsheetApp.openById(OB_MASTER_DB_SS_ID);
+
+    // 1. 거래처 목록 조회
+    var customerSheet = ss.getSheetByName('거래처DB');
+    var customers = [];
+    var brands = [];
+    var brandToSupplierMap = {};
+
+    if (customerSheet) {
+      var customerData = customerSheet.getDataRange().getValues();
+      var customerHeader = customerData[0];
+      var nameIdx = customerHeader.indexOf('거래처명');
+      var codeIdx = customerHeader.indexOf('거래처코드');
+      var typeIdx = customerHeader.indexOf('거래처유형');
+      var brandIdx = customerHeader.indexOf('브랜드');
+
+      var customerSet = {};
+      var brandSet = {};
+
+      for (var i = 1; i < customerData.length; i++) {
+        var row = customerData[i];
+        var name = nameIdx >= 0 ? safeCell_(row[nameIdx]) : '';
+        var code = codeIdx >= 0 ? safeCell_(row[codeIdx]) : '';
+        var type = typeIdx >= 0 ? safeCell_(row[typeIdx]) : '';
+        var brand = brandIdx >= 0 ? safeCell_(row[brandIdx]) : '';
+
+        // 거래처 목록 (중복 제거)
+        if (name && !customerSet[name]) {
+          customerSet[name] = true;
+          customers.push({
+            name: name,
+            code: code,
+            type: type
+          });
+        }
+
+        // 브랜드 목록 및 매입처 매핑
+        if (brand) {
+          if (!brandSet[brand]) {
+            brandSet[brand] = true;
+            brands.push(brand);
+          }
+          if (name) {
+            brandToSupplierMap[brand] = name;
+          }
+        }
+      }
+    }
+
+    // 브랜드 정렬
+    brands.sort();
+
+    // 2. 품목 인덱스 조회
+    var productSheet = ss.getSheetByName(OB_MASTER_PRODUCT_SHEET);
+    var productIndex = {};
+
+    if (productSheet) {
+      var productData = productSheet.getDataRange().getValues();
+      var productHeader = productData[0];
+
+      var colBarcode = productHeader.indexOf('바코드');
+      if (colBarcode === -1) colBarcode = productHeader.indexOf('품목코드');
+      var colName = productHeader.indexOf('제품명');
+      var colBrand = productHeader.indexOf('브랜드');
+      var colBuyPrice = productHeader.indexOf('매입가');
+      if (colBuyPrice === -1) colBuyPrice = productHeader.indexOf('원가');
+
+      for (var j = 1; j < productData.length; j++) {
+        var pRow = productData[j];
+        var barcode = colBarcode >= 0 ? safeCell_(pRow[colBarcode]) : '';
+        if (!barcode) continue;
+
+        productIndex[barcode] = {
+          name: colName >= 0 ? safeCell_(pRow[colName]) : '',
+          brand: colBrand >= 0 ? safeCell_(pRow[colBrand]) : '',
+          buyPrice: colBuyPrice >= 0 ? toNumber_(pRow[colBuyPrice]) : 0
+        };
+      }
+    }
+
+    Logger.log('[getOrderInputMasterData] 완료 - 거래처: ' + customers.length +
+               ', 브랜드: ' + brands.length +
+               ', 품목: ' + Object.keys(productIndex).length);
+
+    return {
+      success: true,
+      customers: customers,
+      brands: brands,
+      brandToSupplierMap: brandToSupplierMap,
+      productIndex: productIndex
+    };
+
+  } catch (e) {
+    Logger.log('[getOrderInputMasterData Error] ' + e.toString());
+    return {
+      success: false,
+      error: e.toString()
+    };
+  }
+}
+
+/* ============================================================
+ * 웹 직접 입력 발주 저장
+ * ============================================================ */
+
+/**
+ * 웹 인터페이스에서 입력한 발주 데이터 저장
+ * @param {Object} params - { orderDate, customer, brand, supplier, items[] }
+ *   items[]: { name, code, qty, buyPrice, supplyPrice }
+ */
+function saveWebOrderInput(params) {
+  try {
+    Logger.log('[saveWebOrderInput] 웹 발주 저장 시작');
+    Logger.log('파라미터: ' + JSON.stringify(params));
+
+    var orderDate = params.orderDate || '';
+    var customer = params.customer || '';
+    var brand = params.brand || '';
+    var supplier = params.supplier || '';
+    var items = params.items || [];
+
+    // 필수값 검증
+    if (!orderDate) {
+      return { success: false, error: '발주일을 입력해주세요.' };
+    }
+    if (!customer) {
+      return { success: false, error: '발주처를 선택해주세요.' };
+    }
+    if (!brand) {
+      return { success: false, error: '브랜드를 선택해주세요.' };
+    }
+    if (items.length === 0) {
+      return { success: false, error: '품목을 추가해주세요.' };
+    }
+
+    // 품목 검증
+    var errors = [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var itemErrors = [];
+
+      if (!item.name) itemErrors.push('제품명 없음');
+      if (!item.code) itemErrors.push('품목코드 없음');
+      if (!item.qty || item.qty <= 0) itemErrors.push('수량 오류');
+      if (!item.buyPrice || item.buyPrice <= 0) itemErrors.push('매입가 오류');
+      if (!item.supplyPrice || item.supplyPrice <= 0) itemErrors.push('공급가 오류');
+
+      if (itemErrors.length > 0) {
+        errors.push('품목 ' + (i + 1) + ' [' + (item.name || '이름없음') + ']: ' + itemErrors.join(', '));
+      }
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        error: '품목 검증 실패',
+        errors: errors
+      };
+    }
+
+    // 거래원장 시트 오픈
+    var ss = SpreadsheetApp.openById(OB_ORDER_ALL_SS_ID);
+    var sheet = ss.getSheetByName(OB_ORDER_MAIN_SHEET);
+    if (!sheet) {
+      return { success: false, error: '거래원장 시트를 찾을 수 없습니다.' };
+    }
+
+    // 헤더 컬럼 매핑
+    var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    function col(name) {
+      var idx = header.indexOf(name);
+      return idx >= 0 ? idx : -1;
+    }
+
+    var c = {
+      orderDate:      col('발주일'),
+      orderCode:      col('발주번호'),
+      productCode:    col('품목코드'),
+      brand:          col('브랜드'),
+      supplier:       col('매입처'),
+      buyer:          col('발주처'),
+      vatType:        col('부가세구분'),
+      productName:    col('제품명'),
+      orderQty:       col('발주수량'),
+      confirmQty:     col('확정수량'),
+      buyPrice:       col('매입가'),
+      supplyPrice:    col('공급가'),
+      amountBuy:      col('매입액'),
+      amountSupply:   col('공급액'),
+      marginAmount:   col('마진액'),
+      marginRate:     col('마진율'),
+      payBuy:         col('매입결제'),
+      paySell:        col('매출결제'),
+      buyOrderFlag:   col('매입발주'),
+      shipFlag:       col('출고'),
+      shipDate:       col('출고일'),
+      inboundPlace:   col('입고지'),
+      memo:           col('비고'),
+      billingDate:    col('청구일'),
+      createdAt:      col('생성일시'),
+      updatedAt:      col('수정일시')
+    };
+
+    // 날짜 파싱
+    var dateParts = orderDate.split('-');
+    var orderDateObj = new Date(
+      parseInt(dateParts[0]),
+      parseInt(dateParts[1]) - 1,
+      parseInt(dateParts[2])
+    );
+    var dateStr = Utilities.formatDate(orderDateObj, 'Asia/Seoul', 'yyyyMMdd');
+
+    // 발주번호 생성
+    var customerCodeMap = buildCustomerCodeMap_();
+    var brandCodeMap = buildBrandCodeMap_();
+
+    var customerCode = customerCodeMap[customer] || customer.substring(0, 3).toUpperCase();
+    var brandCode = brandCodeMap[brand] || brand.substring(0, 2).toUpperCase();
+    var orderSeq = getNextOrderSeq_(sheet, dateStr, customer);
+    var orderCode = dateStr + '-' + customerCode + '-' + brandCode + '-' + padZero(orderSeq, 3);
+
+    Logger.log('발주번호 생성: ' + orderCode);
+
+    // 현재 시간
+    var now = new Date();
+    var timeStr = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
+
+    // 품목별 저장
+    var saved = 0;
+    var startRow = sheet.getLastRow() + 1;
+
+    for (var k = 0; k < items.length; k++) {
+      var item = items[k];
+      var currentRow = startRow + k;
+
+      var row = new Array(header.length).fill('');
+
+      // 기본 정보
+      if (c.orderDate >= 0) row[c.orderDate] = orderDateObj;
+      if (c.orderCode >= 0) row[c.orderCode] = orderCode;
+      if (c.productCode >= 0) row[c.productCode] = item.code;
+      if (c.brand >= 0) row[c.brand] = brand;
+      if (c.supplier >= 0) row[c.supplier] = supplier;
+      if (c.buyer >= 0) row[c.buyer] = customer;
+      if (c.vatType >= 0) row[c.vatType] = '부별';
+      if (c.productName >= 0) row[c.productName] = item.name;
+
+      // 수량
+      if (c.orderQty >= 0) row[c.orderQty] = item.qty;
+      if (c.confirmQty >= 0) row[c.confirmQty] = item.qty;
+
+      // 단가
+      if (c.buyPrice >= 0) row[c.buyPrice] = item.buyPrice;
+      if (c.supplyPrice >= 0) row[c.supplyPrice] = item.supplyPrice;
+
+      // 금액 계산 (수식)
+      var buyPriceCol = getColumnLetter_(c.buyPrice);
+      var supplyPriceCol = getColumnLetter_(c.supplyPrice);
+      var orderQtyCol = getColumnLetter_(c.orderQty);
+      var amountBuyCol = getColumnLetter_(c.amountBuy);
+      var amountSupplyCol = getColumnLetter_(c.amountSupply);
+
+      if (c.amountBuy >= 0) {
+        row[c.amountBuy] = '=' + buyPriceCol + currentRow + '*' + orderQtyCol + currentRow;
+      }
+      if (c.amountSupply >= 0) {
+        row[c.amountSupply] = '=' + supplyPriceCol + currentRow + '*' + orderQtyCol + currentRow;
+      }
+      if (c.marginAmount >= 0) {
+        row[c.marginAmount] = '=' + amountSupplyCol + currentRow + '-' + amountBuyCol + currentRow;
+      }
+      if (c.marginRate >= 0) {
+        var marginAmountCol = getColumnLetter_(c.marginAmount);
+        row[c.marginRate] = '=IF(' + amountSupplyCol + currentRow + '=0,0,' +
+                            marginAmountCol + currentRow + '/' + amountSupplyCol + currentRow + ')';
+      }
+
+      // 상태 정보
+      if (c.payBuy >= 0) row[c.payBuy] = '미결제';
+      if (c.paySell >= 0) row[c.paySell] = '미결제';
+      if (c.buyOrderFlag >= 0) row[c.buyOrderFlag] = '미처리';
+      if (c.shipFlag >= 0) row[c.shipFlag] = '미출고';
+      if (c.shipDate >= 0) row[c.shipDate] = '';
+      if (c.inboundPlace >= 0) row[c.inboundPlace] = customer;
+      if (c.memo >= 0) row[c.memo] = '';
+      if (c.billingDate >= 0) row[c.billingDate] = '';
+
+      // 메타 정보
+      if (c.createdAt >= 0) row[c.createdAt] = timeStr;
+      if (c.updatedAt >= 0) row[c.updatedAt] = timeStr;
+
+      sheet.appendRow(row);
+      saved++;
+    }
+
+    Logger.log('[saveWebOrderInput] 저장 완료: ' + saved + '건, 발주번호: ' + orderCode);
+
+    return {
+      success: true,
+      savedRows: saved,
+      orderCode: orderCode
+    };
+
+  } catch (e) {
+    Logger.log('[saveWebOrderInput Error] ' + e.toString());
+    return {
+      success: false,
+      error: e.toString()
+    };
+  }
+}

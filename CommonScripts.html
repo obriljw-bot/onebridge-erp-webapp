@@ -26,6 +26,9 @@
     var initFuncName = null;
 
     switch(page) {
+      case 'orderInput':
+        initFuncName = 'initOrderInputPage';
+        break;
       case 'orderFile':
         initFuncName = 'initOrderFilePage';
         break;
@@ -4384,6 +4387,466 @@
         }
       });
     }
+  };
+
+  // ===========================================================
+  // ✅ OrderInput 페이지 초기화 함수 (발주 직접 입력)
+  // ===========================================================
+  OB.orderInputState = {
+    items: [],
+    customers: [],
+    brands: [],
+    brandToSupplierMap: {},
+    productIndex: {}
+  };
+
+  OB.initOrderInputPage = function() {
+    console.log('📝 OrderInput 페이지 초기화 시작...');
+
+    var state = OB.orderInputState;
+
+    // DOM 요소
+    var dateInput = document.getElementById('ob-orderinput-date');
+    var customerSelect = document.getElementById('ob-orderinput-customer');
+    var brandSelect = document.getElementById('ob-orderinput-brand');
+    var supplierInput = document.getElementById('ob-orderinput-supplier');
+
+    var productSearch = document.getElementById('ob-product-search');
+    var autocompleteList = document.getElementById('ob-product-autocomplete');
+
+    var itemNameInput = document.getElementById('ob-item-name');
+    var itemCodeInput = document.getElementById('ob-item-code');
+    var itemQtyInput = document.getElementById('ob-item-qty');
+    var itemBuyPriceInput = document.getElementById('ob-item-buyprice');
+    var itemSupplyPriceInput = document.getElementById('ob-item-supplyprice');
+    var itemAmountInput = document.getElementById('ob-item-amount');
+
+    var addItemBtn = document.getElementById('ob-add-item-btn');
+    var clearAllBtn = document.getElementById('ob-clear-all-btn');
+    var resetBtn = document.getElementById('ob-reset-btn');
+    var saveBtn = document.getElementById('ob-save-btn');
+
+    var tbody = document.getElementById('ob-orderinput-tbody');
+    var emptyRow = document.getElementById('ob-empty-row');
+    var itemCountSpan = document.getElementById('ob-item-count');
+    var summaryArea = document.getElementById('ob-summary-area');
+
+    var totalItemsSpan = document.getElementById('ob-total-items');
+    var totalQtySpan = document.getElementById('ob-total-qty');
+    var totalBuySpan = document.getElementById('ob-total-buy');
+    var totalSupplySpan = document.getElementById('ob-total-supply');
+    var totalMarginSpan = document.getElementById('ob-total-margin');
+
+    var modeTabs = document.querySelectorAll('.ob-input-mode-tab');
+    var searchMode = document.getElementById('ob-search-mode');
+
+    // 오늘 날짜 설정
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = ('0' + (today.getMonth() + 1)).slice(-2);
+    var dd = ('0' + today.getDate()).slice(-2);
+    dateInput.value = yyyy + '-' + mm + '-' + dd;
+
+    // 입력 모드 탭 전환
+    modeTabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        modeTabs.forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        var mode = tab.getAttribute('data-mode');
+        if (mode === 'search') {
+          searchMode.style.display = 'flex';
+        } else {
+          searchMode.style.display = 'none';
+        }
+      });
+    });
+
+    // 마스터 데이터 로드
+    function loadMasterData() {
+      OB.showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+          if (result && result.success) {
+            state.customers = result.customers || [];
+            state.brands = result.brands || [];
+            state.brandToSupplierMap = result.brandToSupplierMap || {};
+            state.productIndex = result.productIndex || {};
+
+            // 발주처 드롭다운
+            customerSelect.innerHTML = '<option value="">-- 발주처 선택 --</option>';
+            state.customers.forEach(function(c) {
+              var opt = document.createElement('option');
+              opt.value = c.name;
+              opt.textContent = c.name;
+              customerSelect.appendChild(opt);
+            });
+
+            // 브랜드 드롭다운
+            brandSelect.innerHTML = '<option value="">-- 브랜드 선택 --</option>';
+            state.brands.forEach(function(b) {
+              var opt = document.createElement('option');
+              opt.value = b;
+              opt.textContent = b;
+              brandSelect.appendChild(opt);
+            });
+
+            console.log('✅ 마스터 데이터 로드 완료:', {
+              customers: state.customers.length,
+              brands: state.brands.length,
+              products: Object.keys(state.productIndex).length
+            });
+          } else {
+            alert('마스터 데이터 로드 실패: ' + (result ? result.error : '알 수 없는 오류'));
+          }
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          alert('마스터 데이터 로드 실패: ' + error.message);
+        })
+        .getOrderInputMasterDataApi();
+    }
+
+    // 브랜드 선택 시 매입처 자동 입력
+    brandSelect.addEventListener('change', function() {
+      var brand = brandSelect.value;
+      if (brand && state.brandToSupplierMap[brand]) {
+        supplierInput.value = state.brandToSupplierMap[brand];
+      } else {
+        supplierInput.value = '';
+      }
+    });
+
+    // 품목 검색 자동완성
+    var searchTimeout = null;
+    productSearch.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      var query = productSearch.value.trim();
+      if (query.length < 2) {
+        autocompleteList.classList.remove('show');
+        return;
+      }
+
+      searchTimeout = setTimeout(function() {
+        var results = searchProducts(query);
+        renderAutocomplete(results);
+      }, 200);
+    });
+
+    productSearch.addEventListener('blur', function() {
+      setTimeout(function() {
+        autocompleteList.classList.remove('show');
+      }, 200);
+    });
+
+    function searchProducts(query) {
+      var results = [];
+      var q = query.toLowerCase();
+      var index = state.productIndex;
+
+      for (var barcode in index) {
+        var p = index[barcode];
+        if (barcode.toLowerCase().indexOf(q) !== -1 ||
+            (p.name && p.name.toLowerCase().indexOf(q) !== -1)) {
+          results.push({
+            barcode: barcode,
+            name: p.name,
+            brand: p.brand,
+            buyPrice: p.buyPrice || 0
+          });
+          if (results.length >= 10) break;
+        }
+      }
+      return results;
+    }
+
+    function renderAutocomplete(results) {
+      if (results.length === 0) {
+        autocompleteList.classList.remove('show');
+        return;
+      }
+
+      autocompleteList.innerHTML = '';
+      results.forEach(function(p) {
+        var div = document.createElement('div');
+        div.className = 'ob-autocomplete-item';
+        div.innerHTML = '<span class="barcode">' + p.barcode + '</span> ' +
+                        '<span class="name">' + (p.name || '') + '</span>' +
+                        '<span class="brand">' + (p.brand || '') + '</span>';
+        div.addEventListener('click', function() {
+          selectProduct(p);
+          autocompleteList.classList.remove('show');
+          productSearch.value = '';
+        });
+        autocompleteList.appendChild(div);
+      });
+      autocompleteList.classList.add('show');
+    }
+
+    function selectProduct(product) {
+      itemNameInput.value = product.name || '';
+      itemCodeInput.value = product.barcode || '';
+      itemBuyPriceInput.value = product.buyPrice || '';
+      itemQtyInput.value = '';
+      itemSupplyPriceInput.value = '';
+      itemAmountInput.value = '';
+      itemQtyInput.focus();
+
+      // 브랜드 자동 선택
+      if (product.brand && brandSelect.value === '') {
+        for (var i = 0; i < brandSelect.options.length; i++) {
+          if (brandSelect.options[i].value === product.brand) {
+            brandSelect.value = product.brand;
+            brandSelect.dispatchEvent(new Event('change'));
+            break;
+          }
+        }
+      }
+    }
+
+    // 수량/단가 입력 시 금액 자동 계산
+    function updateItemAmount() {
+      var qty = parseInt(itemQtyInput.value) || 0;
+      var supplyPrice = parseInt(itemSupplyPriceInput.value) || 0;
+      var amount = qty * supplyPrice;
+      itemAmountInput.value = OB.formatNumber(amount);
+    }
+
+    itemQtyInput.addEventListener('input', updateItemAmount);
+    itemSupplyPriceInput.addEventListener('input', updateItemAmount);
+
+    // 품목 추가
+    addItemBtn.addEventListener('click', function() {
+      var name = itemNameInput.value.trim();
+      var code = itemCodeInput.value.trim();
+      var qty = parseInt(itemQtyInput.value) || 0;
+      var buyPrice = parseInt(itemBuyPriceInput.value) || 0;
+      var supplyPrice = parseInt(itemSupplyPriceInput.value) || 0;
+
+      // 필수값 검증
+      if (!name) {
+        alert('제품명을 입력해주세요.');
+        itemNameInput.focus();
+        return;
+      }
+      if (!code) {
+        alert('품목코드를 입력해주세요.');
+        itemCodeInput.focus();
+        return;
+      }
+      if (qty <= 0) {
+        alert('수량을 입력해주세요.');
+        itemQtyInput.focus();
+        return;
+      }
+      if (buyPrice <= 0) {
+        alert('매입가를 입력해주세요.');
+        itemBuyPriceInput.focus();
+        return;
+      }
+      if (supplyPrice <= 0) {
+        alert('공급가를 입력해주세요.');
+        itemSupplyPriceInput.focus();
+        return;
+      }
+
+      var item = {
+        name: name,
+        code: code,
+        qty: qty,
+        buyPrice: buyPrice,
+        supplyPrice: supplyPrice,
+        supplyAmount: qty * supplyPrice,
+        buyAmount: qty * buyPrice,
+        marginAmount: (qty * supplyPrice) - (qty * buyPrice)
+      };
+
+      state.items.push(item);
+      renderItems();
+      clearItemForm();
+      productSearch.focus();
+    });
+
+    function clearItemForm() {
+      itemNameInput.value = '';
+      itemCodeInput.value = '';
+      itemQtyInput.value = '';
+      itemBuyPriceInput.value = '';
+      itemSupplyPriceInput.value = '';
+      itemAmountInput.value = '';
+    }
+
+    function renderItems() {
+      if (state.items.length === 0) {
+        emptyRow.style.display = '';
+        summaryArea.style.display = 'none';
+        clearAllBtn.style.display = 'none';
+        saveBtn.disabled = true;
+        itemCountSpan.textContent = '0';
+        return;
+      }
+
+      emptyRow.style.display = 'none';
+      summaryArea.style.display = 'flex';
+      clearAllBtn.style.display = '';
+      saveBtn.disabled = false;
+      itemCountSpan.textContent = state.items.length;
+
+      // 기존 행 삭제 (빈 행 제외)
+      var existingRows = tbody.querySelectorAll('tr:not(#ob-empty-row)');
+      existingRows.forEach(function(row) { row.remove(); });
+
+      var totals = { items: 0, qty: 0, buy: 0, supply: 0, margin: 0 };
+
+      state.items.forEach(function(item, index) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + (index + 1) + '</td>' +
+          '<td>' + item.name + '</td>' +
+          '<td>' + item.code + '</td>' +
+          '<td class="text-right">' + OB.formatNumber(item.qty) + '</td>' +
+          '<td class="text-right">' + OB.formatNumber(item.buyPrice) + '</td>' +
+          '<td class="text-right">' + OB.formatNumber(item.supplyPrice) + '</td>' +
+          '<td class="text-right">' + OB.formatNumber(item.supplyAmount) + '</td>' +
+          '<td class="text-right">' + OB.formatNumber(item.marginAmount) + '</td>' +
+          '<td class="text-center"><button type="button" class="ob-item-delete-btn" data-index="' + index + '">삭제</button></td>';
+
+        tbody.insertBefore(tr, emptyRow);
+
+        totals.items++;
+        totals.qty += item.qty;
+        totals.buy += item.buyAmount;
+        totals.supply += item.supplyAmount;
+        totals.margin += item.marginAmount;
+      });
+
+      // 합계 업데이트
+      totalItemsSpan.textContent = OB.formatNumber(totals.items);
+      totalQtySpan.textContent = OB.formatNumber(totals.qty);
+      totalBuySpan.textContent = OB.formatNumber(totals.buy);
+      totalSupplySpan.textContent = OB.formatNumber(totals.supply);
+      totalMarginSpan.textContent = OB.formatNumber(totals.margin);
+
+      // 삭제 버튼 이벤트
+      tbody.querySelectorAll('.ob-item-delete-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.getAttribute('data-index'));
+          state.items.splice(idx, 1);
+          renderItems();
+        });
+      });
+    }
+
+    // 전체 삭제
+    clearAllBtn.addEventListener('click', function() {
+      if (confirm('모든 품목을 삭제하시겠습니까?')) {
+        state.items = [];
+        renderItems();
+      }
+    });
+
+    // 초기화
+    resetBtn.addEventListener('click', function() {
+      if (state.items.length > 0) {
+        if (!confirm('입력한 내용이 모두 삭제됩니다. 초기화하시겠습니까?')) {
+          return;
+        }
+      }
+      state.items = [];
+      customerSelect.value = '';
+      brandSelect.value = '';
+      supplierInput.value = '';
+      clearItemForm();
+      renderItems();
+
+      // 오늘 날짜 재설정
+      var today = new Date();
+      var yyyy = today.getFullYear();
+      var mm = ('0' + (today.getMonth() + 1)).slice(-2);
+      var dd = ('0' + today.getDate()).slice(-2);
+      dateInput.value = yyyy + '-' + mm + '-' + dd;
+    });
+
+    // 저장
+    saveBtn.addEventListener('click', function() {
+      var orderDate = dateInput.value;
+      var customer = customerSelect.value.trim();
+      var brand = brandSelect.value.trim();
+      var supplier = supplierInput.value.trim();
+
+      // 필수값 검증
+      if (!orderDate) {
+        alert('발주일을 선택해주세요.');
+        dateInput.focus();
+        return;
+      }
+      if (!customer) {
+        alert('발주처를 선택해주세요.');
+        customerSelect.focus();
+        return;
+      }
+      if (!brand) {
+        alert('브랜드를 선택해주세요.');
+        brandSelect.focus();
+        return;
+      }
+      if (state.items.length === 0) {
+        alert('품목을 추가해주세요.');
+        return;
+      }
+
+      var saveData = {
+        orderDate: orderDate,
+        customer: customer,
+        brand: brand,
+        supplier: supplier,
+        items: state.items
+      };
+
+      if (!confirm('발주를 저장하시겠습니까?\n\n' +
+          '발주처: ' + customer + '\n' +
+          '브랜드: ' + brand + '\n' +
+          '품목수: ' + state.items.length + '건')) {
+        return;
+      }
+
+      OB.showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+          if (result && result.success) {
+            alert('발주가 저장되었습니다.\n\n' +
+                  '발주번호: ' + result.orderCode + '\n' +
+                  '저장건수: ' + result.savedRows + '건');
+
+            // 초기화
+            state.items = [];
+            customerSelect.value = '';
+            brandSelect.value = '';
+            supplierInput.value = '';
+            clearItemForm();
+            renderItems();
+          } else {
+            var errorMsg = '발주 저장 실패';
+            if (result && result.error) {
+              errorMsg += ': ' + result.error;
+            }
+            if (result && result.errors && result.errors.length > 0) {
+              errorMsg += '\n\n' + result.errors.slice(0, 5).join('\n');
+            }
+            alert(errorMsg);
+          }
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          alert('발주 저장 실패: ' + error.message);
+        })
+        .saveWebOrderInputApi(saveData);
+    });
+
+    // 초기화 실행
+    loadMasterData();
+    console.log('✅ OrderInput 페이지 초기화 완료');
   };
 
   // ===========================================================

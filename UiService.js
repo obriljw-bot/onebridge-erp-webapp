@@ -14,6 +14,8 @@ function getPageContent(page) {
 
 function getPageTemplateName_(page) {
   switch (page) {
+    case 'orderInput':
+      return 'Page_OrderInput';
     case 'orderFile':
       return 'Page_OrderFile';
     case 'dashboard':

@@ -19,6 +19,8 @@
         <section id="app-main" class="ob-main-content">
           <? if (page === 'dashboard') { ?>
             <?!= include('Page_Dashboard'); ?>
+          <? } else if (page === 'orderInput') { ?>
+            <?!= include('Page_OrderInput'); ?>
           <? } else if (page === 'orderList') { ?>
             <?!= include('Page_OrderList'); ?>
           <? } else if (page === 'invoiceOutput') { ?>
