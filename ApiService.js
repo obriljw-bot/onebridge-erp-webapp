@@ -1516,6 +1516,15 @@ function getMonthlyClosingDetailApi(params) {
 }
 
 /**
+ * 기간 범위 청구서 조회 (V3)
+ * @param {Object} params - { startMonth, endMonth, company }
+ */
+function getBillingsForPeriodApi(params) {
+  var result = getBillingsForPeriod(params);
+  return safeReturn(result);
+}
+
+/**
  * 월마감 엑셀 데이터 조회
  * @param {Object} params - { yearMonth, type: 'summary' | 'detail' }
  */

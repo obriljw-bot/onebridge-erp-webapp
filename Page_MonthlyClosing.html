@@ -207,6 +207,11 @@
 }
 .status-badge.open{background:#d1fae5;color:#065f46;}
 .status-badge.closed{background:#fee2e2;color:#991b1b;}
+.status-badge.draft{background:#f1f5f9;color:#64748b;}
+.status-badge.issued{background:#dbeafe;color:#1d4ed8;}
+.status-badge.requested{background:#fef3c7;color:#b45309;}
+.status-badge.partial{background:#fce7f3;color:#be185d;}
+.status-badge.paid{background:#d1fae5;color:#065f46;}
 
 .monthly-empty{
   text-align:center;
@@ -236,11 +241,20 @@
     <p>월 단위로 청구서/지급요청서를 확정하고 관리합니다 (발생주의 기준)</p>
   </div>
 
-  <!-- 월 선택 -->
+  <!-- 조회 조건 -->
   <div class="monthly-closing-select">
     <div class="monthly-closing-select-field">
-      <label>마감 월</label>
-      <input type="month" id="monthly-closing-month">
+      <label>조회 기간</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="month" id="monthly-closing-start-month">
+        <span style="color:#9ca3af;">~</span>
+        <input type="month" id="monthly-closing-end-month">
+      </div>
+    </div>
+
+    <div class="monthly-closing-select-field">
+      <label>거래처</label>
+      <input type="text" id="monthly-closing-company" placeholder="전체" style="min-width:150px;">
     </div>
 
     <button class="monthly-btn primary" id="monthly-closing-check-btn">
@@ -268,6 +282,9 @@
       <div class="monthly-section-title">
         <span class="icon">💰</span>
         <span>매출 (청구서)</span>
+        <button class="monthly-btn secondary small" id="monthly-view-sales-btn" style="margin-left:auto;padding:4px 12px;font-size:12px;">
+          📋 목록 보기
+        </button>
       </div>
       <div class="monthly-stats-grid">
         <div class="monthly-stat-item">
@@ -294,6 +311,9 @@
       <div class="monthly-section-title">
         <span class="icon">📦</span>
         <span>매입 (지급요청서)</span>
+        <button class="monthly-btn secondary small" id="monthly-view-purchase-btn" style="margin-left:auto;padding:4px 12px;font-size:12px;">
+          📋 목록 보기
+        </button>
       </div>
       <div class="monthly-stats-grid">
         <div class="monthly-stat-item">
@@ -321,8 +341,14 @@
       <div class="monthly-profit-value" id="monthly-profit-value">₩0</div>
     </div>
 
-    <!-- 액션 버튼 -->
-    <div class="monthly-status-actions">
+    <!-- 출력 옵션 -->
+    <div class="monthly-status-actions" style="flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;margin-right:auto;">
+        <label style="font-size:12px;color:#64748b;">출력 옵션:</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="monthly-export-by-company"> 거래처별 분리
+        </label>
+      </div>
       <button class="monthly-btn secondary" id="monthly-export-summary-btn">
         📥 요약 엑셀
       </button>
@@ -332,30 +358,67 @@
     </div>
   </div>
 
-  <!-- 마감 내역 테이블 -->
+  <!-- 상세 목록 테이블 -->
   <div class="monthly-table-wrap">
+    <div style="padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px;">
+      <span style="font-weight:600;color:#1e293b;">📋 상세 목록</span>
+      <select id="monthly-table-type" style="padding:6px 12px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
+        <option value="all">전체</option>
+        <option value="SALES">청구서 (매출)</option>
+        <option value="PURCHASE">지급요청서 (매입)</option>
+      </select>
+      <span id="monthly-table-count" style="font-size:13px;color:#64748b;">0건</span>
+    </div>
     <table class="monthly-table">
       <thead>
         <tr>
-          <th>년월</th>
+          <th>청구ID</th>
+          <th>유형</th>
+          <th>거래처</th>
+          <th>청구일</th>
+          <th class="num">청구금액</th>
+          <th class="num">결제금액</th>
+          <th class="num">잔액</th>
           <th class="status">상태</th>
-          <th class="num">매출건수</th>
-          <th class="num">매출액</th>
-          <th class="num">미수금</th>
-          <th class="num">매입건수</th>
-          <th class="num">매입액</th>
-          <th class="num">미지급금</th>
-          <th>마감일시</th>
         </tr>
       </thead>
       <tbody id="monthly-closing-tbody">
         <tr>
-          <td colspan="9" class="monthly-empty">
+          <td colspan="8" class="monthly-empty">
             <div class="monthly-empty-icon">📋</div>
-            <div class="monthly-empty-text">마감 내역이 없습니다</div>
+            <div class="monthly-empty-text">조회 버튼을 눌러 데이터를 확인하세요</div>
           </td>
         </tr>
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- 청구서 목록 모달 -->
+<div class="monthly-modal" id="monthly-billing-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center;">
+  <div style="background:white;border-radius:12px;width:90%;max-width:900px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">
+      <h3 style="margin:0;font-size:18px;font-weight:600;" id="monthly-modal-title">청구서 목록</h3>
+      <button id="monthly-modal-close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;">×</button>
+    </div>
+    <div style="padding:16px 20px;overflow:auto;flex:1;">
+      <table class="monthly-table" style="margin:0;">
+        <thead>
+          <tr>
+            <th>청구ID</th>
+            <th>거래처</th>
+            <th>청구일</th>
+            <th class="num">청구금액</th>
+            <th class="num">결제금액</th>
+            <th class="num">잔액</th>
+            <th class="status">상태</th>
+          </tr>
+        </thead>
+        <tbody id="monthly-modal-tbody">
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;">
+      <button class="monthly-btn secondary" id="monthly-modal-close-btn">닫기</button>
+    </div>
+  </div>

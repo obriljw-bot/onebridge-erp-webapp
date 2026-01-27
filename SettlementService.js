@@ -2186,6 +2186,102 @@ function getBillingsForMonth(yearMonth) {
 }
 
 /**
+ * 기간 범위의 청구서/지급요청서 조회 (V3)
+ * @param {Object} params - { startMonth, endMonth, company }
+ * @returns {Object} { success, billings, status }
+ */
+function getBillingsForPeriod(params) {
+  try {
+    var startMonth = params.startMonth; // YYYYMM
+    var endMonth = params.endMonth; // YYYYMM
+    var companyFilter = (params.company || '').trim();
+
+    Logger.log('[getBillingsForPeriod] 기간 조회: ' + startMonth + ' ~ ' + endMonth + ', 거래처: ' + (companyFilter || '전체'));
+
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      return { success: false, error: '청구DB 시트를 찾을 수 없습니다.' };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+
+    var colMap = {};
+    headers.forEach(function(h, idx) {
+      colMap[h] = idx;
+    });
+
+    var billings = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var billingId = row[colMap['청구ID']];
+      if (!billingId) continue;
+
+      // 청구일 기준 기간 필터링
+      var billingDate = row[colMap['청구일']];
+      if (!billingDate) continue;
+
+      var rowYearMonth = formatYearMonth(billingDate);
+      if (rowYearMonth < startMonth || rowYearMonth > endMonth) continue;
+
+      // 거래처 필터
+      var company = row[colMap['업체명']] || '';
+      if (companyFilter && company.indexOf(companyFilter) === -1) continue;
+
+      // DRAFT 제외 (발생주의)
+      var status = row[colMap['청구상태']] || '';
+      if (status === 'DRAFT') continue;
+
+      billings.push({
+        rowIndex: i + 1,
+        billingId: billingId,
+        type: row[colMap['청구유형']] || 'SALES',
+        company: company,
+        billingDate: billingDate,
+        amount: Number(row[colMap['청구금액']]) || 0,
+        status: status,
+        paidAmount: Number(row[colMap['결제완료금액']]) || 0,
+        remainingBalance: Number(row[colMap['미수금']]) || 0,
+        orderNumbers: row[colMap['orderNumbers']] || '[]',
+        previousStatus: row[colMap['이전상태']] || ''
+      });
+    }
+
+    // 단일 월인 경우 마감 상태 확인
+    var closingStatus = 'OPEN';
+    if (startMonth === endMonth) {
+      var closingSheet = ss.getSheetByName(OB_MONTHLY_CLOSING_SHEET);
+      if (closingSheet) {
+        var closingData = closingSheet.getDataRange().getValues();
+        for (var j = 1; j < closingData.length; j++) {
+          if (closingData[j][0] === startMonth) {
+            closingStatus = closingData[j][1] || 'OPEN';
+            break;
+          }
+        }
+      }
+    }
+
+    Logger.log('[getBillingsForPeriod] 조회 완료: ' + billings.length + '건');
+
+    return {
+      success: true,
+      billings: billings,
+      status: closingStatus,
+      startMonth: startMonth,
+      endMonth: endMonth
+    };
+
+  } catch (error) {
+    Logger.log('[getBillingsForPeriod] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * 해당 월 청구서들 LOCKED 처리
  * @param {string} yearMonth - YYYYMM 형식
  * @returns {Object} 처리 결과
