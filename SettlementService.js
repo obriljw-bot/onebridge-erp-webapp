@@ -1823,6 +1823,101 @@ function syncBillingAmount(billingId, newAmount) {
 }
 
 /**
+ * 청구서 금액을 거래원장 기준으로 재계산하여 동기화
+ * - SALES 유형: 공급액 기준
+ * - PURCHASE 유형: 매입가 기준
+ * @param {string} billingId - 청구서 ID
+ * @returns {Object} { success, updated, changeLog }
+ */
+function syncBillingAmountFromLedger(billingId) {
+  try {
+    Logger.log('[syncBillingAmountFromLedger] 시작 - billingId: ' + billingId);
+
+    if (!billingId) {
+      return { success: false, error: '청구서 ID가 없습니다.' };
+    }
+
+    // 1. 청구서 정보 조회
+    var ss = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+    var sheet = ss.getSheetByName(OB_BILLING_SHEET);
+
+    if (!sheet) {
+      return { success: false, error: '청구DB 시트를 찾을 수 없습니다.' };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+
+    var colMap = {};
+    headers.forEach(function(h, idx) {
+      colMap[h] = idx;
+    });
+
+    // 청구서 행 찾기
+    var billingRow = null;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colMap['청구ID']] === billingId) {
+        billingRow = data[i];
+        break;
+      }
+    }
+
+    if (!billingRow) {
+      return { success: false, error: '청구서를 찾을 수 없습니다: ' + billingId };
+    }
+
+    var billingType = billingRow[colMap['청구유형']] || 'SALES';
+    var billingStatus = billingRow[colMap['청구상태']] || '';
+    var orderNumbersStr = billingRow[colMap['orderNumbers']] || '';
+
+    // 2. LOCKED 상태 체크
+    if (billingStatus === 'LOCKED') {
+      return { success: false, error: '마감된 청구서는 금액을 수정할 수 없습니다.' };
+    }
+
+    // 3. 발주번호 파싱
+    var orderNumbers = [];
+    if (orderNumbersStr) {
+      try {
+        orderNumbers = JSON.parse(orderNumbersStr);
+        if (!Array.isArray(orderNumbers)) orderNumbers = [];
+      } catch (e) {
+        orderNumbers = orderNumbersStr.split(',').map(function(s) { return s.trim(); });
+      }
+    }
+
+    if (orderNumbers.length === 0) {
+      return { success: false, error: '연결된 발주번호가 없습니다.' };
+    }
+
+    // 4. 금액 재계산 (유형에 따라)
+    var calcResult;
+    if (billingType === 'PURCHASE') {
+      calcResult = calculatePurchaseAmountFromLedger(orderNumbers);
+    } else {
+      calcResult = calculateAmountFromLedger(orderNumbers);
+    }
+
+    if (!calcResult.success) {
+      return { success: false, error: calcResult.error };
+    }
+
+    var newAmount = calcResult.totalAmount || 0;
+
+    // 5. 금액 동기화
+    var syncResult = syncBillingAmount(billingId, newAmount);
+
+    Logger.log('[syncBillingAmountFromLedger] 완료 - 유형: ' + billingType + ', 새 금액: ' + newAmount);
+
+    return syncResult;
+
+  } catch (error) {
+    Logger.log('[syncBillingAmountFromLedger] ❌ 오류: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * 발주번호로 연결된 청구서 ID 조회
  * @param {string[]} orderNumbers - 발주번호 배열
  * @returns {string|null} 청구서 ID 또는 null

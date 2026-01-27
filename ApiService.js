@@ -1023,6 +1023,16 @@ function syncBillingAmountApi(params) {
 }
 
 /**
+ * 청구서 금액을 거래원장 기준으로 재계산하여 동기화
+ * @param {Object} params - { billingId: string }
+ */
+function syncBillingAmountFromLedgerApi(params) {
+  var billingId = params.billingId;
+  var result = syncBillingAmountFromLedger(billingId);
+  return safeReturn(result);
+}
+
+/**
  * 청구서 출력 전 금액 동기화 통합 함수
  * - 기존 청구서가 있으면 금액 비교 후 업데이트
  * - 없으면 null 반환 (신규 생성 필요)
