@@ -3340,41 +3340,65 @@
     // 엑셀 출력 함수 (V3 - 기간/거래처별)
     function exportToExcel(type) {
       var byCompany = exportByCompanyCheck ? exportByCompanyCheck.checked : false;
-      var data = state.billingsList;
 
       if (type === 'summary') {
-        exportSummaryExcel(data, byCompany);
+        exportSummaryExcel(byCompany);
       } else {
-        exportDetailExcel(data, byCompany);
+        exportDetailExcel(byCompany);
       }
     }
 
     // 요약 엑셀 출력
-    function exportSummaryExcel(data, byCompany) {
-      var csvContent = '\uFEFF';
+    function exportSummaryExcel(byCompany) {
+      var data = state.billingsList;
 
       if (byCompany) {
-        // 거래처별 집계
-        csvContent += '유형,거래처,건수,청구금액,결제금액,잔액\n';
-
-        var grouped = {};
+        // 거래처별 파일 분리
+        var companyGroups = {};
         data.forEach(function(b) {
-          var key = b.type + '_' + (b.company || '미지정');
-          if (!grouped[key]) {
-            grouped[key] = { type: b.type, company: b.company || '미지정', count: 0, amount: 0, paid: 0 };
+          var company = b.company || '미지정';
+          if (!companyGroups[company]) {
+            companyGroups[company] = [];
           }
-          grouped[key].count++;
-          grouped[key].amount += Number(b.amount) || 0;
-          grouped[key].paid += Number(b.paidAmount) || 0;
+          companyGroups[company].push(b);
         });
 
-        Object.keys(grouped).sort().forEach(function(key) {
-          var g = grouped[key];
-          var typeText = g.type === 'PURCHASE' ? '매입' : '매출';
-          csvContent += [typeText, g.company, g.count, g.amount, g.paid, g.amount - g.paid].join(',') + '\n';
+        var companies = Object.keys(companyGroups).sort();
+        if (companies.length === 0) {
+          alert('출력할 데이터가 없습니다.');
+          return;
+        }
+
+        companies.forEach(function(company, index) {
+          var billings = companyGroups[company];
+          var csvContent = '\uFEFF';
+          csvContent += '구분,건수,청구금액,결제금액,잔액\n';
+
+          var sales = { count: 0, amount: 0, paid: 0 };
+          var purchase = { count: 0, amount: 0, paid: 0 };
+
+          billings.forEach(function(b) {
+            var target = b.type === 'PURCHASE' ? purchase : sales;
+            target.count++;
+            target.amount += Number(b.amount) || 0;
+            target.paid += Number(b.paidAmount) || 0;
+          });
+
+          csvContent += ['매출(청구서)', sales.count, sales.amount, sales.paid, sales.amount - sales.paid].join(',') + '\n';
+          csvContent += ['매입(지급요청서)', purchase.count, purchase.amount, purchase.paid, purchase.amount - purchase.paid].join(',') + '\n';
+
+          var safeCompany = company.replace(/[\/\\:*?"<>|]/g, '_');
+          var fileName = '월마감_요약_' + state.startMonth + '_' + safeCompany + '.csv';
+
+          setTimeout(function() {
+            downloadCsv(csvContent, fileName);
+          }, index * 300);
         });
+
+        alert(companies.length + '개 거래처별 파일이 다운로드됩니다.');
       } else {
-        // 전체 요약
+        // 전체 요약 (단일 파일)
+        var csvContent = '\uFEFF';
         csvContent += '구분,건수,청구금액,결제금액,잔액\n';
 
         var sales = { count: 0, amount: 0, paid: 0 };
@@ -3390,47 +3414,104 @@
         csvContent += ['매출(청구서)', sales.count, sales.amount, sales.paid, sales.amount - sales.paid].join(',') + '\n';
         csvContent += ['매입(지급요청서)', purchase.count, purchase.amount, purchase.paid, purchase.amount - purchase.paid].join(',') + '\n';
         csvContent += ['합계', sales.count + purchase.count, sales.amount + purchase.amount, sales.paid + purchase.paid, (sales.amount - sales.paid) + (purchase.amount - purchase.paid)].join(',') + '\n';
-      }
 
-      downloadCsv(csvContent, '월마감_요약_' + state.startMonth + (state.startMonth !== state.endMonth ? '_' + state.endMonth : '') + '.csv');
+        downloadCsv(csvContent, '월마감_요약_' + state.startMonth + (state.startMonth !== state.endMonth ? '_' + state.endMonth : '') + '.csv');
+      }
     }
 
-    // 상세 엑셀 출력
-    function exportDetailExcel(data, byCompany) {
-      var csvContent = '\uFEFF';
-      csvContent += '청구ID,유형,거래처,청구일,청구금액,결제금액,잔액,상태\n';
+    // 상세 엑셀 출력 (발주건별 품목 상세 - 서버 API 호출)
+    function exportDetailExcel(byCompany) {
+      OB.showLoading('상세 데이터 조회 중...');
 
-      // 거래처별 정렬
-      var sortedData = data.slice();
-      if (byCompany) {
-        sortedData.sort(function(a, b) {
-          var typeCompare = (a.type || '').localeCompare(b.type || '');
-          if (typeCompare !== 0) return typeCompare;
-          return (a.company || '').localeCompare(b.company || '');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          OB.hideLoading();
+
+          if (!result || !result.success) {
+            alert('데이터 조회 실패: ' + (result ? result.error : '알 수 없는 오류'));
+            return;
+          }
+
+          var headers = result.headers;
+          var rows = result.rows;
+
+          if (!rows || rows.length === 0) {
+            alert('출력할 상세 데이터가 없습니다.');
+            return;
+          }
+
+          if (byCompany) {
+            // 거래처별 파일 분리
+            var companyIndex = headers.indexOf('거래처');
+            var companyGroups = {};
+
+            rows.forEach(function(row) {
+              var company = row[companyIndex] || '미지정';
+              if (!companyGroups[company]) {
+                companyGroups[company] = [];
+              }
+              companyGroups[company].push(row);
+            });
+
+            var companies = Object.keys(companyGroups).sort();
+
+            companies.forEach(function(company, index) {
+              var companyRows = companyGroups[company];
+              var csvContent = '\uFEFF';
+              csvContent += headers.join(',') + '\n';
+
+              companyRows.forEach(function(row) {
+                var rowData = row.map(function(cell) {
+                  if (cell === null || cell === undefined) return '';
+                  var str = String(cell);
+                  if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1) {
+                    str = '"' + str.replace(/"/g, '""') + '"';
+                  }
+                  return str;
+                });
+                csvContent += rowData.join(',') + '\n';
+              });
+
+              var safeCompany = company.replace(/[\/\\:*?"<>|]/g, '_');
+              var fileName = '월마감_상세_' + state.startMonth + '_' + safeCompany + '.csv';
+
+              setTimeout(function() {
+                downloadCsv(csvContent, fileName);
+              }, index * 300);
+            });
+
+            alert(companies.length + '개 거래처별 파일이 다운로드됩니다.');
+          } else {
+            // 단일 파일
+            var csvContent = '\uFEFF';
+            csvContent += headers.join(',') + '\n';
+
+            rows.forEach(function(row) {
+              var rowData = row.map(function(cell) {
+                if (cell === null || cell === undefined) return '';
+                var str = String(cell);
+                if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1) {
+                  str = '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+              });
+              csvContent += rowData.join(',') + '\n';
+            });
+
+            downloadCsv(csvContent, '월마감_상세_' + state.startMonth + (state.startMonth !== state.endMonth ? '_' + state.endMonth : '') + '.csv');
+          }
+        })
+        .withFailureHandler(function(error) {
+          OB.hideLoading();
+          console.error('상세 데이터 조회 실패:', error);
+          alert('상세 데이터 조회 실패: ' + error.message);
+        })
+        .getMonthlyClosingExcelDataApi({
+          startMonth: state.startMonth,
+          endMonth: state.endMonth,
+          company: state.company,
+          type: 'detail'
         });
-      }
-
-      sortedData.forEach(function(b) {
-        var typeText = b.type === 'PURCHASE' ? '매입' : '매출';
-        var amount = Number(b.amount) || 0;
-        var paid = Number(b.paidAmount) || 0;
-        var remaining = amount - paid;
-        var statusText = getStatusText(b.status);
-
-        var row = [
-          b.billingId || '',
-          typeText,
-          '"' + (b.company || '').replace(/"/g, '""') + '"',
-          b.billingDate || '',
-          amount,
-          paid,
-          remaining,
-          statusText
-        ];
-        csvContent += row.join(',') + '\n';
-      });
-
-      downloadCsv(csvContent, '월마감_상세_' + state.startMonth + (state.startMonth !== state.endMonth ? '_' + state.endMonth : '') + '.csv');
     }
 
     // CSV 다운로드

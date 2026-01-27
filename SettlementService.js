@@ -2704,13 +2704,37 @@ function getMonthlyClosingDetail(params) {
 function getMonthlyClosingExcelData(params) {
   try {
     var yearMonth = params.yearMonth || '';
+    var startMonth = params.startMonth || yearMonth;
+    var endMonth = params.endMonth || yearMonth;
     var type = params.type || 'summary';
+    var companyFilter = params.company || '';
 
-    if (!yearMonth) {
+    if (!startMonth) {
       return { success: false, error: '조회할 월을 선택해주세요.' };
     }
 
-    var billings = getBillingsForMonth(yearMonth);
+    // 기간 범위 청구서 조회
+    var allBillings = [];
+    if (startMonth === endMonth) {
+      allBillings = getBillingsForMonth(startMonth);
+    } else {
+      var periodResult = getBillingsForPeriod({
+        startMonth: startMonth,
+        endMonth: endMonth,
+        company: companyFilter
+      });
+      if (periodResult.success) {
+        allBillings = periodResult.billings;
+      }
+    }
+
+    // 거래처 필터 적용 (단일월 조회 시)
+    var billings = allBillings;
+    if (companyFilter && startMonth === endMonth) {
+      billings = allBillings.filter(function(b) {
+        return (b.company || '').indexOf(companyFilter) !== -1;
+      });
+    }
 
     if (type === 'summary') {
       // 요약 출력
