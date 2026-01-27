@@ -4396,8 +4396,7 @@
     items: [],
     customers: [],
     brands: [],
-    brandToSupplierMap: {},
-    productIndex: {}
+    brandToSupplierMap: {}
   };
 
   OB.initOrderInputPage = function() {
@@ -4471,7 +4470,6 @@
             state.customers = result.customers || [];
             state.brands = result.brands || [];
             state.brandToSupplierMap = result.brandToSupplierMap || {};
-            state.productIndex = result.productIndex || {};
 
             // 발주처 드롭다운
             customerSelect.innerHTML = '<option value="">-- 발주처 선택 --</option>';
@@ -4493,8 +4491,7 @@
 
             console.log('✅ 마스터 데이터 로드 완료:', {
               customers: state.customers.length,
-              brands: state.brands.length,
-              products: Object.keys(state.productIndex).length
+              brands: state.brands.length
             });
           } else {
             alert('마스터 데이터 로드 실패: ' + (result ? result.error : '알 수 없는 오류'));
@@ -4517,7 +4514,7 @@
       }
     });
 
-    // 품목 검색 자동완성
+    // 품목 검색 자동완성 (서버 API 호출)
     var searchTimeout = null;
     productSearch.addEventListener('input', function() {
       clearTimeout(searchTimeout);
@@ -4528,9 +4525,20 @@
       }
 
       searchTimeout = setTimeout(function() {
-        var results = searchProducts(query);
-        renderAutocomplete(results);
-      }, 200);
+        // 서버에서 품목 검색
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              renderAutocomplete(result.products || []);
+            } else {
+              autocompleteList.classList.remove('show');
+            }
+          })
+          .withFailureHandler(function() {
+            autocompleteList.classList.remove('show');
+          })
+          .searchProductsForOrderApi(query, 10);
+      }, 300);
     });
 
     productSearch.addEventListener('blur', function() {
@@ -4538,27 +4546,6 @@
         autocompleteList.classList.remove('show');
       }, 200);
     });
-
-    function searchProducts(query) {
-      var results = [];
-      var q = query.toLowerCase();
-      var index = state.productIndex;
-
-      for (var barcode in index) {
-        var p = index[barcode];
-        if (barcode.toLowerCase().indexOf(q) !== -1 ||
-            (p.name && p.name.toLowerCase().indexOf(q) !== -1)) {
-          results.push({
-            barcode: barcode,
-            name: p.name,
-            brand: p.brand,
-            buyPrice: p.buyPrice || 0
-          });
-          if (results.length >= 10) break;
-        }
-      }
-      return results;
-    }
 
     function renderAutocomplete(results) {
       if (results.length === 0) {

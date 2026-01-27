@@ -912,11 +912,11 @@ function checkTodayDuplicateOrder(customer, dateStr) {
  * ============================================================ */
 
 /**
- * 웹 발주 입력에 필요한 마스터 데이터 조회
+ * 웹 발주 입력에 필요한 마스터 데이터 조회 (경량화)
  * - 거래처 목록 (발주처용)
  * - 브랜드 목록
  * - 브랜드→매입처 매핑
- * - 품목 인덱스 (바코드/제품명 검색용)
+ * ※ 품목 데이터는 검색 시 on-demand 조회 (searchProductsForOrder)
  */
 function getOrderInputMasterData() {
   try {
@@ -924,7 +924,7 @@ function getOrderInputMasterData() {
 
     var ss = SpreadsheetApp.openById(OB_MASTER_DB_SS_ID);
 
-    // 1. 거래처 목록 조회
+    // 거래처 목록 조회
     var customerSheet = ss.getSheetByName('거래처DB');
     var customers = [];
     var brands = [];
@@ -974,44 +974,14 @@ function getOrderInputMasterData() {
     // 브랜드 정렬
     brands.sort();
 
-    // 2. 품목 인덱스 조회
-    var productSheet = ss.getSheetByName(OB_MASTER_PRODUCT_SHEET);
-    var productIndex = {};
-
-    if (productSheet) {
-      var productData = productSheet.getDataRange().getValues();
-      var productHeader = productData[0];
-
-      var colBarcode = productHeader.indexOf('바코드');
-      if (colBarcode === -1) colBarcode = productHeader.indexOf('품목코드');
-      var colName = productHeader.indexOf('제품명');
-      var colBrand = productHeader.indexOf('브랜드');
-      var colBuyPrice = productHeader.indexOf('매입가');
-      if (colBuyPrice === -1) colBuyPrice = productHeader.indexOf('원가');
-
-      for (var j = 1; j < productData.length; j++) {
-        var pRow = productData[j];
-        var barcode = colBarcode >= 0 ? safeCell_(pRow[colBarcode]) : '';
-        if (!barcode) continue;
-
-        productIndex[barcode] = {
-          name: colName >= 0 ? safeCell_(pRow[colName]) : '',
-          brand: colBrand >= 0 ? safeCell_(pRow[colBrand]) : '',
-          buyPrice: colBuyPrice >= 0 ? toNumber_(pRow[colBuyPrice]) : 0
-        };
-      }
-    }
-
     Logger.log('[getOrderInputMasterData] 완료 - 거래처: ' + customers.length +
-               ', 브랜드: ' + brands.length +
-               ', 품목: ' + Object.keys(productIndex).length);
+               ', 브랜드: ' + brands.length);
 
     return {
       success: true,
       customers: customers,
       brands: brands,
-      brandToSupplierMap: brandToSupplierMap,
-      productIndex: productIndex
+      brandToSupplierMap: brandToSupplierMap
     };
 
   } catch (e) {
@@ -1019,6 +989,75 @@ function getOrderInputMasterData() {
     return {
       success: false,
       error: e.toString()
+    };
+  }
+}
+
+/* ============================================================
+ * 품목 검색 (on-demand)
+ * ============================================================ */
+
+/**
+ * 품목 검색 - 바코드 또는 제품명으로 검색
+ * @param {string} query - 검색어 (바코드 또는 제품명)
+ * @param {number} limit - 최대 결과 수 (기본 10)
+ */
+function searchProductsForOrder(query, limit) {
+  try {
+    if (!query || query.length < 2) {
+      return { success: true, products: [] };
+    }
+
+    limit = limit || 10;
+    var q = query.toLowerCase();
+
+    var ss = SpreadsheetApp.openById(OB_MASTER_DB_SS_ID);
+    var sheet = ss.getSheetByName(OB_MASTER_PRODUCT_SHEET);
+
+    if (!sheet) {
+      return { success: false, error: '품목DB를 찾을 수 없습니다.' };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var header = data[0];
+
+    var colBarcode = header.indexOf('바코드');
+    if (colBarcode === -1) colBarcode = header.indexOf('품목코드');
+    var colName = header.indexOf('제품명');
+    var colBrand = header.indexOf('브랜드');
+    var colBuyPrice = header.indexOf('매입가');
+    if (colBuyPrice === -1) colBuyPrice = header.indexOf('원가');
+
+    var results = [];
+
+    for (var i = 1; i < data.length && results.length < limit; i++) {
+      var row = data[i];
+      var barcode = colBarcode >= 0 ? safeCell_(row[colBarcode]) : '';
+      var name = colName >= 0 ? safeCell_(row[colName]) : '';
+
+      // 바코드 또는 제품명으로 검색
+      if ((barcode && barcode.toLowerCase().indexOf(q) !== -1) ||
+          (name && name.toLowerCase().indexOf(q) !== -1)) {
+        results.push({
+          barcode: barcode,
+          name: name,
+          brand: colBrand >= 0 ? safeCell_(row[colBrand]) : '',
+          buyPrice: colBuyPrice >= 0 ? toNumber_(row[colBuyPrice]) : 0
+        });
+      }
+    }
+
+    return {
+      success: true,
+      products: results
+    };
+
+  } catch (e) {
+    Logger.log('[searchProductsForOrder Error] ' + e.toString());
+    return {
+      success: false,
+      error: e.toString(),
+      products: []
     };
   }
 }

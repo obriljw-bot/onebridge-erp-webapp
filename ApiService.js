@@ -1135,11 +1135,21 @@ function updateBulkOrderStatusApi(params) {
  */
 
 /**
- * 웹 발주 입력용 마스터 데이터 조회
- * - 거래처 목록, 브랜드 목록, 브랜드→매입처 매핑, 품목 인덱스
+ * 웹 발주 입력용 마스터 데이터 조회 (경량화)
+ * - 거래처 목록, 브랜드 목록, 브랜드→매입처 매핑
  */
 function getOrderInputMasterDataApi() {
   var result = getOrderInputMasterData();
+  return safeReturn(result);
+}
+
+/**
+ * 품목 검색 (on-demand)
+ * @param {string} query - 검색어
+ * @param {number} limit - 최대 결과 수
+ */
+function searchProductsForOrderApi(query, limit) {
+  var result = searchProductsForOrder(query, limit);
   return safeReturn(result);
 }
 
