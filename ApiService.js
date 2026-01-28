@@ -1565,3 +1565,349 @@ function getMonthlyClosingExcelDataApi(params) {
   var result = getMonthlyClosingExcelData(params);
   return safeReturn(result);
 }
+
+/**
+ * ============================================================
+ * 현황판(Dashboard) API
+ * ============================================================
+ */
+
+/**
+ * 현황판 데이터 조회
+ * - KPI 카드: 오늘발주, 이번달 누적, 매출미수금, 매입미지급
+ * - 발주 진행 현황: 매입발주/출고 완료/미처리 현황
+ * - 청구서/지급요청서 현황: 상태별 건수
+ * - 브랜드별 Top 5
+ * - 월마감 현황
+ * - 거래처별 미결제 현황
+ */
+function getDashboardData() {
+  try {
+    var today = new Date();
+    var todayStr = Utilities.formatDate(today, 'Asia/Seoul', 'yyyy-MM-dd');
+    var thisMonth = Utilities.formatDate(today, 'Asia/Seoul', 'yyyy-MM');
+    var thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // ============================================================
+    // 1. 거래원장 데이터 조회
+    // ============================================================
+    var ledgerSheet = getOrderMergedSheet();
+    var ledgerData = ledgerSheet.getDataRange().getValues();
+
+    if (ledgerData.length <= 1) {
+      return safeReturn({
+        success: true,
+        data: getEmptyDashboardData()
+      });
+    }
+
+    var header = ledgerData[0];
+    var rows = ledgerData.slice(1);
+
+    // 컬럼 인덱스
+    var idx = {};
+    header.forEach(function(h, i) { idx[h] = i; });
+
+    var cOrderDate = idx['발주일'] !== undefined ? idx['발주일'] : -1;
+    var cOrderCode = idx['발주번호'] !== undefined ? idx['발주번호'] : -1;
+    var cBuyer = idx['발주처'] !== undefined ? idx['발주처'] : -1;
+    var cSupplier = idx['매입처'] !== undefined ? idx['매입처'] : -1;
+    var cBrand = idx['브랜드'] !== undefined ? idx['브랜드'] : -1;
+    var cSupplyAmount = idx['공급액'] !== undefined ? idx['공급액'] : -1;
+    var cBuyOrder = idx['매입발주'] !== undefined ? idx['매입발주'] : -1;
+    var cShip = idx['출고'] !== undefined ? idx['출고'] : -1;
+
+    // KPI 계산용 변수
+    var todayAmount = 0;
+    var monthAmount = 0;
+
+    // 발주 진행 현황
+    var buyOrderDone = 0, buyOrderPending = 0;
+    var shipDone = 0, shipPending = 0;
+
+    // 브랜드별 집계
+    var brandAmounts = {};
+
+    // 발주번호별 중복 제거용
+    var processedOrders = {};
+
+    // 미처리 목록
+    var pendingBuyOrders = [];
+    var pendingShipments = [];
+
+    rows.forEach(function(row) {
+      var orderCode = row[cOrderCode] ? String(row[cOrderCode]) : '';
+      var orderDateVal = row[cOrderDate];
+      var amount = Number(row[cSupplyAmount]) || 0;
+      var brand = row[cBrand] ? String(row[cBrand]) : '기타';
+      var buyOrderStatus = row[cBuyOrder] ? String(row[cBuyOrder]) : '';
+      var shipStatus = row[cShip] ? String(row[cShip]) : '';
+      var buyer = row[cBuyer] ? String(row[cBuyer]) : '';
+
+      // 날짜 처리
+      var orderDate = null;
+      if (orderDateVal) {
+        if (orderDateVal instanceof Date) {
+          orderDate = orderDateVal;
+        } else {
+          orderDate = new Date(orderDateVal);
+        }
+      }
+
+      // KPI: 오늘 발주, 이번달 누적
+      if (orderDate) {
+        var orderDateStr = Utilities.formatDate(orderDate, 'Asia/Seoul', 'yyyy-MM-dd');
+        var orderMonthStr = Utilities.formatDate(orderDate, 'Asia/Seoul', 'yyyy-MM');
+
+        if (orderDateStr === todayStr) {
+          todayAmount += amount;
+        }
+        if (orderMonthStr === thisMonth) {
+          monthAmount += amount;
+        }
+
+        // 브랜드별 집계 (최근 30일)
+        if (orderDate >= thirtyDaysAgo) {
+          if (!brandAmounts[brand]) brandAmounts[brand] = 0;
+          brandAmounts[brand] += amount;
+        }
+      }
+
+      // 발주번호 단위로 매입발주/출고 현황 집계 (중복 제거)
+      if (orderCode && !processedOrders[orderCode]) {
+        processedOrders[orderCode] = true;
+
+        // 매입발주 현황
+        if (buyOrderStatus === '발주완료') {
+          buyOrderDone++;
+        } else {
+          buyOrderPending++;
+          if (pendingBuyOrders.length < 10) {
+            pendingBuyOrders.push({
+              orderCode: orderCode,
+              buyer: buyer,
+              amount: amount,
+              orderDate: orderDate ? Utilities.formatDate(orderDate, 'Asia/Seoul', 'yyyy-MM-dd') : ''
+            });
+          }
+        }
+
+        // 출고 현황
+        if (shipStatus === '출고완료') {
+          shipDone++;
+        } else {
+          shipPending++;
+          if (pendingShipments.length < 10) {
+            pendingShipments.push({
+              orderCode: orderCode,
+              buyer: buyer,
+              orderDate: orderDate ? Utilities.formatDate(orderDate, 'Asia/Seoul', 'yyyy-MM-dd') : ''
+            });
+          }
+        }
+      }
+    });
+
+    // 브랜드 Top 5
+    var brandTop5 = [];
+    var brandList = [];
+    for (var b in brandAmounts) {
+      brandList.push({ brand: b, amount: brandAmounts[b] });
+    }
+    brandList.sort(function(a, b) { return b.amount - a.amount; });
+    var totalBrandAmount = brandList.reduce(function(sum, item) { return sum + item.amount; }, 0);
+    for (var i = 0; i < Math.min(5, brandList.length); i++) {
+      var pct = totalBrandAmount > 0 ? Math.round(brandList[i].amount / totalBrandAmount * 100) : 0;
+      brandTop5.push({
+        rank: i + 1,
+        brand: brandList[i].brand,
+        amount: brandList[i].amount,
+        percent: pct
+      });
+    }
+
+    // ============================================================
+    // 2. 청구DB 데이터 조회 (미수금/미지급금, 청구서 현황)
+    // ============================================================
+    var billingStats = { SALES: {}, PURCHASE: {} };
+    var receivables = 0, receivableCount = 0;
+    var payables = 0, payableCount = 0;
+    var receivablesByCompany = {};
+    var payablesByCompany = {};
+
+    try {
+      var settlementSS = SpreadsheetApp.openById(OB_SETTLEMENT_SS_ID);
+      var billingSheet = settlementSS.getSheetByName(OB_BILLING_SHEET);
+
+      if (billingSheet) {
+        var billingData = billingSheet.getDataRange().getValues();
+        if (billingData.length > 1) {
+          var bHeader = billingData[0];
+          var bRows = billingData.slice(1);
+
+          var bIdx = {};
+          bHeader.forEach(function(h, i) { bIdx[h] = i; });
+
+          var cType = bIdx['청구유형'] !== undefined ? bIdx['청구유형'] : -1;
+          var cStatus = bIdx['상태'] !== undefined ? bIdx['상태'] : -1;
+          var cAmount = bIdx['청구금액'] !== undefined ? bIdx['청구금액'] : -1;
+          var cCompany = bIdx['거래처'] !== undefined ? bIdx['거래처'] : -1;
+          var cPaidAmount = bIdx['결제완료금액'] !== undefined ? bIdx['결제완료금액'] : -1;
+
+          bRows.forEach(function(row) {
+            var type = row[cType] ? String(row[cType]) : 'SALES';
+            var status = row[cStatus] ? String(row[cStatus]) : '';
+            var amount = Number(row[cAmount]) || 0;
+            var company = row[cCompany] ? String(row[cCompany]) : '기타';
+            var paidAmount = Number(row[cPaidAmount]) || 0;
+
+            // 청구서 현황 집계
+            if (!billingStats[type]) billingStats[type] = {};
+            if (!billingStats[type][status]) billingStats[type][status] = { count: 0, amount: 0 };
+            billingStats[type][status].count++;
+            billingStats[type][status].amount += amount;
+
+            // 미수금/미지급금 (PAID가 아닌 것)
+            if (status !== 'PAID' && status !== 'LOCKED') {
+              var remaining = amount - paidAmount;
+              if (remaining > 0) {
+                if (type === 'SALES') {
+                  receivables += remaining;
+                  receivableCount++;
+                  if (!receivablesByCompany[company]) {
+                    receivablesByCompany[company] = { amount: 0, count: 0 };
+                  }
+                  receivablesByCompany[company].amount += remaining;
+                  receivablesByCompany[company].count++;
+                } else if (type === 'PURCHASE') {
+                  payables += remaining;
+                  payableCount++;
+                  if (!payablesByCompany[company]) {
+                    payablesByCompany[company] = { amount: 0, count: 0 };
+                  }
+                  payablesByCompany[company].amount += remaining;
+                  payablesByCompany[company].count++;
+                }
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      Logger.log('[getDashboardData] 청구DB 조회 오류: ' + e.message);
+    }
+
+    // 거래처별 미결제 Top 5
+    var receivablesTop5 = [];
+    var recList = [];
+    for (var c in receivablesByCompany) {
+      recList.push({ company: c, amount: receivablesByCompany[c].amount, count: receivablesByCompany[c].count });
+    }
+    recList.sort(function(a, b) { return b.amount - a.amount; });
+    for (var i = 0; i < Math.min(5, recList.length); i++) {
+      receivablesTop5.push(recList[i]);
+    }
+
+    var payablesTop5 = [];
+    var payList = [];
+    for (var c in payablesByCompany) {
+      payList.push({ company: c, amount: payablesByCompany[c].amount, count: payablesByCompany[c].count });
+    }
+    payList.sort(function(a, b) { return b.amount - a.amount; });
+    for (var i = 0; i < Math.min(5, payList.length); i++) {
+      payablesTop5.push(payList[i]);
+    }
+
+    // ============================================================
+    // 3. 월마감 현황 조회
+    // ============================================================
+    var monthlyClosings = [];
+    try {
+      var closingResult = getMonthlyClosings();
+      if (closingResult && closingResult.success && closingResult.closings) {
+        // 최근 3개월
+        monthlyClosings = closingResult.closings.slice(0, 3);
+      }
+    } catch (e) {
+      Logger.log('[getDashboardData] 월마감 조회 오류: ' + e.message);
+    }
+
+    // ============================================================
+    // 결과 조립
+    // ============================================================
+    return safeReturn({
+      success: true,
+      data: {
+        // KPI 카드
+        kpi: {
+          todayAmount: todayAmount,
+          monthAmount: monthAmount,
+          receivables: receivables,
+          receivableCount: receivableCount,
+          payables: payables,
+          payableCount: payableCount
+        },
+        // 발주 진행 현황
+        orderProgress: {
+          totalOrders: buyOrderDone + buyOrderPending,
+          buyOrder: {
+            done: buyOrderDone,
+            pending: buyOrderPending,
+            rate: (buyOrderDone + buyOrderPending) > 0 ? Math.round(buyOrderDone / (buyOrderDone + buyOrderPending) * 100) : 0
+          },
+          ship: {
+            done: shipDone,
+            pending: shipPending,
+            rate: (shipDone + shipPending) > 0 ? Math.round(shipDone / (shipDone + shipPending) * 100) : 0
+          },
+          pendingBuyOrders: pendingBuyOrders,
+          pendingShipments: pendingShipments
+        },
+        // 청구서 현황
+        billingStats: billingStats,
+        // 브랜드 Top 5
+        brandTop5: brandTop5,
+        // 월마감 현황
+        monthlyClosings: monthlyClosings,
+        // 거래처별 미결제
+        receivablesTop5: receivablesTop5,
+        payablesTop5: payablesTop5
+      }
+    });
+
+  } catch (err) {
+    Logger.log('[getDashboardData Error] ' + err.message);
+    return safeReturn({
+      success: false,
+      error: err.message
+    });
+  }
+}
+
+/**
+ * 빈 대시보드 데이터 반환
+ */
+function getEmptyDashboardData() {
+  return {
+    kpi: {
+      todayAmount: 0,
+      monthAmount: 0,
+      receivables: 0,
+      receivableCount: 0,
+      payables: 0,
+      payableCount: 0
+    },
+    orderProgress: {
+      totalOrders: 0,
+      buyOrder: { done: 0, pending: 0, rate: 0 },
+      ship: { done: 0, pending: 0, rate: 0 },
+      pendingBuyOrders: [],
+      pendingShipments: []
+    },
+    billingStats: { SALES: {}, PURCHASE: {} },
+    brandTop5: [],
+    monthlyClosings: [],
+    receivablesTop5: [],
+    payablesTop5: []
+  };
+}

@@ -9441,6 +9441,14 @@
   function initDashboardPage() {
     console.log('📊 대시보드 페이지 초기화 중...');
 
+    // 새로고침 버튼 이벤트
+    var refreshBtn = document.getElementById('dashboard-refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function() {
+        loadDashboardData();
+      });
+    }
+
     // 대시보드 데이터 로드
     loadDashboardData();
   }
@@ -9449,13 +9457,15 @@
    * 대시보드 데이터 로드 및 위젯 업데이트
    */
   function loadDashboardData() {
+    console.log('🔄 대시보드 데이터 로딩...');
+
     google.script.run
       .withSuccessHandler(function(response) {
         if (response && response.success && response.data) {
+          console.log('✅ 대시보드 데이터 로드 성공:', response.data);
           updateDashboardWidgets(response.data);
         } else {
-          console.error('❌ 대시보드 데이터 로드 실패:', response.error);
-          // 데이터 로드 실패 시 기본값 표시
+          console.error('❌ 대시보드 데이터 로드 실패:', response ? response.error : 'Unknown error');
           showDashboardError();
         }
       })
@@ -9463,118 +9473,262 @@
         console.error('❌ 대시보드 API 호출 실패:', error.message);
         showDashboardError();
       })
-      .api_getDashboardData();
+      .getDashboardData();
   }
 
   /**
    * 대시보드 위젯 업데이트
    */
   function updateDashboardWidgets(data) {
-    // 오늘 결제 예정 (SPEC_04)
-    if (data.paymentDue) {
-      var 매입 = data.paymentDue.매입 || { count: 0, amount: 0 };
-      var 매출 = data.paymentDue.매출 || { count: 0, amount: 0 };
+    // ============================================================
+    // 1. KPI 카드
+    // ============================================================
+    var kpi = data.kpi || {};
 
-      var purchaseCountEl = document.getElementById('dashboard-payment-due-purchase-count');
-      var purchaseAmountEl = document.getElementById('dashboard-payment-due-purchase-amount');
-      var salesCountEl = document.getElementById('dashboard-payment-due-sales-count');
-      var salesAmountEl = document.getElementById('dashboard-payment-due-sales-amount');
+    setText('kpi-today-amount', '₩' + formatNumber(kpi.todayAmount || 0));
+    setText('kpi-month-amount', '₩' + formatNumber(kpi.monthAmount || 0));
+    setText('kpi-receivables', '₩' + formatNumber(kpi.receivables || 0));
+    setText('kpi-receivable-count', (kpi.receivableCount || 0) + '건 미결제');
+    setText('kpi-payables', '₩' + formatNumber(kpi.payables || 0));
+    setText('kpi-payable-count', (kpi.payableCount || 0) + '건 미결제');
 
-      if (purchaseCountEl) {
-        purchaseCountEl.textContent = 매입.count + '건';
-      }
-      if (purchaseAmountEl) {
-        purchaseAmountEl.textContent = '₩ ' + (매입.amount || 0).toLocaleString();
-      }
-      if (salesCountEl) {
-        salesCountEl.textContent = 매출.count + '건';
-      }
-      if (salesAmountEl) {
-        salesAmountEl.textContent = '₩ ' + (매출.amount || 0).toLocaleString();
-      }
-    }
+    // ============================================================
+    // 2. 발주 진행 현황
+    // ============================================================
+    var progress = data.orderProgress || {};
 
-    // 미수금/미지급금 현황 (SPEC_05)
-    if (data.receivablePayable) {
-      var 매출현황 = data.receivablePayable.매출 || {};
-      var 매입현황 = data.receivablePayable.매입 || {};
+    setText('total-orders-badge', (progress.totalOrders || 0) + '건');
 
-      // 총 미수금 (매출)
-      var receivableTotalEl = document.getElementById('dashboard-receivable-total');
-      var receivableCountEl = document.getElementById('dashboard-receivable-count');
-      if (receivableTotalEl) {
-        receivableTotalEl.textContent = '₩ ' + (매출현황.총미수금 || 0).toLocaleString();
-      }
-      if (receivableCountEl) {
-        var totalCount = (매출현황.정상건수 || 0) + (매출현황.연체건수 || 0);
-        receivableCountEl.textContent = totalCount + '건';
-      }
+    // 매입발주
+    var buyOrder = progress.buyOrder || {};
+    setText('buyorder-done', buyOrder.done || 0);
+    setText('buyorder-pending', buyOrder.pending || 0);
+    setText('buyorder-rate', buyOrder.rate || 0);
+    setStyle('buyorder-progress-bar', 'width', (buyOrder.rate || 0) + '%');
+    setProgressBarColor('buyorder-progress-bar', buyOrder.rate || 0);
 
-      // 총 미지급금 (매입)
-      var payableTotalEl = document.getElementById('dashboard-payable-total');
-      var payableCountEl = document.getElementById('dashboard-payable-count');
-      if (payableTotalEl) {
-        payableTotalEl.textContent = '₩ ' + (매입현황.총미지급금 || 0).toLocaleString();
-      }
-      if (payableCountEl) {
-        var totalCount = (매입현황.정상건수 || 0) + (매입현황.연체건수 || 0);
-        payableCountEl.textContent = totalCount + '건';
-      }
+    // 출고
+    var ship = progress.ship || {};
+    setText('ship-done', ship.done || 0);
+    setText('ship-pending', ship.pending || 0);
+    setText('ship-rate', ship.rate || 0);
+    setStyle('ship-progress-bar', 'width', (ship.rate || 0) + '%');
+    setProgressBarColor('ship-progress-bar', ship.rate || 0);
 
-      // 연체 건수 (매출)
-      var overdueReceivableEl = document.getElementById('dashboard-overdue-receivable');
-      var overdueReceivableAmountEl = document.getElementById('dashboard-overdue-receivable-amount');
-      if (overdueReceivableEl) {
-        overdueReceivableEl.textContent = (매출현황.연체건수 || 0) + '건';
-      }
-      if (overdueReceivableAmountEl) {
-        overdueReceivableAmountEl.textContent = '₩ ' + (매출현황.연체금액 || 0).toLocaleString();
-      }
+    // 미처리 목록
+    renderPendingList('pending-buyorders', progress.pendingBuyOrders || [], 'buyorder');
+    renderPendingList('pending-shipments', progress.pendingShipments || [], 'ship');
 
-      // 연체 건수 (매입)
-      var overduePayableEl = document.getElementById('dashboard-overdue-payable');
-      var overduePayableAmountEl = document.getElementById('dashboard-overdue-payable-amount');
-      if (overduePayableEl) {
-        overduePayableEl.textContent = (매입현황.연체건수 || 0) + '건';
-      }
-      if (overduePayableAmountEl) {
-        overduePayableAmountEl.textContent = '₩ ' + (매입현황.연체금액 || 0).toLocaleString();
-      }
-    }
+    // ============================================================
+    // 3. 청구서 현황
+    // ============================================================
+    var billingStats = data.billingStats || {};
+    renderBillingStatus('billing-sales-status', billingStats.SALES || {});
+    renderBillingStatus('billing-purchase-status', billingStats.PURCHASE || {});
+
+    // ============================================================
+    // 4. 브랜드 Top 5
+    // ============================================================
+    renderBrandTop5(data.brandTop5 || []);
+
+    // ============================================================
+    // 5. 월마감 현황
+    // ============================================================
+    renderMonthlyClosings(data.monthlyClosings || []);
+
+    // ============================================================
+    // 6. 거래처별 미결제
+    // ============================================================
+    renderCompanyList('receivables-by-company', data.receivablesTop5 || [], 'receivable');
+    renderCompanyList('payables-by-company', data.payablesTop5 || [], 'payable');
+
+    setText('receivables-total', '₩' + formatNumber(kpi.receivables || 0) + ' (' + (kpi.receivableCount || 0) + '건)');
+    setText('payables-total', '₩' + formatNumber(kpi.payables || 0) + ' (' + (kpi.payableCount || 0) + '건)');
 
     console.log('✅ 대시보드 위젯 업데이트 완료');
+  }
+
+  // 헬퍼 함수들
+  function setText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  function setStyle(id, prop, value) {
+    var el = document.getElementById(id);
+    if (el) el.style[prop] = value;
+  }
+
+  function setProgressBarColor(id, rate) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.classList.remove('warning', 'danger');
+      if (rate < 50) {
+        el.classList.add('danger');
+      } else if (rate < 80) {
+        el.classList.add('warning');
+      }
+    }
+  }
+
+  function renderPendingList(containerId, items, type) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!items || items.length === 0) {
+      container.innerHTML = '<div class="dashboard-empty">미처리 항목이 없습니다</div>';
+      return;
+    }
+
+    var html = '';
+    items.forEach(function(item) {
+      html += '<div class="pending-item">' +
+        '<span class="code">' + (item.orderCode || '-') + '</span>' +
+        '<span class="info">' + (item.buyer || '-') + '</span>' +
+        (type === 'buyorder' ? '<span class="amount">₩' + formatNumber(item.amount || 0) + '</span>' : '<span class="info">' + (item.orderDate || '-') + '</span>') +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function renderBillingStatus(containerId, stats) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+
+    var statusConfig = [
+      { key: 'PENDING', icon: '⏳', label: '발행대기' },
+      { key: 'ISSUED', icon: '📄', label: '발행완료' },
+      { key: 'REQUESTED', icon: '📄', label: '지급요청' },
+      { key: 'PAID_PARTIAL', icon: '⚠️', label: '부분결제' },
+      { key: 'PAID', icon: '✅', label: '결제완료' },
+      { key: 'LOCKED', icon: '🔒', label: '마감완료' }
+    ];
+
+    var hasData = false;
+    var html = '';
+
+    statusConfig.forEach(function(cfg) {
+      var stat = stats[cfg.key];
+      if (stat && stat.count > 0) {
+        hasData = true;
+        html += '<div class="billing-status-item">' +
+          '<span class="billing-status-icon">' + cfg.icon + '</span>' +
+          '<span class="billing-status-label">' + cfg.label + '</span>' +
+          '<span class="billing-status-value">' + stat.count + '건</span>' +
+          '</div>';
+      }
+    });
+
+    if (!hasData) {
+      html = '<div class="dashboard-empty">데이터가 없습니다</div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function renderBrandTop5(brands) {
+    var tbody = document.getElementById('brand-top5-tbody');
+    if (!tbody) return;
+
+    if (!brands || brands.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="dashboard-empty">데이터가 없습니다</td></tr>';
+      return;
+    }
+
+    var html = '';
+    brands.forEach(function(item) {
+      html += '<tr>' +
+        '<td class="rank">' + item.rank + '</td>' +
+        '<td>' + item.brand + '</td>' +
+        '<td class="num">₩' + formatNumber(item.amount) + '</td>' +
+        '<td class="num">' + item.percent + '%</td>' +
+        '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  function renderMonthlyClosings(closings) {
+    var container = document.getElementById('monthly-closings');
+    if (!container) return;
+
+    if (!closings || closings.length === 0) {
+      container.innerHTML = '<div class="dashboard-empty">월마감 데이터가 없습니다</div>';
+      return;
+    }
+
+    var html = '';
+    closings.forEach(function(item) {
+      var statusClass = item.status === 'LOCKED' ? 'locked' : 'open';
+      var statusText = item.status === 'LOCKED' ? '마감완료' : '진행중';
+
+      html += '<div class="closing-item">' +
+        '<span class="closing-month">' + (item.yearMonth || item.월) + '</span>' +
+        '<span class="closing-status ' + statusClass + '">' + statusText + '</span>' +
+        '<span class="closing-amount">₩' + formatNumber(item.totalAmount || item.금액 || 0) + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function renderCompanyList(containerId, companies, type) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!companies || companies.length === 0) {
+      container.innerHTML = '<div class="dashboard-empty">미결제 내역이 없습니다</div>';
+      return;
+    }
+
+    var html = '';
+    companies.forEach(function(item) {
+      html += '<div class="company-item">' +
+        '<span class="name">' + item.company + '</span>' +
+        '<span class="amount ' + type + '">₩' + formatNumber(item.amount) + '</span>' +
+        '<span class="count">' + item.count + '건</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
   }
 
   /**
    * 대시보드 오류 표시
    */
   function showDashboardError() {
-    // 모든 위젯을 기본값으로 설정
-    var widgetIds = [
-      'dashboard-payment-due-purchase-count',
-      'dashboard-payment-due-purchase-amount',
-      'dashboard-payment-due-sales-count',
-      'dashboard-payment-due-sales-amount',
-      'dashboard-receivable-total',
-      'dashboard-receivable-count',
-      'dashboard-payable-total',
-      'dashboard-payable-count',
-      'dashboard-overdue-receivable',
-      'dashboard-overdue-receivable-amount',
-      'dashboard-overdue-payable',
-      'dashboard-overdue-payable-amount'
-    ];
+    console.warn('⚠️ 대시보드 데이터 로드 실패 - 기본값 표시');
 
-    widgetIds.forEach(function(id) {
+    // KPI
+    setText('kpi-today-amount', '₩0');
+    setText('kpi-month-amount', '₩0');
+    setText('kpi-receivables', '₩0');
+    setText('kpi-receivable-count', '0건 미결제');
+    setText('kpi-payables', '₩0');
+    setText('kpi-payable-count', '0건 미결제');
+
+    // 진행 현황
+    setText('total-orders-badge', '0건');
+    setText('buyorder-done', '0');
+    setText('buyorder-pending', '0');
+    setText('buyorder-rate', '0');
+    setText('ship-done', '0');
+    setText('ship-pending', '0');
+    setText('ship-rate', '0');
+
+    // 빈 목록
+    var emptyHtml = '<div class="dashboard-empty">데이터를 불러올 수 없습니다</div>';
+    var emptyContainers = [
+      'pending-buyorders', 'pending-shipments',
+      'billing-sales-status', 'billing-purchase-status',
+      'monthly-closings', 'receivables-by-company', 'payables-by-company'
+    ];
+    emptyContainers.forEach(function(id) {
       var el = document.getElementById(id);
-      if (el) {
-        if (id.includes('count') || id.includes('overdue')) {
-          el.textContent = '-';
-        } else {
-          el.textContent = '₩ 0';
-        }
-      }
+      if (el) el.innerHTML = emptyHtml;
     });
+
+    var brandTbody = document.getElementById('brand-top5-tbody');
+    if (brandTbody) {
+      brandTbody.innerHTML = '<tr><td colspan="4" class="dashboard-empty">데이터를 불러올 수 없습니다</td></tr>';
+    }
   }
 
   /**

@@ -1,120 +1,238 @@
-<div>
-  <div class="ob-page-title">대시보드</div>
-  <div class="ob-page-subtitle">
-    발주 / 매출 / 재고 등 주요 KPI를 한 눈에 보는 화면의 뼈대입니다. 이후 스프레드시트 또는 DB에서 실제 수치를 연동할 예정입니다.
+<style>
+  .dashboard-wrap { padding: 20px; }
+  .dashboard-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .dashboard-header h1 { margin: 0; font-size: 24px; font-weight: 700; color: #1e293b; }
+  .dashboard-refresh-btn { padding: 8px 16px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 13px; color: #475569; }
+  .dashboard-refresh-btn:hover { background: #e2e8f0; }
+
+  /* KPI 카드 */
+  .dashboard-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .dashboard-kpi-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid #3b82f6; }
+  .dashboard-kpi-card.receivable { border-left-color: #10b981; }
+  .dashboard-kpi-card.payable { border-left-color: #ef4444; }
+  .dashboard-kpi-label { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+  .dashboard-kpi-value { font-size: 24px; font-weight: 700; color: #1e293b; }
+  .dashboard-kpi-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+  /* 섹션 */
+  .dashboard-section { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+  .dashboard-section-title { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .dashboard-section-title .badge { font-size: 11px; padding: 2px 8px; background: #dbeafe; color: #2563eb; border-radius: 10px; font-weight: 600; }
+
+  /* 그리드 레이아웃 */
+  .dashboard-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
+  .dashboard-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+
+  /* 진행 현황 */
+  .progress-stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .progress-stat-box { background: #f8fafc; border-radius: 8px; padding: 16px; }
+  .progress-stat-box h4 { margin: 0 0 12px; font-size: 14px; color: #475569; }
+  .progress-bar-wrap { margin-bottom: 8px; }
+  .progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: #10b981; border-radius: 4px; transition: width 0.3s; }
+  .progress-bar-fill.warning { background: #f59e0b; }
+  .progress-bar-fill.danger { background: #ef4444; }
+  .progress-stats { display: flex; justify-content: space-between; font-size: 13px; }
+  .progress-stats .done { color: #10b981; font-weight: 600; }
+  .progress-stats .pending { color: #f59e0b; font-weight: 600; }
+  .progress-rate { font-size: 20px; font-weight: 700; color: #1e293b; margin-top: 8px; }
+
+  /* 청구서 현황 */
+  .billing-status-list { display: flex; flex-direction: column; gap: 8px; }
+  .billing-status-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; }
+  .billing-status-icon { font-size: 16px; }
+  .billing-status-label { flex: 1; font-size: 13px; color: #475569; }
+  .billing-status-value { font-size: 14px; font-weight: 600; color: #1e293b; }
+
+  /* 테이블 */
+  .dashboard-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dashboard-table th, .dashboard-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+  .dashboard-table th { background: #f8fafc; font-weight: 600; color: #475569; }
+  .dashboard-table td.num { text-align: right; font-family: 'Courier New', monospace; }
+  .dashboard-table .rank { width: 40px; text-align: center; font-weight: 700; color: #3b82f6; }
+
+  /* 미처리 목록 */
+  .pending-list { max-height: 200px; overflow-y: auto; }
+  .pending-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .pending-item:last-child { border-bottom: none; }
+  .pending-item .code { color: #3b82f6; font-weight: 600; }
+  .pending-item .info { color: #64748b; }
+  .pending-item .amount { font-weight: 600; color: #1e293b; }
+
+  /* 월마감 현황 */
+  .closing-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+  .closing-item:last-child { border-bottom: none; }
+  .closing-month { font-weight: 600; color: #1e293b; min-width: 80px; }
+  .closing-status { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .closing-status.locked { background: #d1fae5; color: #065f46; }
+  .closing-status.open { background: #fef3c7; color: #92400e; }
+  .closing-amount { flex: 1; text-align: right; font-weight: 600; color: #1e293b; }
+
+  /* 거래처 미결제 */
+  .company-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .company-section h4 { margin: 0 0 12px; font-size: 14px; color: #475569; display: flex; align-items: center; gap: 8px; }
+  .company-list { display: flex; flex-direction: column; gap: 6px; }
+  .company-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 13px; }
+  .company-item .name { color: #1e293b; }
+  .company-item .amount { font-weight: 600; }
+  .company-item .amount.receivable { color: #10b981; }
+  .company-item .amount.payable { color: #ef4444; }
+  .company-item .count { color: #94a3b8; font-size: 12px; }
+  .company-total { margin-top: 8px; padding: 10px 12px; background: #e0f2fe; border-radius: 6px; display: flex; justify-content: space-between; font-weight: 600; }
+
+  /* 로딩 */
+  .dashboard-loading { text-align: center; padding: 60px 20px; color: #64748b; }
+  .dashboard-empty { text-align: center; padding: 40px 20px; color: #94a3b8; }
+
+  @media (max-width: 1200px) {
+    .dashboard-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="dashboard-wrap">
+  <!-- 헤더 -->
+  <div class="dashboard-header">
+    <h1>📊 현황판</h1>
+    <button class="dashboard-refresh-btn" id="dashboard-refresh-btn">🔄 새로고침</button>
   </div>
 
-  <div class="ob-kpi-grid ob-mb-12">
-    <div class="ob-kpi-card">
-      <div class="ob-kpi-label">오늘 발주금액 (예시)</div>
-      <div class="ob-kpi-value">₩ 32,500,000</div>
-      <div class="ob-kpi-delta up">전일 대비 +12.4%</div>
+  <!-- KPI 카드 -->
+  <div class="dashboard-kpi-grid">
+    <div class="dashboard-kpi-card">
+      <div class="dashboard-kpi-label">📦 오늘 발주금액</div>
+      <div class="dashboard-kpi-value" id="kpi-today-amount">₩0</div>
     </div>
-    <div class="ob-kpi-card">
-      <div class="ob-kpi-label">이번달 누적발주 (예시)</div>
-      <div class="ob-kpi-value">₩ 420,000,000</div>
-      <div class="ob-kpi-delta up">전월 동기 대비 +8.9%</div>
+    <div class="dashboard-kpi-card">
+      <div class="dashboard-kpi-label">📈 이번달 누적발주</div>
+      <div class="dashboard-kpi-value" id="kpi-month-amount">₩0</div>
     </div>
-    <div class="ob-kpi-card">
-      <div class="ob-kpi-label">매입 미정산 (예시)</div>
-      <div class="ob-kpi-value">₩ 58,000,000</div>
-      <div class="ob-kpi-delta down">전월 대비 -3.2%</div>
+    <div class="dashboard-kpi-card receivable">
+      <div class="dashboard-kpi-label">💰 매출 미수금</div>
+      <div class="dashboard-kpi-value" id="kpi-receivables">₩0</div>
+      <div class="dashboard-kpi-sub" id="kpi-receivable-count">0건 미결제</div>
     </div>
-    <div class="ob-kpi-card">
-      <div class="ob-kpi-label">재고 회전일 (예시)</div>
-      <div class="ob-kpi-value">27.4일</div>
-      <div class="ob-kpi-delta up">목표 30일 대비 양호</div>
+    <div class="dashboard-kpi-card payable">
+      <div class="dashboard-kpi-label">💳 매입 미지급</div>
+      <div class="dashboard-kpi-value" id="kpi-payables">₩0</div>
+      <div class="dashboard-kpi-sub" id="kpi-payable-count">0건 미결제</div>
     </div>
   </div>
 
-  <div class="ob-grid-2">
-    <div class="ob-card">
-      <div class="ob-card-header">
-        <div>
-          <div class="ob-card-title">브랜드별 발주 Top 5 (예시)</div>
-          <div class="ob-card-subtitle">최근 30일 기준</div>
+  <!-- 발주 진행 현황 -->
+  <div class="dashboard-section">
+    <div class="dashboard-section-title">🚚 발주 진행 현황 <span class="badge" id="total-orders-badge">0건</span></div>
+    <div class="progress-stat-grid">
+      <div class="progress-stat-box">
+        <h4>📋 매입발주 현황</h4>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar">
+            <div class="progress-bar-fill" id="buyorder-progress-bar" style="width: 0%;"></div>
+          </div>
         </div>
+        <div class="progress-stats">
+          <span>✅ 완료: <span class="done" id="buyorder-done">0</span>건</span>
+          <span>⏳ 미처리: <span class="pending" id="buyorder-pending">0</span>건</span>
+        </div>
+        <div class="progress-rate">진행률: <span id="buyorder-rate">0</span>%</div>
       </div>
-      <div class="ob-table-wrap">
-        <table class="ob-table">
-          <thead>
-            <tr>
-              <th>순위</th>
-              <th>브랜드</th>
-              <th class="ob-text-right">발주금액</th>
-              <th class="ob-text-right">비중</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>Dr.G</td>
-              <td class="ob-text-right">₩ 120,000,000</td>
-              <td class="ob-text-right">28%</td>
-            </tr>
-            <tr>
-              <td>2</td>
-              <td>rom&nd</td>
-              <td class="ob-text-right">₩ 95,000,000</td>
-              <td class="ob-text-right">22%</td>
-            </tr>
-            <tr>
-              <td>3</td>
-              <td>마녀공장</td>
-              <td class="ob-text-right">₩ 70,000,000</td>
-              <td class="ob-text-right">17%</td>
-            </tr>
-            <tr>
-              <td>4</td>
-              <td>종근당</td>
-              <td class="ob-text-right">₩ 60,000,000</td>
-              <td class="ob-text-right">14%</td>
-            </tr>
-            <tr>
-              <td>5</td>
-              <td>기타</td>
-              <td class="ob-text-right">₩ 75,000,000</td>
-              <td class="ob-text-right">19%</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="progress-stat-box">
+        <h4>📦 출고 현황</h4>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar">
+            <div class="progress-bar-fill" id="ship-progress-bar" style="width: 0%;"></div>
+          </div>
+        </div>
+        <div class="progress-stats">
+          <span>✅ 출고완료: <span class="done" id="ship-done">0</span>건</span>
+          <span>⏳ 미출고: <span class="pending" id="ship-pending">0</span>건</span>
+        </div>
+        <div class="progress-rate">진행률: <span id="ship-rate">0</span>%</div>
       </div>
     </div>
+  </div>
 
-    <div class="ob-card">
-      <div class="ob-card-header">
-        <div>
-          <div class="ob-card-title">매입처별 미정산 현황 (예시)</div>
-          <div class="ob-card-subtitle">정산 주기 관리용</div>
+  <!-- 미처리 항목 상세 -->
+  <div class="dashboard-grid-2">
+    <div class="dashboard-section">
+      <div class="dashboard-section-title">📋 매입발주 미처리</div>
+      <div class="pending-list" id="pending-buyorders">
+        <div class="dashboard-empty">미처리 항목이 없습니다</div>
+      </div>
+    </div>
+    <div class="dashboard-section">
+      <div class="dashboard-section-title">📦 출고 미완료</div>
+      <div class="pending-list" id="pending-shipments">
+        <div class="dashboard-empty">미출고 항목이 없습니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 청구서 / 지급요청서 현황 -->
+  <div class="dashboard-grid-2">
+    <div class="dashboard-section">
+      <div class="dashboard-section-title">📄 청구서 현황 (매출)</div>
+      <div class="billing-status-list" id="billing-sales-status">
+        <div class="dashboard-loading">로딩 중...</div>
+      </div>
+    </div>
+    <div class="dashboard-section">
+      <div class="dashboard-section-title">📄 지급요청서 현황 (매입)</div>
+      <div class="billing-status-list" id="billing-purchase-status">
+        <div class="dashboard-loading">로딩 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 브랜드 Top 5 / 월마감 현황 -->
+  <div class="dashboard-grid-2">
+    <div class="dashboard-section">
+      <div class="dashboard-section-title">🏷️ 브랜드별 발주 Top 5 <span class="badge">최근 30일</span></div>
+      <table class="dashboard-table" id="brand-top5-table">
+        <thead>
+          <tr>
+            <th class="rank">순위</th>
+            <th>브랜드</th>
+            <th class="num">발주금액</th>
+            <th class="num">비중</th>
+          </tr>
+        </thead>
+        <tbody id="brand-top5-tbody">
+          <tr><td colspan="4" class="dashboard-loading">로딩 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="dashboard-section">
+      <div class="dashboard-section-title">📅 월마감 현황</div>
+      <div id="monthly-closings">
+        <div class="dashboard-loading">로딩 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 거래처별 미결제 현황 -->
+  <div class="dashboard-section">
+    <div class="dashboard-section-title">🏢 거래처별 미결제 현황</div>
+    <div class="company-grid">
+      <div class="company-section">
+        <h4>💰 매출 미수금 (발주처별)</h4>
+        <div class="company-list" id="receivables-by-company">
+          <div class="dashboard-loading">로딩 중...</div>
+        </div>
+        <div class="company-total">
+          <span>합계</span>
+          <span id="receivables-total">₩0 (0건)</span>
         </div>
       </div>
-      <div class="ob-table-wrap">
-        <table class="ob-table">
-          <thead>
-            <tr>
-              <th>매입처</th>
-              <th class="ob-text-right">미정산 금액</th>
-              <th class="ob-text-right">마감 예정일</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>A 매입처</td>
-              <td class="ob-text-right">₩ 18,000,000</td>
-              <td class="ob-text-right">2025-11-25</td>
-            </tr>
-            <tr>
-              <td>B 매입처</td>
-              <td class="ob-text-right">₩ 12,000,000</td>
-              <td class="ob-text-right">2025-11-27</td>
-            </tr>
-            <tr>
-              <td>C 매입처</td>
-              <td class="ob-text-right">₩ 9,000,000</td>
-              <td class="ob-text-right">2025-12-01</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="company-section">
+        <h4>💳 매입 미지급 (매입처별)</h4>
+        <div class="company-list" id="payables-by-company">
+          <div class="dashboard-loading">로딩 중...</div>
+        </div>
+        <div class="company-total">
+          <span>합계</span>
+          <span id="payables-total">₩0 (0건)</span>
+        </div>
       </div>
     </div>
   </div>
