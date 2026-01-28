@@ -269,7 +269,8 @@ function saveParsedOrdersToDB(items) {
 
   // 공통 값 생성
   var now = new Date();
-  var todaySerial = now; // Excel 날짜 형식 (Date 객체)
+  // ✅ 날짜만 저장 (시간 제외) - 조회 시 날짜 비교가 정확하도록
+  var todaySerial = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   var dateStr = Utilities.formatDate(now, 'Asia/Seoul', 'yyyyMMdd');
   var timeStr = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
 
@@ -392,11 +393,16 @@ function saveParsedOrdersToDB(items) {
       if (c.updatedAt      >= 0) row[c.updatedAt]      = timeStr;
 
       sheet.appendRow(row);
+
+      // ✅ 굵게(bold) 서식 제거 - 기본 폰트 두께로 설정
+      var newRowRange = sheet.getRange(currentRow, 1, 1, header.length);
+      newRowRange.setFontWeight('normal');
+
       saved++;
     }
     // ✅ orderSeq++ 삭제: 각 그룹마다 getNextOrderSeq_()를 새로 호출하므로 불필요
   }
-  
+
   Logger.log('✅✅✅ 저장 완료! 총 ' + saved + '건');
 
   return {
