@@ -4853,6 +4853,7 @@
     var endDateInput = document.getElementById('ledger-end-date');
     var companyInput = document.getElementById('ledger-company');
     var statusSelect = document.getElementById('ledger-status');
+    var paymentStatusSelect = document.getElementById('ledger-payment-status');
     var orderCodeInput = document.getElementById('ledger-order-code');
     var searchBtn = document.getElementById('ledger-search-btn');
     var resetBtn = document.getElementById('ledger-reset-btn');
@@ -4893,6 +4894,7 @@
       var end = parseDate(endDateInput.value);
       var company = (companyInput.value || '').trim();
       var status = statusSelect.value;
+      var paymentStatus = paymentStatusSelect ? paymentStatusSelect.value : '';
       var orderCode = (orderCodeInput.value || '').trim();
 
       state.filtered = state.raw.filter(function(tx) {
@@ -4915,6 +4917,14 @@
           if (String(tx['매출결제'] || '').toUpperCase().indexOf(statusUpper) !== -1) matchFound = true;
           if (String(tx['출고'] || '').toUpperCase().indexOf(statusUpper) !== -1) matchFound = true;
           keep = keep && matchFound;
+        }
+
+        // 결제상태 필터 (매입결제 또는 매출결제 중 하나라도 매칭되면 포함)
+        if (paymentStatus) {
+          var payBuy = String(tx['매입결제'] || '');
+          var paySell = String(tx['매출결제'] || '');
+          var paymentMatch = (payBuy === paymentStatus) || (paySell === paymentStatus);
+          keep = keep && paymentMatch;
         }
 
         if (start || end) {
@@ -5560,6 +5570,7 @@
     resetBtn.addEventListener('click', function() {
       companyInput.value = '';
       statusSelect.value = '';
+      if (paymentStatusSelect) paymentStatusSelect.value = '';
       orderCodeInput.value = '';
       startDateInput.value = formatDateInput(firstDay);
       endDateInput.value = formatDateInput(today);
