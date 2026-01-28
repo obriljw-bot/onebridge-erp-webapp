@@ -1614,42 +1614,36 @@
       var endIdx = Math.min(startIdx + itemsPerPage, filteredOrders.length);
       var pageOrders = filteredOrders.slice(startIdx, endIdx);
 
-      // 상태 뱃지 생성 함수
-      function getStatusBadge(type, status) {
-        var badges = {
-          'buyOrder': {
-            '': '<span class="orderlist-status-badge badge-buy-order-pending">미처리</span>',
-            '미처리': '<span class="orderlist-status-badge badge-buy-order-pending">미처리</span>',
-            '발주완료': '<span class="orderlist-status-badge badge-buy-order-done">발주완료</span>'
-          },
-          'payBuy': {
-            '': '<span class="orderlist-status-badge badge-pay-buy-unpaid">미결제</span>',
-            '미결제': '<span class="orderlist-status-badge badge-pay-buy-unpaid">미결제</span>',
-            '부분결제': '<span class="orderlist-status-badge badge-pay-buy-partial">부분결제</span>',
-            '결제완료': '<span class="orderlist-status-badge badge-pay-buy-paid">결제완료</span>'
-          },
-          'paySell': {
-            '': '<span class="orderlist-status-badge badge-pay-sell-unpaid">미결제</span>',
-            '미결제': '<span class="orderlist-status-badge badge-pay-sell-unpaid">미결제</span>',
-            '부분결제': '<span class="orderlist-status-badge badge-pay-sell-partial">부분결제</span>',
-            '결제완료': '<span class="orderlist-status-badge badge-pay-sell-paid">결제완료</span>'
-          },
-          'ship': {
-            '': '<span class="orderlist-status-badge badge-ship-pending">미출고</span>',
-            '미출고': '<span class="orderlist-status-badge badge-ship-pending">미출고</span>',
-            '부분출고': '<span class="orderlist-status-badge badge-ship-partial">부분출고</span>',
-            '출고완료': '<span class="orderlist-status-badge badge-ship-done">출고완료</span>'
-          }
-        };
-
-        if (!badges[type]) return status || '';
-        return badges[type][status] || badges[type][''] || status;
-      }
-
       // 테이블 렌더링
       pageOrders.forEach(function(order) {
         var tr = document.createElement('tr');
         tr.dataset.orderCode = order.orderCode;
+
+        // 진행상태 이모지 생성 (매입발주, 매입결제, 매출결제, 출고 순)
+        function getProgressStatus(order) {
+          // 매입발주: ⏳미처리 / ✅발주완료
+          var buyOrderEmoji = order.buyOrder === '발주완료' ? '✅' : '⏳';
+          var buyOrderTitle = '매입발주: ' + (order.buyOrder || '미처리');
+
+          // 매입결제: ❌미결제 / 🔸부분결제 / ✅결제완료
+          var payBuyEmoji = order.payBuy === '결제완료' ? '✅' : (order.payBuy === '부분결제' ? '🔸' : '❌');
+          var payBuyTitle = '매입결제: ' + (order.payBuy || '미결제');
+
+          // 매출결제: ❌미결제 / 🔸부분결제 / ✅결제완료
+          var paySellEmoji = order.paySell === '결제완료' ? '✅' : (order.paySell === '부분결제' ? '🔸' : '❌');
+          var paySellTitle = '매출결제: ' + (order.paySell || '미결제');
+
+          // 출고: ⬜미출고 / 📦부분출고 / ✅출고완료
+          var shipEmoji = order.ship === '출고완료' ? '✅' : (order.ship === '부분출고' ? '📦' : '⬜');
+          var shipTitle = '출고: ' + (order.ship || '미출고');
+
+          return '<div class="orderlist-progress-status">' +
+            '<span title="' + buyOrderTitle + '">' + buyOrderEmoji + '</span>' +
+            '<span title="' + payBuyTitle + '">' + payBuyEmoji + '</span>' +
+            '<span title="' + paySellTitle + '">' + paySellEmoji + '</span>' +
+            '<span title="' + shipTitle + '">' + shipEmoji + '</span>' +
+            '</div>';
+        }
 
         tr.innerHTML =
           '<td>' + formatDate(order.orderDate) + '</td>' +
@@ -1660,11 +1654,7 @@
           '<td class="text-center">' + (order.itemCount || 0) + '개</td>' +
           '<td class="text-right">₩' + formatNumber(order.totalPurchaseAmount) + '</td>' +
           '<td class="text-right">₩' + formatNumber(order.totalAmount) + '</td>' +
-          '<td class="text-center">' + getStatusBadge('buyOrder', order.buyOrder) + '</td>' +
-          '<td class="text-center">' + getStatusBadge('payBuy', order.payBuy) + '</td>' +
-          '<td class="text-center">' + getStatusBadge('paySell', order.paySell) + '</td>' +
-          '<td class="text-center">' + getStatusBadge('ship', order.ship) + '</td>' +
-          '<td class="text-center"><button class="orderlist-btn orderlist-btn-sm orderlist-btn-secondary" onclick="event.stopPropagation();">상세</button></td>';
+          '<td class="text-center">' + getProgressStatus(order) + '</td>';
 
         tr.addEventListener('click', function() {
           loadOrderDetail(order.orderCode);
@@ -1743,7 +1733,7 @@
     // ============================================================
     function renderEmpty() {
       tbody.innerHTML =
-        '<tr><td colspan="13" class="orderlist-empty">' +
+        '<tr><td colspan="9" class="orderlist-empty">' +
         '<div class="orderlist-empty-icon">📋</div>' +
         '<div class="orderlist-empty-text">조회 결과가 없습니다</div>' +
         '</td></tr>';
@@ -3900,65 +3890,6 @@
     var footerCloseBtn = document.getElementById('billing-detail-close-footer-btn');
     if (footerCloseBtn) {
       footerCloseBtn.addEventListener('click', closeDetailModal);
-    }
-
-    // 청구서 재출력 버튼 클릭
-    var reprintBtn = document.getElementById('billing-detail-reprint-btn');
-    if (reprintBtn) {
-      reprintBtn.addEventListener('click', function() {
-        if (!currentBilling || !currentBilling.billingId) {
-          alert('청구서 정보가 없습니다.');
-          return;
-        }
-
-        if (!confirm('청구서를 재출력하시겠습니까?')) {
-          return;
-        }
-
-        OB.showLoading('청구서 재출력 중...');
-
-        google.script.run
-          .withSuccessHandler(function(result) {
-            OB.hideLoading();
-            console.log('✅ 청구서 재출력 결과:', result);
-
-            if (!result || !result.success) {
-              alert('재출력 실패: ' + (result ? result.error : '알 수 없는 오류'));
-              return;
-            }
-
-            // ZIP 파일 다운로드
-            if (result.zipBase64 && result.fileName) {
-              var binary = atob(result.zipBase64);
-              var array = new Uint8Array(binary.length);
-              for (var i = 0; i < binary.length; i++) {
-                array[i] = binary.charCodeAt(i);
-              }
-              var blob = new Blob([array], { type: 'application/zip' });
-              var url = URL.createObjectURL(blob);
-              var a = document.createElement('a');
-              a.href = url;
-              a.download = result.fileName;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-
-              alert('청구서 재출력이 완료되었습니다.\n파일: ' + result.fileName);
-            } else {
-              alert('재출력은 완료되었지만 다운로드 파일을 생성하지 못했습니다.');
-            }
-          })
-          .withFailureHandler(function(error) {
-            OB.hideLoading();
-            console.error('❌ 청구서 재출력 실패:', error);
-            alert('청구서 재출력 실패: ' + error.message);
-          })
-          .reprintInvoiceApi({
-            billingId: currentBilling.billingId,
-            type: currentBilling.type
-          });
-      });
     }
 
     // 금액 동기화 버튼 클릭
