@@ -234,9 +234,6 @@
     <div class="tab-nav-item" data-tab="bulk-billing">
       💳 일괄 청구서
     </div>
-    <div class="tab-nav-item" data-tab="transaction-ledger">
-      📊 거래원장
-    </div>
   </div>
 
   <!-- =============================================== -->
@@ -433,96 +430,6 @@
       <button class="ob-btn secondary" id="billing-export-xlsx">📥 엑셀 다운로드</button>
       <button class="ob-btn success" id="billing-export-pdf">📄 PDF 청구서 생성</button>
       <button class="ob-btn primary" id="billing-save-db">💾 청구서 DB 저장 + 발행</button>
-    </div>
-
-  </div>
-
-  <!-- =============================================== -->
-  <!-- 탭 3: 거래원장 -->
-  <!-- =============================================== -->
-  <div id="tab-transaction-ledger" class="tab-content">
-
-    <!-- 조회 조건 -->
-    <div class="ob-topbar">
-      <label style="font-weight:600;color:#1e293b;">🔍 조회 조건</label>
-      <span style="border-left:1px solid #cbd5e1;height:20px;"></span>
-
-      <label>기간</label>
-      <input id="ledger-start-date" type="date">
-      <span style="color:#9ca3af;">~</span>
-      <input id="ledger-end-date" type="date">
-
-      <label>발주처</label>
-      <input id="ledger-company" placeholder="업체명" style="min-width:120px;">
-
-      <label>상태</label>
-      <select id="ledger-status" style="min-width:100px;">
-        <option value="">전체</option>
-        <option value="DRAFT">작성중</option>
-        <option value="CONFIRMED">확정</option>
-        <option value="ISSUED">발행</option>
-        <option value="PAID">결제완료</option>
-      </select>
-
-      <label>발주번호</label>
-      <input id="ledger-order-code" placeholder="OB2025-..." style="min-width:140px;">
-
-      <button id="ledger-search-btn" class="ob-btn primary">🔍 조회</button>
-      <button id="ledger-reset-btn" class="ob-btn secondary">초기화</button>
-    </div>
-
-    <!-- 요약 정보 -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-      <div style="background:white;padding:16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);text-align:center;">
-        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">조회 건수</div>
-        <div style="font-size:20px;font-weight:700;color:#1e293b;" id="ledger-summary-count">0건</div>
-      </div>
-      <div style="background:white;padding:16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);text-align:center;">
-        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">총 발주수량</div>
-        <div style="font-size:20px;font-weight:700;color:#2563eb;" id="ledger-summary-order-qty">0</div>
-      </div>
-      <div style="background:white;padding:16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);text-align:center;">
-        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">총 확정수량</div>
-        <div style="font-size:20px;font-weight:700;color:#059669;" id="ledger-summary-confirmed-qty">0</div>
-      </div>
-      <div style="background:white;padding:16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);text-align:center;">
-        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">총 공급액</div>
-        <div style="font-size:20px;font-weight:700;color:#f59e0b;" id="ledger-summary-amount">₩0</div>
-      </div>
-    </div>
-
-    <!-- 일괄 작업 버튼 -->
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;">
-      <span style="font-size:13px;color:#64748b;">선택된 항목: <strong id="ledger-selected-count">0</strong>건</span>
-      <div style="flex:1;"></div>
-      <button id="ledger-bulk-invoice-btn" class="ob-btn primary" disabled>📄 청구서 생성 (매출)</button>
-      <button id="ledger-bulk-payment-request-btn" class="ob-btn warning" disabled>💰 지급요청서 생성 (매입)</button>
-      <button id="ledger-bulk-status-btn" class="ob-btn secondary" disabled>📝 일괄 상태변경</button>
-    </div>
-
-    <!-- 거래 테이블 -->
-    <div class="ob-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:40px;"><input type="checkbox" id="ledger-select-all"></th>
-            <th>발주일</th>
-            <th>발주번호</th>
-            <th>발주처</th>
-            <th>브랜드</th>
-            <th class="num">발주수량</th>
-            <th class="num">확정수량</th>
-            <th class="num">매입액</th>
-            <th class="num">공급액</th>
-            <th class="num">마진액</th>
-            <th class="num">마진율</th>
-            <th style="text-align:center;">상태</th>
-          </tr>
-        </thead>
-        <tbody id="ledger-tbody">
-          <tr><td colspan="12" class="ledger-empty" style="text-align:center;color:#777;padding:40px;">조회 버튼을 눌러 거래 내역을 확인하세요</td></tr>
-        </tbody>
-      </table>
     </div>
 
   </div>
