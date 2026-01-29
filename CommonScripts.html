@@ -4841,7 +4841,8 @@
   // ===========================================================
   OB.transactionLedgerState = {
     raw: [],
-    filtered: []
+    filtered: [],
+    paymentTermsMap: {}
   };
 
   OB.initTransactionLedgerPage = function() {
@@ -4853,7 +4854,7 @@
     var endDateInput = document.getElementById('ledger-end-date');
     var companyInput = document.getElementById('ledger-company');
     var statusSelect = document.getElementById('ledger-status');
-    var paymentStatusSelect = document.getElementById('ledger-payment-status');
+    var paymentTermsSelect = document.getElementById('ledger-payment-terms');
     var orderCodeInput = document.getElementById('ledger-order-code');
     var searchBtn = document.getElementById('ledger-search-btn');
     var resetBtn = document.getElementById('ledger-reset-btn');
@@ -4894,7 +4895,7 @@
       var end = parseDate(endDateInput.value);
       var company = (companyInput.value || '').trim();
       var status = statusSelect.value;
-      var paymentStatus = paymentStatusSelect ? paymentStatusSelect.value : '';
+      var paymentTerms = paymentTermsSelect ? paymentTermsSelect.value : '';
       var orderCode = (orderCodeInput.value || '').trim();
 
       state.filtered = state.raw.filter(function(tx) {
@@ -4919,12 +4920,11 @@
           keep = keep && matchFound;
         }
 
-        // 결제상태 필터 (매입결제 또는 매출결제 중 하나라도 매칭되면 포함)
-        if (paymentStatus) {
-          var payBuy = String(tx['매입결제'] || '');
-          var paySell = String(tx['매출결제'] || '');
-          var paymentMatch = (payBuy === paymentStatus) || (paySell === paymentStatus);
-          keep = keep && paymentMatch;
+        // 결제조건 필터 (매입처의 거래처DB 결제조건 기준)
+        if (paymentTerms) {
+          var supplier = String(tx['매입처'] || '').trim();
+          var supplierTerms = state.paymentTermsMap[supplier] || '';
+          keep = keep && (supplierTerms === paymentTerms);
         }
 
         if (start || end) {
@@ -5570,7 +5570,7 @@
     resetBtn.addEventListener('click', function() {
       companyInput.value = '';
       statusSelect.value = '';
-      if (paymentStatusSelect) paymentStatusSelect.value = '';
+      if (paymentTermsSelect) paymentTermsSelect.value = '';
       orderCodeInput.value = '';
       startDateInput.value = formatDateInput(firstDay);
       endDateInput.value = formatDateInput(today);
@@ -6272,8 +6272,22 @@
       document.body.appendChild(modal);
     }
 
-    // 초기 조회
-    fetchTransactions();
+    // 매입처별 결제조건 맵 로드 후 초기 조회
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.success) {
+          state.paymentTermsMap = result.paymentTermsMap || {};
+          console.log('✅ 결제조건 맵 로드 완료:', Object.keys(state.paymentTermsMap).length + '건');
+        } else {
+          console.warn('⚠️ 결제조건 맵 로드 실패:', result ? result.error : '알 수 없는 오류');
+        }
+        fetchTransactions();
+      })
+      .withFailureHandler(function(error) {
+        console.warn('⚠️ 결제조건 맵 로드 실패:', error.message);
+        fetchTransactions();
+      })
+      .getPaymentTermsMapApi();
 
     console.log('✅ TransactionLedger 페이지 초기화 완료');
   };

@@ -631,6 +631,57 @@ function getCustomers() {
 
 /**
  * ============================================================
+ * 매입처별 결제조건 맵 조회
+ * ============================================================
+ * 거래처DB에서 거래처명 → 결제조건 매핑을 반환
+ * @returns {Object} {success, paymentTermsMap: {거래처명: 결제조건}}
+ */
+function getPaymentTermsMapApi() {
+  try {
+    var data = getSuppliers();
+    var header = data.header || [];
+    var rows = data.rows || [];
+
+    var nameIdx = header.indexOf('거래처명');
+    var termsIdx = header.indexOf('결제조건');
+    var typeIdx = header.indexOf('거래처구분');
+
+    if (nameIdx < 0 || termsIdx < 0) {
+      return {
+        success: false,
+        error: '거래처명 또는 결제조건 컬럼을 찾을 수 없습니다.',
+        paymentTermsMap: {}
+      };
+    }
+
+    var map = {};
+    rows.forEach(function(row) {
+      var name = String(row[nameIdx] || '').trim();
+      var terms = String(row[termsIdx] || '').trim();
+      var type = typeIdx >= 0 ? String(row[typeIdx] || '').trim() : '';
+
+      if (name && terms) {
+        map[name] = terms;
+      }
+    });
+
+    return {
+      success: true,
+      paymentTermsMap: map
+    };
+
+  } catch (err) {
+    Logger.log('[getPaymentTermsMapApi Error] ' + err.message);
+    return {
+      success: false,
+      error: err.message,
+      paymentTermsMap: {}
+    };
+  }
+}
+
+/**
+ * ============================================================
  * 품목 목록
  * ============================================================
  */
