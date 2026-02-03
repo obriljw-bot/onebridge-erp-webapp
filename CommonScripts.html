@@ -9392,6 +9392,14 @@
   }
 
   /**
+   * 숫자 포맷팅 (대시보드용)
+   */
+  function formatNumber(num) {
+    if (num === null || num === undefined || num === '') return '0';
+    return Number(num).toLocaleString('ko-KR');
+  }
+
+  /**
    * 대시보드 위젯 업데이트
    */
   function updateDashboardWidgets(data) {
