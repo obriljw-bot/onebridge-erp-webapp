@@ -1800,9 +1800,9 @@ function getDashboardData() {
           bHeader.forEach(function(h, i) { bIdx[h] = i; });
 
           var cType = bIdx['청구유형'] !== undefined ? bIdx['청구유형'] : -1;
-          var cStatus = bIdx['상태'] !== undefined ? bIdx['상태'] : -1;
+          var cStatus = bIdx['청구상태'] !== undefined ? bIdx['청구상태'] : -1;  // 컬럼명 수정: '상태' → '청구상태'
           var cAmount = bIdx['청구금액'] !== undefined ? bIdx['청구금액'] : -1;
-          var cCompany = bIdx['거래처'] !== undefined ? bIdx['거래처'] : -1;
+          var cCompany = bIdx['업체명'] !== undefined ? bIdx['업체명'] : -1;    // 컬럼명 수정: '거래처' → '업체명'
           var cPaidAmount = bIdx['결제완료금액'] !== undefined ? bIdx['결제완료금액'] : -1;
 
           bRows.forEach(function(row) {
